@@ -11,8 +11,8 @@ venv/
 env/
 ENV/
 
-# CSV feeds (may contain custom data)
-feeds.csv
+# CSV feeds - needed for GitHub Actions workflow
+# feeds.csv
 
 # IDE
 .vscode/
