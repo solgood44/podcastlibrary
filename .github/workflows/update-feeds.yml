@@ -30,17 +30,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
       
-      - name: Verify environment
+      - name: Verify setup
         run: |
-          echo "Checking environment variables..."
-          if [ -z "$SUPABASE_URL" ]; then echo "ERROR: SUPABASE_URL is not set"; exit 1; fi
-          if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then echo "ERROR: SUPABASE_SERVICE_ROLE_KEY is not set"; exit 1; fi
-          echo "✓ Environment variables are set"
           echo "Checking feeds.csv..."
           cd backend
           if [ ! -f "feeds.csv" ]; then echo "ERROR: feeds.csv not found"; exit 1; fi
-          echo "✓ feeds.csv exists"
-          wc -l feeds.csv
+          echo "✓ feeds.csv exists ($(wc -l < feeds.csv) lines)"
+          echo "Checking Python script..."
+          if [ ! -f "feed_ingestor.py" ]; then echo "ERROR: feed_ingestor.py not found"; exit 1; fi
+          echo "✓ feed_ingestor.py exists"
       
       - name: Run feed ingestor
         env:
@@ -51,7 +49,8 @@ jobs:
           # REFRESH_BATCH_SIZE: 200
         run: |
           cd backend
-          python feed_ingestor.py
+          echo "Starting feed ingestor..."
+          python feed_ingestor.py || exit 1
       
       - name: Upload logs (on failure)
         if: failure()
