@@ -44,7 +44,7 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          CSV_PATH: ./backend/feeds.csv
+          CSV_PATH: ./feeds.csv
           # Optional: Set REFRESH_BATCH_SIZE to limit feeds processed per run
           # REFRESH_BATCH_SIZE: 200
         run: |
