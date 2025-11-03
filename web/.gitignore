@@ -1,0 +1,4 @@
+# Don't commit config with real credentials
+# config.js
+
+.vercel

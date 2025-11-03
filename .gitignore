@@ -1,0 +1,16 @@
+# macOS
+.DS_Store
+
+# Xcode
+ios/PodcastMVP/build/
+ios/PodcastMVP/*.xcodeproj/xcuserdata/
+ios/PodcastMVP/*.xcworkspace/xcuserdata/
+ios/PodcastMVP/.swiftpm/
+
+# Environment files
+backend/.env
+
+# Python
+backend/__pycache__/
+backend/*.pyc
+

@@ -1,0 +1,50 @@
+name: Update Podcast Feeds
+
+on:
+  schedule:
+    # Run every 6 hours (UTC time)
+    # Adjust schedule as needed:
+    # - Every 4 hours: '0 */4 * * *'
+    # - Every 2 hours: '0 */2 * * *'
+    # - Daily at 2 AM UTC: '0 2 * * *'
+    # - Every 30 minutes: '*/30 * * * *' (for very active feeds)
+    - cron: '0 */6 * * *'
+  workflow_dispatch: # Allow manual trigger from GitHub Actions tab
+
+jobs:
+  update-feeds:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
+      
+      - name: Run feed ingestor
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          CSV_PATH: ./backend/feeds.csv
+          # Optional: Set REFRESH_BATCH_SIZE to limit feeds processed per run
+          # REFRESH_BATCH_SIZE: 200
+        run: |
+          cd backend
+          python feed_ingestor.py
+      
+      - name: Upload logs (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: feed-update-logs
+          path: backend/*.log
+          if-no-files-found: ignore
+
