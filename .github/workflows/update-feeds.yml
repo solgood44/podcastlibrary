@@ -30,6 +30,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
       
+      - name: Verify environment
+        run: |
+          echo "Checking environment variables..."
+          if [ -z "$SUPABASE_URL" ]; then echo "ERROR: SUPABASE_URL is not set"; exit 1; fi
+          if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then echo "ERROR: SUPABASE_SERVICE_ROLE_KEY is not set"; exit 1; fi
+          echo "✓ Environment variables are set"
+          echo "Checking feeds.csv..."
+          cd backend
+          if [ ! -f "feeds.csv" ]; then echo "ERROR: feeds.csv not found"; exit 1; fi
+          echo "✓ feeds.csv exists"
+          wc -l feeds.csv
+      
       - name: Run feed ingestor
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
