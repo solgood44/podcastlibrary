@@ -5,18 +5,27 @@ class AuthService {
     if (!SUPABASE_CONFIG.url.includes('YOUR-PROJECT') && !SUPABASE_CONFIG.anonKey.includes('YOUR')) {
       this.supabaseUrl = SUPABASE_CONFIG.url;
       this.supabaseAnonKey = SUPABASE_CONFIG.anonKey;
+      this._client = null; // Cache the client instance
     } else {
       console.error('Please configure your Supabase credentials in config.js');
     }
   }
 
-  // Initialize Supabase client (using CDN)
+  // Initialize Supabase client (using CDN) - singleton pattern
   getSupabaseClient() {
     if (typeof supabase === 'undefined') {
       console.error('Supabase client not loaded. Make sure to include Supabase JS in index.html');
       return null;
     }
-    return supabase.createClient(this.supabaseUrl, this.supabaseAnonKey);
+    
+    // Return cached client if it exists
+    if (this._client) {
+      return this._client;
+    }
+    
+    // Create client once and cache it
+    this._client = supabase.createClient(this.supabaseUrl, this.supabaseAnonKey);
+    return this._client;
   }
 
   // Sign up with email and password
