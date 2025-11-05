@@ -884,7 +884,18 @@ function openEpisodeDetail(episodeId, podcastId) {
 function handleURLParams() {
     let path = window.location.pathname;
     
-    // Check sessionStorage for a pending route (from 404 redirect)
+    // Check for _route query param (from middleware redirect)
+    const urlParams = new URLSearchParams(window.location.search);
+    const routeParam = urlParams.get('_route');
+    if (routeParam) {
+        path = routeParam;
+        // Clean up the URL by removing the query param
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.delete('_route');
+        window.history.replaceState({}, '', newUrl.pathname + newUrl.search);
+    }
+    
+    // Check sessionStorage for a pending route (from 404 redirect or SEO page)
     const pendingRoute = sessionStorage.getItem('pendingRoute');
     if (pendingRoute) {
         path = pendingRoute;
@@ -907,7 +918,6 @@ function handleURLParams() {
     }
     
     // Handle query parameters
-    const urlParams = new URLSearchParams(window.location.search);
     const episodeId = urlParams.get('episode');
     const podcastId = urlParams.get('podcast');
     
