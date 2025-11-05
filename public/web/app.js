@@ -1845,22 +1845,67 @@ async function loadEpisodesPage() {
             const latestPodcast = podcasts.find(p => p.id === currentPodcast.id) || currentPodcast;
             const hasDescription = latestPodcast.description && latestPodcast.description.trim().length > 0;
             
+            // Premium compact header with artwork, title, and controls in one row
             const headerHTML = `
-                <div class="episodes-page-header" id="episodes-page-header">
-                    <div class="episodes-page-header-content">
+                <div class="episodes-page-header-compact" id="episodes-page-header">
+                    <div class="episodes-header-left">
                         <img src="${latestPodcast.image_url || getPlaceholderImage()}" 
                              alt="${escapeHtml(latestPodcast.title || '')}" 
-                             class="episodes-page-artwork"
+                             class="episodes-page-artwork-compact"
                              onload="extractColorFromImage(this)"
                              onerror="this.src='${getPlaceholderImage()}'">
+                        <div class="episodes-header-info">
+                            <h1 class="episodes-podcast-title-compact">${escapeHtml(latestPodcast.title || '')}</h1>
+                            ${latestPodcast.author ? `<p class="episodes-podcast-author-compact">${escapeHtml(latestPodcast.author)}</p>` : ''}
+                        </div>
                     </div>
-                    <button class="btn-podcast-favorite-episodes ${isPodcastFavorite ? 'favorited' : ''}" onclick="event.stopPropagation(); togglePodcastFavorite('${latestPodcast.id}');" title="${isPodcastFavorite ? 'Remove from favorites' : 'Add to favorites'}">
-                        ${isPodcastFavorite ? '❤️' : '🤍'}
-                    </button>
+                    <div class="episodes-header-right">
+                        <div class="episodes-header-controls">
+                            <div class="sort-controls-inline">
+                                <label for="podcast-episodes-sort-select-inline" class="sort-label-inline">Sort:</label>
+                                <select id="podcast-episodes-sort-select-inline" class="sort-select-inline" onchange="applyPodcastEpisodesSorting()">
+                                    <option value="title-asc" ${podcastEpisodesSortMode === 'title-asc' ? 'selected' : ''}>A-Z</option>
+                                    <option value="title-desc" ${podcastEpisodesSortMode === 'title-desc' ? 'selected' : ''}>Z-A</option>
+                                    <option value="date-desc" ${podcastEpisodesSortMode === 'date-desc' ? 'selected' : ''}>Newest</option>
+                                    <option value="date-asc" ${podcastEpisodesSortMode === 'date-asc' ? 'selected' : ''}>Oldest</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button class="btn-podcast-favorite-episodes-compact ${isPodcastFavorite ? 'favorited' : ''}" onclick="event.stopPropagation(); togglePodcastFavorite('${latestPodcast.id}');" title="${isPodcastFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+                            ${isPodcastFavorite ? '❤️' : '🤍'}
+                        </button>
+                    </div>
                 </div>
             `;
             
-            const descriptionHTML = hasDescription ? `<div class="episodes-page-description-full">${sanitizeHtml(latestPodcast.description)}</div>` : '';
+            // Compact collapsible description integrated into header
+            let descriptionHTML = '';
+            if (hasDescription) {
+                const fullDescription = sanitizeHtml(latestPodcast.description);
+                // Extract first 1-2 sentences (approximately 150-200 chars or until second sentence)
+                const sentences = latestPodcast.description.match(/[^.!?]+[.!?]+/g) || [latestPodcast.description];
+                const previewText = sentences.length > 1 
+                    ? sentences.slice(0, 2).join(' ').trim()
+                    : (latestPodcast.description.length > 200 
+                        ? latestPodcast.description.substring(0, 200).trim() + '...'
+                        : latestPodcast.description);
+                const previewHtml = sanitizeHtml(previewText);
+                const hasMore = fullDescription.length > previewText.length || sentences.length > 2;
+                
+                descriptionHTML = `
+                    <div class="episodes-page-description-compact" data-full-description="${escapeHtml(fullDescription)}">
+                        <div class="description-preview">${previewHtml}</div>
+                        ${hasMore ? `
+                            <!-- Full description kept in HTML for SEO but visually hidden -->
+                            <div class="description-full hidden">${fullDescription}</div>
+                            <button class="btn-description-toggle" onclick="window.toggleDescription(this)">
+                                <span class="toggle-text">See more</span>
+                                <span class="toggle-icon">▼</span>
+                            </button>
+                        ` : ''}
+                    </div>
+                `;
+            }
             
             const episodesHTML = sortedEpisodes.map(episode => {
                 const progress = getEpisodeProgress(episode.id);
@@ -1897,7 +1942,20 @@ async function loadEpisodesPage() {
                 `;
             }).join('');
             
-            listEl.innerHTML = headerHTML + descriptionHTML + `<div class="episodes-list-content">${episodesHTML}</div>`;
+            // Hide the separate controls since we moved them to header
+            if (controlsEl) controlsEl.classList.add('hidden');
+            
+            listEl.innerHTML = headerHTML + descriptionHTML + `<div class="episodes-list-content-compact">${episodesHTML}</div>`;
+            
+            // Sync the inline sort select with the hidden one
+            const inlineSelect = document.getElementById('podcast-episodes-sort-select-inline');
+            const hiddenSelect = document.getElementById('podcast-episodes-sort-select');
+            if (inlineSelect && hiddenSelect) {
+                inlineSelect.addEventListener('change', function() {
+                    hiddenSelect.value = this.value;
+                    applyPodcastEpisodesSorting();
+                });
+            }
         }
     } catch (error) {
         console.error('Error loading episodes:', error);
@@ -2286,6 +2344,35 @@ function skipForward() {
     if (!audioPlayer || !currentEpisode) return;
     audioPlayer.currentTime = Math.min(audioPlayer.duration, audioPlayer.currentTime + 30);
 }
+
+// Toggle description expand/collapse (make globally available for onclick)
+window.toggleDescription = function(button) {
+    const container = button.closest('.episodes-page-description-compact');
+    if (!container) return;
+    
+    const preview = container.querySelector('.description-preview');
+    const full = container.querySelector('.description-full');
+    const toggleText = button.querySelector('.toggle-text');
+    const toggleIcon = button.querySelector('.toggle-icon');
+    
+    if (!full || !preview) return;
+    
+    const isExpanded = !full.classList.contains('hidden');
+    
+    if (isExpanded) {
+        // Collapse
+        full.classList.add('hidden');
+        preview.style.display = 'block';
+        toggleText.textContent = 'See more';
+        toggleIcon.textContent = '▼';
+    } else {
+        // Expand
+        full.classList.remove('hidden');
+        preview.style.display = 'none';
+        toggleText.textContent = 'See less';
+        toggleIcon.textContent = '▲';
+    }
+};
 
 // Toggle play/pause
 function togglePlayPause() {
