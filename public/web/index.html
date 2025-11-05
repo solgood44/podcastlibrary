@@ -37,6 +37,13 @@
                 <p class="sidebar-empty">Loading categories...</p>
             </div>
         </div>
+        
+        <div class="sidebar-section">
+            <div class="sidebar-item" onclick="navigateTo('authors')">
+                <span class="sidebar-item-icon">✍️</span>
+                <span class="sidebar-item-title">Authors</span>
+            </div>
+        </div>
     </div>
     
     <!-- Sidebar Overlay -->
@@ -197,6 +204,50 @@
                 <p>Loading history...</p>
             </div>
             <div id="history-list" class="episodes-full-page"></div>
+        </div>
+
+        <!-- Authors Page -->
+        <div id="page-authors" class="page hidden">
+            <div class="page-header">
+                <button class="btn-back" onclick="navigateTo('grid')">← Back</button>
+                <h1>Authors</h1>
+            </div>
+            <div id="authors-loading" class="loading hidden">
+                <div class="spinner"></div>
+                <p>Loading authors...</p>
+            </div>
+            <div id="authors-content" class="podcast-controls hidden">
+                <div class="controls-left">
+                    <div class="view-toggle">
+                        <button id="authors-view-grid-btn" class="view-btn active" onclick="setAuthorsViewMode('grid')" title="Grid View">
+                            <span>⊞</span>
+                        </button>
+                        <button id="authors-view-list-btn" class="view-btn" onclick="setAuthorsViewMode('list')" title="List View">
+                            <span>☰</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="controls-right">
+                    <div id="authors-count" class="podcast-count"></div>
+                </div>
+            </div>
+            <div id="authors-container">
+                <div id="authors-grid" class="podcast-grid hidden"></div>
+                <div id="authors-list" class="podcast-list hidden"></div>
+            </div>
+        </div>
+
+        <!-- Author Detail Page -->
+        <div id="page-author" class="page hidden">
+            <div class="page-header">
+                <button class="btn-back" onclick="navigateTo('authors')">← Back</button>
+                <h1 id="author-page-title">Author</h1>
+            </div>
+            <div id="author-loading" class="loading hidden">
+                <div class="spinner"></div>
+                <p>Loading podcasts...</p>
+            </div>
+            <div id="author-grid" class="podcast-grid hidden"></div>
         </div>
 
         <!-- Episode Detail Page -->

@@ -11,6 +11,9 @@ let currentPage = 'grid';
 let episodesCache = {}; // Cache episodes by podcast ID
 let categories = []; // All unique categories
 let currentCategory = null; // Currently viewed category
+let authors = []; // All unique authors
+let currentAuthor = null; // Currently viewed author
+let authorsViewMode = 'grid'; // 'grid' or 'list' for authors page
 let searchMode = 'episodes'; // 'episodes' or 'podcasts'
 let viewMode = 'grid'; // 'grid' or 'list'
 let sortMode = 'title-asc'; // 'title-asc', 'title-desc'
@@ -29,6 +32,14 @@ const HISTORY_KEY = 'episode_history';
 const FAVORITES_KEY = 'podcast_favorites';
 const PODCAST_SORT_PREFERENCES_KEY = 'podcast_sort_preferences';
 const MAX_HISTORY = 50;
+
+// Authors to exclude from the authors list
+const EXCLUDED_AUTHORS = [
+    'solgoodmedia',
+    'solgoodmedia.com',
+    'sol good network',
+    'public domain'
+].map(a => a.toLowerCase());
 
 // Generate URL-friendly slug from title
 function generateSlug(title) {
@@ -364,6 +375,10 @@ function navigateTo(page, param = null) {
         }
     } else if (page === 'category' && param) {
         showCategoryPage(param);
+    } else if (page === 'authors') {
+        loadAuthorsPage();
+    } else if (page === 'author' && param) {
+        showAuthorPage(param);
     } else if (page === 'history') {
         loadHistoryPage();
     } else if (page === 'favorites') {
@@ -429,8 +444,9 @@ async function loadPodcasts() {
         
         podcasts = await apiService.fetchPodcasts();
         
-        // Extract categories
+        // Extract categories and authors
         extractCategories();
+        extractAuthors();
         
         loadingEl.classList.add('hidden');
         
@@ -476,6 +492,22 @@ function extractCategories() {
     }
     
     categories = Array.from(categorySet).sort();
+}
+
+// Extract unique authors from podcasts (excluding specified ones)
+function extractAuthors() {
+    const authorSet = new Set();
+    podcasts.forEach(podcast => {
+        if (podcast.author && typeof podcast.author === 'string') {
+            const author = podcast.author.trim();
+            // Check if author should be excluded
+            if (author && !EXCLUDED_AUTHORS.includes(author.toLowerCase())) {
+                authorSet.add(author);
+            }
+        }
+    });
+    
+    authors = Array.from(authorSet).sort();
 }
 
 // Render sidebar
@@ -867,6 +899,159 @@ function showCategoryPage(categoryName) {
     }, 300);
 }
 
+// Load authors page
+function loadAuthorsPage() {
+    const loadingEl = document.getElementById('authors-loading');
+    const contentEl = document.getElementById('authors-content');
+    const gridEl = document.getElementById('authors-grid');
+    const listEl = document.getElementById('authors-list');
+    
+    loadingEl.classList.remove('hidden');
+    contentEl.classList.add('hidden');
+    gridEl.classList.add('hidden');
+    listEl.classList.add('hidden');
+    
+    // Make sure authors are extracted
+    if (authors.length === 0) {
+        extractAuthors();
+    }
+    
+    setTimeout(() => {
+        loadingEl.classList.add('hidden');
+        
+        if (authors.length === 0) {
+            contentEl.classList.add('hidden');
+            gridEl.innerHTML = '<div class="empty"><p>No authors available</p></div>';
+            gridEl.classList.remove('hidden');
+            return;
+        }
+        
+        contentEl.classList.remove('hidden');
+        renderAuthors();
+        updateAuthorsCount();
+        setAuthorsViewMode(authorsViewMode);
+    }, 300);
+}
+
+// Render authors in grid or list view
+function renderAuthors() {
+    const gridEl = document.getElementById('authors-grid');
+    const listEl = document.getElementById('authors-list');
+    
+    // Clear existing content
+    gridEl.innerHTML = '';
+    listEl.innerHTML = '';
+    
+    authors.forEach(author => {
+        const podcastCount = getAuthorPodcastCount(author);
+        
+        // Grid view item
+        const gridItem = document.createElement('div');
+        gridItem.className = 'podcast-card';
+        gridItem.onclick = () => showAuthor(author);
+        gridItem.innerHTML = `
+            <div class="podcast-card-image">
+                <div class="podcast-card-image-placeholder">✍️</div>
+            </div>
+            <div class="podcast-card-info">
+                <h3 class="podcast-card-title">${escapeHtml(author)}</h3>
+                <p class="podcast-card-meta">${podcastCount} ${podcastCount === 1 ? 'podcast' : 'podcasts'}</p>
+            </div>
+        `;
+        gridEl.appendChild(gridItem);
+        
+        // List view item
+        const listItem = document.createElement('div');
+        listItem.className = 'podcast-list-item';
+        listItem.onclick = () => showAuthor(author);
+        listItem.innerHTML = `
+            <div class="podcast-list-item-image">
+                <div class="podcast-list-item-image-placeholder">✍️</div>
+            </div>
+            <div class="podcast-list-item-info">
+                <h3 class="podcast-list-item-title">${escapeHtml(author)}</h3>
+                <p class="podcast-list-item-meta">${podcastCount} ${podcastCount === 1 ? 'podcast' : 'podcasts'}</p>
+            </div>
+        `;
+        listEl.appendChild(listItem);
+    });
+}
+
+// Get count of podcasts by author
+function getAuthorPodcastCount(author) {
+    return podcasts.filter(p => {
+        if (p.author && typeof p.author === 'string') {
+            return p.author.trim() === author;
+        }
+        return false;
+    }).length;
+}
+
+// Set authors view mode
+function setAuthorsViewMode(mode) {
+    authorsViewMode = mode;
+    const gridEl = document.getElementById('authors-grid');
+    const listEl = document.getElementById('authors-list');
+    const gridBtn = document.getElementById('authors-view-grid-btn');
+    const listBtn = document.getElementById('authors-view-list-btn');
+    
+    if (mode === 'grid') {
+        gridEl.classList.remove('hidden');
+        listEl.classList.add('hidden');
+        if (gridBtn) gridBtn.classList.add('active');
+        if (listBtn) listBtn.classList.remove('active');
+    } else {
+        gridEl.classList.add('hidden');
+        listEl.classList.remove('hidden');
+        if (gridBtn) gridBtn.classList.remove('active');
+        if (listBtn) listBtn.classList.add('active');
+    }
+}
+
+// Update authors count
+function updateAuthorsCount() {
+    const countEl = document.getElementById('authors-count');
+    if (countEl) {
+        countEl.textContent = `${authors.length} ${authors.length === 1 ? 'author' : 'authors'}`;
+    }
+}
+
+// Show author (navigate to author detail page)
+function showAuthor(authorName) {
+    currentAuthor = authorName;
+    navigateTo('author', authorName);
+}
+
+// Show author page (podcasts by author)
+function showAuthorPage(authorName) {
+    currentAuthor = authorName;
+    const loadingEl = document.getElementById('author-loading');
+    const gridEl = document.getElementById('author-grid');
+    const titleEl = document.getElementById('author-page-title');
+    
+    titleEl.textContent = authorName;
+    loadingEl.classList.remove('hidden');
+    gridEl.classList.add('hidden');
+    
+    // Filter podcasts by author
+    const filteredPodcasts = podcasts.filter(p => {
+        if (p.author && typeof p.author === 'string') {
+            return p.author.trim() === authorName;
+        }
+        return false;
+    });
+    
+    setTimeout(() => {
+        loadingEl.classList.add('hidden');
+        if (filteredPodcasts.length === 0) {
+            gridEl.innerHTML = '<div class="empty"><p>No podcasts by this author</p></div>';
+        } else {
+            renderPodcasts(filteredPodcasts, gridEl);
+        }
+        gridEl.classList.remove('hidden');
+    }, 300);
+}
+
 // Open podcast (adds to history)
 function openPodcast(podcastId) {
     addToHistory(podcastId);
@@ -1138,6 +1323,7 @@ async function loadAllEpisodes() {
         
         // Re-extract categories to include "Daily" if any podcast now has 200+ episodes
         extractCategories();
+        extractAuthors();
         renderSidebar();
     } catch (error) {
         console.error('Error loading all episodes:', error);
@@ -1789,6 +1975,7 @@ async function loadEpisodesPage() {
             
             // Re-extract categories to include "Daily" if this podcast now has 200+ episodes
             extractCategories();
+            extractAuthors();
             renderSidebar();
             
             // Update podcast display to reflect new episode counts
