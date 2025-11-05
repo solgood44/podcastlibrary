@@ -883,10 +883,9 @@ body {
 .episodes-full-page {
     background: var(--bg-card);
     border-radius: 16px;
-    overflow: hidden;
+    overflow-y: auto;
     min-height: 400px;
     max-height: calc(100vh - 250px);
-    overflow-y: auto;
     border: 1px solid var(--border);
 }
 
@@ -986,6 +985,12 @@ body {
     max-width: 900px;
     margin: 0 auto;
     padding: 32px 24px;
+    overflow: visible !important;
+    white-space: normal !important;
+    word-wrap: break-word;
+    display: block;
+    position: relative;
+    z-index: 1;
 }
 
 .episodes-page-description-full a {
