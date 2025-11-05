@@ -1882,15 +1882,22 @@ async function loadEpisodesPage() {
             let descriptionHTML = '';
             if (hasDescription) {
                 const fullDescription = sanitizeHtml(latestPodcast.description);
+                const originalDescription = latestPodcast.description;
+                
                 // Extract first 1-2 sentences (approximately 150-200 chars or until second sentence)
-                const sentences = latestPodcast.description.match(/[^.!?]+[.!?]+/g) || [latestPodcast.description];
+                const sentences = originalDescription.match(/[^.!?]+[.!?]+/g) || [originalDescription];
                 const previewText = sentences.length > 1 
                     ? sentences.slice(0, 2).join(' ').trim()
-                    : (latestPodcast.description.length > 200 
-                        ? latestPodcast.description.substring(0, 200).trim() + '...'
-                        : latestPodcast.description);
+                    : (originalDescription.length > 200 
+                        ? originalDescription.substring(0, 200).trim() + '...'
+                        : originalDescription);
                 const previewHtml = sanitizeHtml(previewText);
-                const hasMore = fullDescription.length > previewText.length || sentences.length > 2;
+                
+                // Only show toggle if preview text is actually shorter than full description
+                // Compare original text lengths (not HTML-sanitized) to accurately detect truncation
+                const originalPreviewLength = previewText.length;
+                const originalFullLength = originalDescription.length;
+                const hasMore = originalFullLength > originalPreviewLength;
                 
                 descriptionHTML = `
                     <div class="episodes-page-description-compact" data-full-description="${escapeHtml(fullDescription)}">
