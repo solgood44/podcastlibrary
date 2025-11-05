@@ -1,0 +1,7 @@
+{
+  "buildCommand": null,
+  "outputDirectory": "web",
+  "installCommand": "cd web && npm install",
+  "framework": null
+}
+

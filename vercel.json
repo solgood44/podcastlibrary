@@ -1,6 +1,24 @@
 {
-  "buildCommand": null,
-  "outputDirectory": "web",
-  "installCommand": "cd web && npm install",
-  "framework": null
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "rewrites": [
+    {
+      "source": "/podcast/:slug*",
+      "destination": "/podcast/:slug*"
+    },
+    {
+      "source": "/sitemap.xml",
+      "destination": "/sitemap.xml"
+    },
+    {
+      "source": "/robots.txt",
+      "destination": "/robots.txt"
+    },
+    {
+      "source": "/:path*",
+      "destination": "/web/:path*"
+    }
+  ]
 }

@@ -6,8 +6,6 @@
     "build": "echo 'No build step required for static site'"
   },
   "dependencies": {
-    "@vercel/analytics": "^1.3.0"
-  },
-  "devDependencies": {}
+    "@vercel/analytics": "^1.5.0"
+  }
 }
-

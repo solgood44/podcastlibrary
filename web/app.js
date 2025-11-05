@@ -38,7 +38,10 @@ document.addEventListener('DOMContentLoaded', () => {
     setupAuth(); // Initialize authentication
     // Set initial search mode based on default page (grid = podcasts)
     setSearchMode('podcasts');
-    loadPodcasts(); // This will call loadAllEpisodes after podcasts load
+    loadPodcasts().then(() => {
+        // After podcasts load, check URL params for episode/podcast links
+        handleURLParams();
+    });
     restoreProgress(); // Restore any saved progress
     restorePodcastSortPreferences(); // Restore podcast sort preferences
     renderSidebar();
@@ -813,6 +816,29 @@ function openEpisodeDetail(episodeId, podcastId) {
     displayedEpisode = episode; // Store the episode being viewed separately
     currentPodcast = podcast; // Keep currentPodcast for navigation context
     navigateTo('episode');
+}
+
+// Handle URL parameters from SEO pages (e.g., ?episode=123&podcast=456)
+function handleURLParams() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const episodeId = urlParams.get('episode');
+    const podcastId = urlParams.get('podcast');
+    
+    if (episodeId && podcastId) {
+        // Open the episode detail page
+        openEpisodeDetail(episodeId, podcastId);
+        // Clean up URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (podcastId) {
+        // Just open the podcast episodes page
+        const podcast = podcasts.find(p => p.id === podcastId);
+        if (podcast) {
+            currentPodcast = podcast;
+            navigateTo('episodes');
+            // Clean up URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+    }
 }
 
 // Load episode detail page
