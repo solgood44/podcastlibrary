@@ -260,8 +260,8 @@ function toggleSidebar() {
 
 // Simple routing
 function setupRouting() {
-    // Set initial page
-    showPage('grid');
+    // Set initial page to favorites
+    navigateTo('favorites');
     
     // Handle browser back/forward navigation
     window.addEventListener('popstate', (event) => {
@@ -280,9 +280,9 @@ function setupRouting() {
             }
         }
         
-        // Handle /web/ root path
+        // Handle /web/ root path - go to favorites
         if (path === '/web/' || path === '/web' || path === '/') {
-            navigateTo('grid');
+            navigateTo('favorites');
             currentPodcast = null;
             return;
         }
@@ -1347,23 +1347,13 @@ function applySorting() {
     renderPodcasts(currentPodcasts);
 }
 
-// Update podcast count display
+// Update podcast count display (removed - showing inaccurate count due to 1000 limit)
 function updatePodcastCount() {
+    // Podcast count removed - API returns limited results (1000) but total is 1300+
+    // Hide the count element instead of showing inaccurate count
     const countEl = document.getElementById('podcast-count');
-    let currentPodcasts = currentCategory 
-        ? podcasts.filter(p => {
-            if (p.genre && Array.isArray(p.genre)) {
-                return p.genre.some(g => g && g.trim() === currentCategory);
-            }
-            return p.genre && p.genre.trim() === currentCategory;
-        })
-        : podcasts;
-    
-    // Apply duration filter to count
-    currentPodcasts = filterPodcastsByDuration(currentPodcasts);
-    
     if (countEl) {
-        countEl.textContent = `${currentPodcasts.length} ${currentPodcasts.length === 1 ? 'podcast' : 'podcasts'}`;
+        countEl.style.display = 'none';
     }
 }
 
