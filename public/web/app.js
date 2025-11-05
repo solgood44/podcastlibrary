@@ -857,13 +857,26 @@ function loadHistoryPage() {
 
 // Open episode detail page
 function openEpisodeDetail(episodeId, podcastId) {
-    const episode = allEpisodes.find(e => e.id === episodeId);
+    let episode = allEpisodes.find(e => e.id === episodeId);
     const podcast = podcasts.find(p => p.id === podcastId);
     
-    if (!episode || !podcast) return;
+    // If episode not found in allEpisodes, check the cache
+    if (!episode && podcast && episodesCache[podcast.id]) {
+        episode = episodesCache[podcast.id].find(e => e.id === episodeId);
+    }
+    
+    if (!episode || !podcast) {
+        console.error('Episode or podcast not found:', { episodeId, podcastId, episode, podcast });
+        return;
+    }
     
     displayedEpisode = episode; // Store the episode being viewed separately
     currentPodcast = podcast; // Keep currentPodcast for navigation context
+    
+    // Update URL with podcast slug (keep it at podcast page, not episode-specific URL)
+    const slug = generateSlug(podcast.title || '');
+    window.history.pushState({ episodeId: episodeId, podcastId: podcastId, page: 'episode' }, '', `/podcast/${slug}`);
+    
     navigateTo('episode');
 }
 
