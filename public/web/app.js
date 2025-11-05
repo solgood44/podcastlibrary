@@ -882,7 +882,14 @@ function openEpisodeDetail(episodeId, podcastId) {
 
 // Handle URL parameters from SEO pages (e.g., ?episode=123&podcast=456)
 function handleURLParams() {
-    const path = window.location.pathname;
+    let path = window.location.pathname;
+    
+    // Check sessionStorage for a pending route (from 404 redirect)
+    const pendingRoute = sessionStorage.getItem('pendingRoute');
+    if (pendingRoute) {
+        path = pendingRoute;
+        sessionStorage.removeItem('pendingRoute');
+    }
     
     // Check for /podcast/[slug] path
     const podcastMatch = path.match(/^\/podcast\/([^\/]+)/);
@@ -891,6 +898,8 @@ function handleURLParams() {
         const podcast = podcasts.find(p => generateSlug(p.title || '') === slug);
         if (podcast) {
             currentPodcast = podcast;
+            // Update URL to match the path
+            window.history.replaceState({ podcastId: podcast.id, page: 'episodes' }, '', path);
             navigateTo('episodes');
             loadEpisodesPage();
             return;

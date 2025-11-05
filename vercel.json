@@ -5,10 +5,6 @@
   "framework": "nextjs",
   "rewrites": [
     {
-      "source": "/podcast/:slug*",
-      "destination": "/podcast/:slug*"
-    },
-    {
       "source": "/sitemap.xml",
       "destination": "/sitemap.xml"
     },
@@ -17,7 +13,19 @@
       "destination": "/robots.txt"
     },
     {
+      "source": "/podcast/:slug*",
+      "destination": "/podcast/:slug*"
+    },
+    {
+      "source": "/web/:path*",
+      "destination": "/web/:path*"
+    },
+    {
       "source": "/",
+      "destination": "/web/index.html"
+    },
+    {
+      "source": "/(.*)",
       "destination": "/web/index.html"
     }
   ]
