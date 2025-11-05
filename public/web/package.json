@@ -1,0 +1,11 @@
+{
+  "name": "podcast-website",
+  "version": "1.0.0",
+  "description": "Podcast Library Website",
+  "scripts": {
+    "build": "echo 'No build step required for static site'"
+  },
+  "dependencies": {
+    "@vercel/analytics": "^1.5.0"
+  }
+}

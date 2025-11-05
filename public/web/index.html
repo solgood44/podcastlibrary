@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Podcast Library</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="dark-mode">
+    <!-- Sidebar -->
+    <div id="sidebar" class="sidebar">
+        <div class="sidebar-header">
+            <h2>Menu</h2>
+            <button class="btn-close-sidebar" onclick="toggleSidebar()">✕</button>
+        </div>
+        
+        <div class="sidebar-section">
+            <div class="sidebar-item" onclick="navigateTo('grid')">
+                <span class="sidebar-item-icon">🏠</span>
+                <span class="sidebar-item-title">Home</span>
+            </div>
+            <div class="sidebar-item" onclick="navigateTo('history')">
+                <span class="sidebar-item-icon">🕒</span>
+                <span class="sidebar-item-title">History</span>
+                <span id="sidebar-history-count" class="sidebar-item-count">0</span>
+            </div>
+            <div class="sidebar-item" onclick="navigateTo('favorites')">
+                <span class="sidebar-item-icon">⭐</span>
+                <span class="sidebar-item-title">Favorites</span>
+                <span id="sidebar-favorites-count" class="sidebar-item-count">0</span>
+            </div>
+        </div>
+        
+        <div class="sidebar-section">
+            <h3 class="sidebar-section-title">Categories</h3>
+            <div id="sidebar-categories" class="sidebar-categories">
+                <p class="sidebar-empty">Loading categories...</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Sidebar Overlay -->
+    <div id="sidebar-overlay" class="sidebar-overlay hidden" onclick="toggleSidebar()"></div>
+    
+    <!-- Top Bar -->
+    <header class="top-bar">
+        <button class="btn-menu" onclick="toggleSidebar()">☰</button>
+        <div class="top-bar-search-container">
+            <div class="search-mode-toggle">
+                <button id="search-mode-episodes" class="search-mode-btn active" onclick="setSearchMode('episodes')">Episodes</button>
+                <button id="search-mode-podcasts" class="search-mode-btn" onclick="setSearchMode('podcasts')">Podcasts</button>
+            </div>
+            <input 
+                type="text" 
+                id="top-search-input" 
+                placeholder="Search..." 
+                class="top-search-input"
+                oninput="handleSearchInput(this.value)"
+                onfocus="handleSearchFocus()"
+            >
+        </div>
+        <div class="top-bar-spacer"></div>
+        <div id="auth-button-container" class="auth-button-container">
+            <button id="auth-button" class="btn-auth" onclick="toggleAuthModal()">Sign In</button>
+        </div>
+    </header>
+    <!-- Main Content Area -->
+    <main class="main-content">
+        <!-- Grid Page -->
+        <div id="page-grid" class="page active">
+            <div id="loading" class="loading">
+                <div class="spinner"></div>
+                <p>Loading podcasts...</p>
+            </div>
+            <div id="error" class="error hidden">
+                <h2>Error Loading Podcasts</h2>
+                <p id="error-message"></p>
+                <button onclick="loadPodcasts()" class="btn-retry">Retry</button>
+            </div>
+            <div id="empty" class="empty hidden">
+                <p>No podcasts available</p>
+            </div>
+            <div id="podcast-controls" class="podcast-controls hidden">
+                <div class="controls-left">
+                    <div class="view-toggle">
+                        <button id="view-grid-btn" class="view-btn active" onclick="setViewMode('grid')" title="Grid View">
+                            <span>⊞</span>
+                        </button>
+                        <button id="view-list-btn" class="view-btn" onclick="setViewMode('list')" title="List View">
+                            <span>☰</span>
+                        </button>
+                    </div>
+                    <div class="sort-controls">
+                        <label for="sort-select" class="sort-label">Sort:</label>
+                        <select id="sort-select" class="sort-select" onchange="applySorting()">
+                            <option value="title-asc">A-Z</option>
+                            <option value="title-desc">Z-A</option>
+                        </select>
+                    </div>
+                    <div class="filter-controls">
+                        <label for="duration-filter" class="filter-label">Episode Duration:</label>
+                        <select id="duration-filter" class="filter-select" onchange="applyDurationFilter()">
+                            <option value="all">All Durations</option>
+                            <option value="under10">Under 10 min</option>
+                            <option value="10-30">10-30 min</option>
+                            <option value="30-60">30-60 min</option>
+                            <option value="60plus">60+ min</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="controls-right">
+                    <div id="podcast-count" class="podcast-count"></div>
+                </div>
+            </div>
+            <div id="podcast-container">
+                <div id="podcast-grid" class="podcast-grid"></div>
+                <div id="podcast-list" class="podcast-list hidden"></div>
+            </div>
+        </div>
+
+        <!-- Episodes Page -->
+        <div id="page-episodes" class="page hidden">
+            <div class="page-header">
+                <button class="btn-back" onclick="goBackToLibrary()">← Back</button>
+                <h1 id="episodes-page-title">Episodes</h1>
+            </div>
+            <div id="episodes-loading" class="loading hidden">
+                <div class="spinner"></div>
+                <p>Loading episodes...</p>
+            </div>
+            <div id="podcast-episodes-controls" class="podcast-controls hidden">
+                <div class="controls-left">
+                    <div class="sort-controls">
+                        <label for="podcast-episodes-sort-select" class="sort-label">Sort:</label>
+                        <select id="podcast-episodes-sort-select" class="sort-select" onchange="applyPodcastEpisodesSorting()">
+                            <option value="title-asc">A-Z</option>
+                            <option value="title-desc">Z-A</option>
+                            <option value="date-desc">Newest to Oldest</option>
+                            <option value="date-asc">Oldest to Newest</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="controls-right">
+                    <div id="podcast-episodes-count" class="podcast-count"></div>
+                </div>
+            </div>
+            <div id="episodes-list" class="episodes-full-page"></div>
+        </div>
+
+        <!-- Player Page -->
+        <div id="page-player" class="page hidden">
+            <div class="page-header">
+                <button class="btn-back" onclick="goBackToEpisode()">← Back</button>
+                <h1>Now Playing</h1>
+            </div>
+            <div id="player-page-content" class="player-page-content">
+                <div class="player-page-empty">
+                    <p>No episode selected</p>
+                    <p class="subtitle">Start playing an episode to see it here</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Category Page -->
+        <div id="page-category" class="page hidden">
+            <div class="page-header">
+                <button class="btn-back" onclick="navigateTo('grid')">← Back</button>
+                <h1 id="category-page-title">Category</h1>
+            </div>
+            <div id="category-loading" class="loading hidden">
+                <div class="spinner"></div>
+                <p>Loading podcasts...</p>
+            </div>
+            <div id="category-grid" class="podcast-grid hidden"></div>
+        </div>
+
+        <!-- Favorites Page -->
+        <div id="page-favorites" class="page hidden">
+            <div class="page-header">
+                <h1>Favorites</h1>
+            </div>
+            <div id="favorites-loading" class="loading hidden">
+                <div class="spinner"></div>
+                <p>Loading favorites...</p>
+            </div>
+            <div id="favorites-content"></div>
+        </div>
+
+        <!-- History Page -->
+        <div id="page-history" class="page hidden">
+            <div class="page-header">
+                <h1>Recent Episodes</h1>
+                <button class="btn-clear-history-header" onclick="clearHistory(); navigateTo('history')" title="Clear history">Clear History</button>
+            </div>
+            <div id="history-loading" class="loading hidden">
+                <div class="spinner"></div>
+                <p>Loading history...</p>
+            </div>
+            <div id="history-list" class="episodes-full-page"></div>
+        </div>
+
+        <!-- Episode Detail Page -->
+        <div id="page-episode" class="page hidden">
+            <div class="page-header">
+                <button class="btn-back" onclick="goBackFromEpisode()">← Back</button>
+                <h1 id="episode-page-title">Episode</h1>
+            </div>
+            <div id="episode-detail-content" class="episode-detail-content"></div>
+        </div>
+
+        <!-- Search Page / All Episodes Page -->
+        <div id="page-search" class="page hidden">
+            <div class="page-header">
+                <h1 id="search-page-title">Search</h1>
+            </div>
+            <div class="search-container">
+                <div id="search-results" class="search-results">
+                    <div class="empty"><p>Start typing in the search bar above...</p></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- All Episodes Page -->
+        <div id="page-all-episodes" class="page hidden">
+            <div class="page-header">
+                <h1>All Episodes</h1>
+            </div>
+            <div id="episodes-controls" class="podcast-controls">
+                <div class="controls-left">
+                    <div class="sort-controls">
+                        <label for="episodes-sort-select" class="sort-label">Sort:</label>
+                        <select id="episodes-sort-select" class="sort-select" onchange="applyEpisodesSorting()">
+                            <option value="title-asc">A-Z</option>
+                            <option value="title-desc">Z-A</option>
+                            <option value="date-desc">Newest to Oldest</option>
+                            <option value="date-asc">Oldest to Newest</option>
+                        </select>
+                    </div>
+                    <div class="filter-controls">
+                        <label for="episodes-duration-filter" class="filter-label">Episode Duration:</label>
+                        <select id="episodes-duration-filter" class="filter-select" onchange="applyEpisodesDurationFilter()">
+                            <option value="all">All Durations</option>
+                            <option value="under10">Under 10 min</option>
+                            <option value="10-30">10-30 min</option>
+                            <option value="30-60">30-60 min</option>
+                            <option value="60plus">60+ min</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="controls-right">
+                    <div id="episodes-count" class="podcast-count"></div>
+                </div>
+            </div>
+            <div id="all-episodes-list" class="episodes-full-page"></div>
+        </div>
+    </main>
+
+    <!-- Persistent Audio Player (always visible when playing) -->
+    <div id="player-bar" class="player-bar hidden">
+        <div class="player-bar-content">
+            <div class="player-bar-left" onclick="navigateTo('episode')">
+                <div class="player-bar-artwork">
+                    <img id="player-bar-image" src="" alt="" onerror="this.style.display='none'">
+                </div>
+                <div class="player-bar-text">
+                    <h3 id="player-bar-title">Now Playing</h3>
+                    <p id="player-bar-episode">Select an episode</p>
+                </div>
+            </div>
+            <div class="player-bar-center">
+                <div class="player-bar-controls">
+                    <button class="btn-skip-text-only" onclick="skipBackward()" title="Skip back 10s">
+                        <span class="skip-number">-10</span>
+                    </button>
+                    <button id="play-pause-btn-bar" class="btn-play-pause-main" onclick="togglePlayPause()">
+                        <span id="play-icon-bar">▶</span>
+                    </button>
+                    <button class="btn-skip-text-only" onclick="skipForward()" title="Skip forward 30s">
+                        <span class="skip-number">+30</span>
+                    </button>
+                </div>
+                <div class="player-bar-progress-wrapper">
+                    <div class="player-bar-time-left" id="current-time-bar">0:00</div>
+                    <div class="player-bar-progress" id="player-bar-progress" onclick="seekToPosition(event)">
+                        <div class="player-bar-progress-fill" id="player-bar-progress-fill"></div>
+                    </div>
+                    <div class="player-bar-time-right" id="duration-bar">0:00</div>
+                </div>
+            </div>
+            <div class="player-bar-right"></div>
+        </div>
+        <audio id="audio-player" preload="metadata"></audio>
+    </div>
+
+    <!-- Auth Modal -->
+    <div id="auth-modal" class="auth-modal hidden">
+        <div class="auth-modal-overlay" onclick="closeAuthModal()"></div>
+        <div class="auth-modal-content">
+            <div class="auth-modal-header">
+                <h2 id="auth-modal-title">Sign In</h2>
+                <button class="btn-close-modal" onclick="closeAuthModal()">✕</button>
+            </div>
+            <div class="auth-modal-body">
+                <div id="auth-error" class="auth-error hidden"></div>
+                <div id="auth-success" class="auth-success hidden"></div>
+                
+                <div id="auth-signin-form" class="auth-form">
+                    <div class="auth-form-group">
+                        <label for="signin-email">Email</label>
+                        <input type="email" id="signin-email" class="auth-input" placeholder="your@email.com">
+                    </div>
+                    <div class="auth-form-group">
+                        <label for="signin-password">Password</label>
+                        <input type="password" id="signin-password" class="auth-input" placeholder="••••••••">
+                    </div>
+                    <button class="btn-auth-primary" onclick="handleSignIn()">Sign In</button>
+                    <p class="auth-switch-text">
+                        Don't have an account? 
+                        <a href="#" onclick="switchAuthMode('signup'); return false;">Sign up</a>
+                    </p>
+                </div>
+
+                <div id="auth-signup-form" class="auth-form hidden">
+                    <div class="auth-form-group">
+                        <label for="signup-email">Email</label>
+                        <input type="email" id="signup-email" class="auth-input" placeholder="your@email.com">
+                    </div>
+                    <div class="auth-form-group">
+                        <label for="signup-password">Password</label>
+                        <input type="password" id="signup-password" class="auth-input" placeholder="••••••••">
+                    </div>
+                    <div class="auth-form-group">
+                        <label for="signup-password-confirm">Confirm Password</label>
+                        <input type="password" id="signup-password-confirm" class="auth-input" placeholder="••••••••">
+                    </div>
+                    <button class="btn-auth-primary" onclick="handleSignUp()">Sign Up</button>
+                    <p class="auth-switch-text">
+                        Already have an account? 
+                        <a href="#" onclick="switchAuthMode('signin'); return false;">Sign in</a>
+                    </p>
+                </div>
+
+                <div id="auth-signedin" class="auth-signedin hidden">
+                    <p>Signed in as <strong id="auth-user-email"></strong></p>
+                    <p class="auth-sync-status" id="auth-sync-status">Syncing...</p>
+                    <button class="btn-auth-secondary" onclick="handleSignOut()">Sign Out</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Supabase JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
+    <script src="api.js"></script>
+    <script src="auth.js"></script>
+    <script src="app.js"></script>
+    <!-- Vercel Analytics -->
+    <script type="module">
+        import { inject } from 'https://esm.sh/@vercel/analytics@1';
+        inject();
+    </script>
+</body>
+</html>

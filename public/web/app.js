@@ -1,0 +1,3050 @@
+// Main application logic
+
+let podcasts = [];
+let allEpisodes = []; // Cache all episodes for search
+let currentPodcast = null;
+let audioPlayer = null;
+let currentEpisode = null; // The episode that is currently playing (if any)
+let displayedEpisode = null; // The episode being viewed on detail page
+let isPlaying = false;
+let currentPage = 'grid';
+let episodesCache = {}; // Cache episodes by podcast ID
+let categories = []; // All unique categories
+let currentCategory = null; // Currently viewed category
+let searchMode = 'episodes'; // 'episodes' or 'podcasts'
+let viewMode = 'grid'; // 'grid' or 'list'
+let sortMode = 'title-asc'; // 'title-asc', 'title-desc'
+let durationFilter = 'all'; // 'all', 'under10', '10-30', '30-60', '60plus'
+let episodesSortMode = 'title-asc'; // 'title-asc', 'title-desc', 'date-desc', 'date-asc'
+let episodesDurationFilter = 'all'; // 'all', 'under10', '10-30', '30-60', '60plus'
+let podcastEpisodesSortMode = 'date-desc'; // Sorting mode for podcast episodes page (default: newest first)
+let podcastEpisodesDurationFilter = 'all'; // Duration filter for podcast episodes page
+let podcastSortPreferences = {}; // Store sort preferences per podcast ID
+let isSyncing = false; // Track if sync is in progress
+let syncEnabled = false; // Track if user has enabled sync
+
+// Progress tracking key for localStorage
+const PROGRESS_KEY = 'podcast_progress';
+const HISTORY_KEY = 'episode_history';
+const FAVORITES_KEY = 'podcast_favorites';
+const PODCAST_SORT_PREFERENCES_KEY = 'podcast_sort_preferences';
+const MAX_HISTORY = 50;
+
+// Initialize app when DOM loads
+document.addEventListener('DOMContentLoaded', () => {
+    audioPlayer = document.getElementById('audio-player');
+    setupAudioPlayer();
+    setupRouting();
+    setupAuth(); // Initialize authentication
+    // Set initial search mode based on default page (grid = podcasts)
+    setSearchMode('podcasts');
+    loadPodcasts().then(() => {
+        // After podcasts load, check URL params for episode/podcast links
+        handleURLParams();
+    });
+    restoreProgress(); // Restore any saved progress
+    restorePodcastSortPreferences(); // Restore podcast sort preferences
+    renderSidebar();
+    
+    // Handle window resize to manage sidebar state
+    window.addEventListener('resize', handleResize);
+    
+    // Set initial sidebar state based on screen size and user preference
+    const sidebar = document.getElementById('sidebar');
+    const body = document.body;
+    if (!isMobileScreen()) {
+        // On desktop, check if user previously closed sidebar
+        const sidebarClosed = localStorage.getItem('sidebar-closed');
+        if (!sidebarClosed) {
+            sidebar.classList.add('open');
+            body.classList.remove('sidebar-closed');
+        } else {
+            body.classList.add('sidebar-closed');
+        }
+    } else {
+        // On mobile, sidebar starts closed
+        if (!sidebar.classList.contains('open')) {
+            body.classList.add('sidebar-closed');
+        } else {
+            body.classList.remove('sidebar-closed');
+        }
+    }
+    handleResize();
+});
+
+// Handle window resize to adjust sidebar behavior
+function handleResize() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    const body = document.body;
+    
+    if (isMobileScreen()) {
+        // On mobile, automatically close sidebar when screen is small or shrunk
+        if (sidebar.classList.contains('open')) {
+            sidebar.classList.remove('open');
+            overlay.classList.add('hidden');
+            body.classList.add('sidebar-closed');
+        } else {
+            overlay.classList.add('hidden');
+            body.classList.add('sidebar-closed');
+        }
+    } else {
+        // On desktop, ensure overlay is always hidden
+        // Sidebar defaults to open via CSS, but user can close it if they want
+        overlay.classList.add('hidden');
+        // If sidebar doesn't have open class, add it (on desktop, it should be open by default)
+        if (!sidebar.classList.contains('open') && !localStorage.getItem('sidebar-closed')) {
+            sidebar.classList.add('open');
+            body.classList.remove('sidebar-closed');
+        } else if (!sidebar.classList.contains('open')) {
+            body.classList.add('sidebar-closed');
+        } else {
+            body.classList.remove('sidebar-closed');
+        }
+    }
+}
+
+// Check if we're on mobile/small screen
+function isMobileScreen() {
+    return window.innerWidth <= 768;
+}
+
+// Toggle sidebar
+function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    const body = document.body;
+    
+    if (isMobileScreen()) {
+        // On mobile, sidebar toggle works as before
+        sidebar.classList.toggle('open');
+        overlay.classList.toggle('hidden');
+        // Update body class for mobile
+        if (sidebar.classList.contains('open')) {
+            body.classList.remove('sidebar-closed');
+        } else {
+            body.classList.add('sidebar-closed');
+        }
+    } else {
+        // On desktop, user can still close sidebar if they want
+        sidebar.classList.toggle('open');
+        // Update body class to adjust layout
+        if (sidebar.classList.contains('open')) {
+            body.classList.remove('sidebar-closed');
+            localStorage.removeItem('sidebar-closed');
+        } else {
+            body.classList.add('sidebar-closed');
+            localStorage.setItem('sidebar-closed', 'true');
+        }
+        // Overlay is not needed on desktop (sidebar slides in/out without overlay)
+        overlay.classList.add('hidden');
+    }
+}
+
+// Simple routing
+function setupRouting() {
+    // Set initial page
+    showPage('grid');
+}
+
+function navigateTo(page, param = null) {
+    showPage(page);
+    
+    // Close sidebar only on mobile
+    if (isMobileScreen()) {
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('sidebar-overlay');
+        sidebar.classList.remove('open');
+        overlay.classList.add('hidden');
+    }
+    
+    // Load page-specific content
+    if (page === 'grid') {
+        // Set search mode to podcasts when viewing grid
+        if (searchMode !== 'podcasts') {
+            setSearchMode('podcasts');
+        }
+        currentCategory = null; // Reset category when going home
+        const controlsEl = document.getElementById('podcast-controls');
+        const containerEl = document.getElementById('podcast-container');
+        if (podcasts.length > 0) {
+            if (controlsEl) controlsEl.classList.remove('hidden');
+            if (containerEl) containerEl.classList.remove('hidden');
+            // Update sort select to match current sort mode
+            const sortSelect = document.getElementById('sort-select');
+            if (sortSelect) {
+                sortSelect.value = sortMode;
+            }
+            // Update duration filter to match current filter
+            const durationFilterSelect = document.getElementById('duration-filter');
+            if (durationFilterSelect) {
+                durationFilterSelect.value = durationFilter;
+            }
+            renderPodcasts(podcasts);
+        } else if (podcasts.length === 0 && allEpisodes.length === 0) {
+            // If no podcasts loaded yet, trigger load
+            loadPodcasts();
+        }
+    } else if (page === 'all-episodes') {
+        // Set search mode to episodes when viewing all episodes
+        if (searchMode !== 'episodes') {
+            setSearchMode('episodes');
+        }
+        loadAllEpisodesPage();
+    } else if (page === 'episodes' && currentPodcast) {
+        loadEpisodesPage();
+    } else if (page === 'player') {
+        loadPlayerPage();
+    } else if (page === 'search') {
+        const topSearchInput = document.getElementById('top-search-input');
+        const titleEl = document.getElementById('search-page-title');
+        if (topSearchInput) {
+            topSearchInput.focus();
+            // If there's a value, trigger search
+            if (topSearchInput.value.trim()) {
+                handleSearch(topSearchInput.value);
+                if (titleEl) titleEl.textContent = 'Search Results';
+            } else {
+                // Show all items based on mode
+                if (searchMode === 'podcasts') {
+                    navigateTo('grid');
+                } else {
+                    navigateTo('all-episodes');
+                }
+            }
+        }
+    } else if (page === 'category' && param) {
+        showCategoryPage(param);
+    } else if (page === 'history') {
+        loadHistoryPage();
+    } else if (page === 'favorites') {
+        loadFavoritesPage();
+    } else if (page === 'episode') {
+        // If navigating to episode page and we have a playing episode, show it
+        // Otherwise, displayedEpisode should already be set by openEpisodeDetail()
+        if (currentEpisode && !displayedEpisode) {
+            displayedEpisode = currentEpisode;
+            // Also set currentPodcast if we don't have it
+            if (!currentPodcast && currentEpisode.podcast_id) {
+                currentPodcast = podcasts.find(p => p.id === currentEpisode.podcast_id);
+            }
+        }
+        if (displayedEpisode && currentPodcast) {
+            loadEpisodeDetailPage();
+        }
+    }
+}
+
+function showPage(page) {
+    currentPage = page;
+    document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+    const pageEl = document.getElementById(`page-${page}`);
+    if (pageEl) {
+        pageEl.classList.remove('hidden');
+    }
+}
+
+// Go back to library from episodes
+function goBackToLibrary() {
+    navigateTo('grid');
+}
+
+// Go back to episodes from player
+function goBackToEpisode() {
+    if (currentPodcast) {
+        navigateTo('episodes');
+    } else {
+        navigateTo('grid');
+    }
+}
+
+// Load podcasts from API
+async function loadPodcasts() {
+    const loadingEl = document.getElementById('loading');
+    const errorEl = document.getElementById('error');
+    const emptyEl = document.getElementById('empty');
+    const containerEl = document.getElementById('podcast-container');
+    const controlsEl = document.getElementById('podcast-controls');
+    
+    try {
+        loadingEl.classList.remove('hidden');
+        errorEl.classList.add('hidden');
+        emptyEl.classList.add('hidden');
+        if (containerEl) containerEl.classList.add('hidden');
+        if (controlsEl) controlsEl.classList.add('hidden');
+        
+        podcasts = await apiService.fetchPodcasts();
+        
+        // Extract categories
+        extractCategories();
+        
+        loadingEl.classList.add('hidden');
+        
+        if (podcasts.length === 0) {
+            emptyEl.classList.remove('hidden');
+        } else {
+            // Reload episodes now that podcasts are loaded
+            await loadAllEpisodes();
+            // Make sure container and controls are visible
+            if (controlsEl) controlsEl.classList.remove('hidden');
+            if (containerEl) containerEl.classList.remove('hidden');
+            renderPodcasts(podcasts);
+            updatePodcastCount();
+            renderSidebar(); // Update sidebar with categories
+        }
+    } catch (error) {
+        console.error('Error loading podcasts:', error);
+        loadingEl.classList.add('hidden');
+        errorEl.classList.remove('hidden');
+        document.getElementById('error-message').textContent = error.message || 'Failed to load podcasts. Check your Supabase configuration.';
+    }
+}
+
+// Extract unique categories from podcasts
+function extractCategories() {
+    const categorySet = new Set();
+    podcasts.forEach(podcast => {
+        if (podcast.genre && Array.isArray(podcast.genre)) {
+            podcast.genre.forEach(genre => {
+                if (genre && genre.trim()) {
+                    categorySet.add(genre.trim());
+                }
+            });
+        } else if (podcast.genre && typeof podcast.genre === 'string') {
+            categorySet.add(podcast.genre.trim());
+        }
+    });
+    
+    // Add "Daily" category if any podcast has 200+ episodes
+    const hasDailyPodcasts = podcasts.some(p => isDailyPodcast(p.id));
+    if (hasDailyPodcasts) {
+        categorySet.add('Daily');
+    }
+    
+    categories = Array.from(categorySet).sort();
+}
+
+// Render sidebar
+function renderSidebar() {
+    renderHistory();
+    renderFavorites();
+    renderCategories();
+}
+
+// Render history in sidebar (just a clickable link)
+function renderHistory() {
+    const historyEl = document.getElementById('sidebar-history-count');
+    const history = getHistory();
+    
+    if (historyEl) {
+        historyEl.textContent = history.length;
+    }
+}
+
+// Render favorites in sidebar
+function renderFavorites() {
+    const favoritesEl = document.getElementById('sidebar-favorites-count');
+    const favorites = getFavorites();
+    const totalCount = favorites.podcasts.length + favorites.episodes.length;
+    
+    if (favoritesEl) {
+        favoritesEl.textContent = totalCount;
+    }
+}
+
+// Get favorites from localStorage
+function getFavorites() {
+    try {
+        const stored = JSON.parse(localStorage.getItem(FAVORITES_KEY) || '{}');
+        return {
+            podcasts: stored.podcasts || [],
+            episodes: stored.episodes || []
+        };
+    } catch (e) {
+        return { podcasts: [], episodes: [] };
+    }
+}
+
+// Save favorites to localStorage
+function saveFavorites(favorites) {
+    try {
+        // Ensure favorites object has required structure
+        if (!favorites.podcasts) favorites.podcasts = [];
+        if (!favorites.episodes) favorites.episodes = [];
+        
+        localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
+        renderSidebar(); // This calls renderFavorites() internally
+        debouncedSync(); // Sync to server if enabled
+    } catch (e) {
+        console.error('Error saving favorites:', e);
+        // If storage is full or blocked, try to continue anyway
+        if (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+            console.warn('LocalStorage quota exceeded. Favorites may not persist.');
+        }
+    }
+}
+
+// Check if podcast is favorited
+function isPodcastFavorited(podcastId) {
+    const favorites = getFavorites();
+    return favorites.podcasts.includes(String(podcastId));
+}
+
+// Check if episode is favorited
+function isEpisodeFavorited(episodeId) {
+    const favorites = getFavorites();
+    return favorites.episodes.some(e => e.id === String(episodeId));
+}
+
+// Toggle podcast favorite
+function togglePodcastFavorite(podcastId) {
+    try {
+        if (!podcastId) {
+            console.error('togglePodcastFavorite: podcastId is missing');
+            return;
+        }
+        
+        const favorites = getFavorites();
+        
+        // Ensure podcasts array exists
+        if (!Array.isArray(favorites.podcasts)) {
+            favorites.podcasts = [];
+        }
+        
+        const id = String(podcastId);
+        const index = favorites.podcasts.indexOf(id);
+        
+        if (index > -1) {
+            // Remove from favorites
+            favorites.podcasts.splice(index, 1);
+        } else {
+            // Add to favorites
+            favorites.podcasts.push(id);
+        }
+        
+        saveFavorites(favorites);
+        
+        // Re-render podcasts to update favorite buttons
+        renderPodcasts();
+        
+        // Update sidebar favorites count
+        renderFavorites();
+        
+        // Update episodes page if on it (to update the header favorite button)
+        if (currentPage === 'episodes' && currentPodcast) {
+            loadEpisodesPage();
+        }
+        
+        // Update favorites page if on it
+        if (currentPage === 'favorites') {
+            loadFavoritesPage();
+        }
+    } catch (error) {
+        console.error('Error toggling podcast favorite:', error);
+    }
+}
+
+// Toggle episode favorite
+function toggleEpisodeFavorite(episodeId, podcastId) {
+    const favorites = getFavorites();
+    const id = String(episodeId);
+    const existingIndex = favorites.episodes.findIndex(e => e.id === id);
+    
+    if (existingIndex > -1) {
+        favorites.episodes.splice(existingIndex, 1);
+    } else {
+        favorites.episodes.push({
+            id: id,
+            podcastId: String(podcastId),
+            timestamp: Date.now()
+        });
+    }
+    
+    saveFavorites(favorites);
+    
+    // Reload current page if it shows episodes
+    if (currentPage === 'episodes' && currentPodcast) {
+        loadEpisodesPage();
+    } else if (currentPage === 'favorites') {
+        loadFavoritesPage();
+    } else if (currentPage === 'episode' && displayedEpisode) {
+        loadEpisodeDetailPage();
+    } else if (currentPage === 'history') {
+        loadHistoryPage();
+    }
+    
+    renderSidebar();
+}
+
+// Load favorites page
+function loadFavoritesPage() {
+    const loadingEl = document.getElementById('favorites-loading');
+    const contentEl = document.getElementById('favorites-content');
+    
+    if (loadingEl) loadingEl.classList.remove('hidden');
+    if (contentEl) contentEl.innerHTML = '';
+    
+    setTimeout(() => {
+        const favorites = getFavorites();
+        if (loadingEl) loadingEl.classList.add('hidden');
+        
+        if (!contentEl) return;
+        
+        if (favorites.podcasts.length === 0 && favorites.episodes.length === 0) {
+            contentEl.innerHTML = '<div class="empty"><p>No favorites yet</p><p class="subtitle">Tap the heart icon on podcasts or episodes to add them to favorites</p></div>';
+            return;
+        }
+        
+        let html = '';
+        
+        // Render favorite podcasts
+        if (favorites.podcasts.length > 0) {
+            html += '<div class="favorites-section"><h2 class="favorites-section-title">Favorite Podcasts</h2><div class="podcast-grid">';
+            const favoritePodcasts = podcasts.filter(p => favorites.podcasts.includes(String(p.id)));
+            favoritePodcasts.forEach(podcast => {
+                const isFavorite = true;
+                html += `
+                    <div class="podcast-card">
+                        <div class="podcast-card-content" onclick="openEpisodes('${podcast.id}')">
+                            <img 
+                                src="${podcast.image_url || getPlaceholderImage()}" 
+                                alt="${escapeHtml(podcast.title || 'Podcast')}"
+                                class="podcast-image"
+                                onerror="this.src='${getPlaceholderImage()}'"
+                            >
+                            <div class="podcast-info">
+                                <div class="podcast-title">${escapeHtml(podcast.title || 'Untitled Podcast')}</div>
+                                ${(() => {
+                                    const cleanedAuthor = podcast.author ? cleanAuthorText(podcast.author) : '';
+                                    return cleanedAuthor && !shouldHideAuthor(cleanedAuthor) ? `<div class="podcast-author">${escapeHtml(cleanedAuthor)}</div>` : '';
+                                })()}
+                            </div>
+                        </div>
+                        <button class="btn-podcast-favorite favorited" onclick="event.stopPropagation(); togglePodcastFavorite('${podcast.id}');" title="Remove from favorites">
+                            ❤️
+                        </button>
+                    </div>
+                `;
+            });
+            html += '</div></div>';
+        }
+        
+        // Render favorite episodes
+        if (favorites.episodes.length > 0) {
+            html += '<div class="favorites-section"><h2 class="favorites-section-title">Favorite Episodes</h2><div class="episodes-full-page"><div class="episodes-list-content">';
+            favorites.episodes.forEach(favEpisode => {
+                const episode = allEpisodes.find(e => String(e.id) === favEpisode.id);
+                const podcast = podcasts.find(p => String(p.id) === favEpisode.podcastId);
+                if (!episode || !podcast) return '';
+                
+                const progress = getEpisodeProgress(episode.id);
+                const isCompleted = progress >= 95; // Consider 95%+ as completed
+                const progressBar = `<div class="progress-bar"><div class="progress-fill" style="width: ${progress}%"></div></div>`;
+                const isCurrentEpisode = currentEpisode && currentEpisode.id === episode.id;
+                const isEpisodePlaying = isCurrentEpisode && isPlaying;
+                
+                html += `
+                    <div class="episode-item ${isCompleted ? 'episode-completed' : ''} ${isCurrentEpisode ? 'episode-playing' : ''}">
+                        <div class="episode-item-image">
+                            <img src="${podcast.image_url || getPlaceholderImage()}" 
+                                 alt="${escapeHtml(podcast.title || '')}" 
+                                 class="episode-list-artwork"
+                                 onerror="this.src='${getPlaceholderImage()}'">
+                        </div>
+                        <button class="btn-episode-play ${isEpisodePlaying ? 'playing' : ''}" onclick="event.stopPropagation(); ${isEpisodePlaying ? 'togglePlayPause()' : `playEpisode(${JSON.stringify(episode).replace(/"/g, '&quot;')})`}" title="${isEpisodePlaying ? 'Pause' : 'Play'}">
+                            <span class="episode-play-icon" data-episode-id="${episode.id}">${isEpisodePlaying ? '⏸' : '▶'}</span>
+                        </button>
+                        <div class="episode-item-main" onclick="openEpisodeDetail('${episode.id}', '${podcast.id}')">
+                            <div class="episode-title">${escapeHtml(episode.title || 'Untitled Episode')}</div>
+                            <div class="episode-meta">
+                                <span onclick="event.stopPropagation(); openEpisodes('${podcast.id}')" style="cursor: pointer; text-decoration: underline;">${escapeHtml(podcast.title || 'Unknown Podcast')}</span>
+                                ${episode.pub_date ? `<span>• ${formatDate(episode.pub_date)}</span>` : ''}
+                                ${episode.duration_seconds ? `<span>• ${formatDuration(episode.duration_seconds)}</span>` : ''}
+                                ${progress > 0 ? `<span class="episode-progress-text">${Math.round(progress)}%</span>` : ''}
+                            </div>
+                            ${progressBar}
+                        </div>
+                        <button class="btn-favorite favorited" onclick="event.stopPropagation(); toggleEpisodeFavorite('${episode.id}', '${podcast.id}')" title="Remove from favorites">
+                            ❤️
+                        </button>
+                    </div>
+                `;
+            });
+            html += '</div></div></div>';
+        }
+        
+        contentEl.innerHTML = html;
+    }, 300);
+}
+
+// Get emoji for category/genre
+function getCategoryEmoji(category) {
+    // Handle "Daily" category specially
+    if (category === 'Daily') {
+        return '📅';
+    }
+    
+    const categoryLower = category.toLowerCase();
+    const emojiMap = {
+        'technology': '💻',
+        'tech': '💻',
+        'business': '💼',
+        'news': '📰',
+        'comedy': '😂',
+        'entertainment': '🎭',
+        'science': '🔬',
+        'health': '🏥',
+        'education': '📚',
+        'history': '📜',
+        'true crime': '🔍',
+        'sports': '⚽',
+        'music': '🎵',
+        'arts': '🎨',
+        'culture': '🌍',
+        'politics': '🏛️',
+        'society': '👥',
+        'storytelling': '📖',
+        'interview': '🎙️',
+        'discussion': '💬',
+        'science fiction': '🚀',
+        'fantasy': '🧙',
+        'self-improvement': '💪',
+        'personal development': '💪',
+        'philosophy': '🤔',
+        'psychology': '🧠',
+        'religion': '⛪',
+        'spirituality': '✨',
+        'finance': '💰',
+        'investing': '📈',
+        'food': '🍔',
+        'travel': '✈️',
+        'fitness': '💪',
+        'parenting': '👶',
+        'relationships': '❤️',
+    };
+    
+    // Try exact match first
+    if (emojiMap[categoryLower]) {
+        return emojiMap[categoryLower];
+    }
+    
+    // Try partial match
+    for (const [key, emoji] of Object.entries(emojiMap)) {
+        if (categoryLower.includes(key) || key.includes(categoryLower)) {
+            return emoji;
+        }
+    }
+    
+    // Default emoji
+    return '🎙️';
+}
+
+// Render categories in sidebar
+function renderCategories() {
+    const categoriesEl = document.getElementById('sidebar-categories');
+    
+    if (categories.length === 0) {
+        categoriesEl.innerHTML = '<p class="sidebar-empty">No categories</p>';
+        return;
+    }
+    
+    categoriesEl.innerHTML = categories.map(category => `
+        <div class="sidebar-item" onclick="showCategory('${escapeHtml(category)}')">
+            <span class="sidebar-item-icon">${getCategoryEmoji(category)}</span>
+            <span class="sidebar-item-title">${escapeHtml(category)}</span>
+            <span class="sidebar-item-count">${getCategoryCount(category)}</span>
+        </div>
+    `).join('');
+}
+
+// Get count of podcasts in category
+function getCategoryCount(category) {
+    // Handle "Daily" category specially
+    if (category === 'Daily') {
+        return podcasts.filter(p => isDailyPodcast(p.id)).length;
+    }
+    
+    return podcasts.filter(p => {
+        if (p.genre && Array.isArray(p.genre)) {
+            return p.genre.some(g => g && g.trim() === category);
+        }
+        return p.genre && p.genre.trim() === category;
+    }).length;
+}
+
+// Show category page
+function showCategory(categoryName) {
+    currentCategory = categoryName;
+    navigateTo('category', categoryName);
+}
+
+function showCategoryPage(categoryName) {
+    currentCategory = categoryName;
+    const loadingEl = document.getElementById('category-loading');
+    const gridEl = document.getElementById('category-grid');
+    const titleEl = document.getElementById('category-page-title');
+    
+    titleEl.textContent = categoryName;
+    loadingEl.classList.remove('hidden');
+    gridEl.classList.add('hidden');
+    
+    // Filter podcasts by category
+    let filteredPodcasts;
+    if (categoryName === 'Daily') {
+        // Filter for Daily podcasts (200+ episodes)
+        filteredPodcasts = podcasts.filter(p => isDailyPodcast(p.id));
+    } else {
+        filteredPodcasts = podcasts.filter(p => {
+            if (p.genre && Array.isArray(p.genre)) {
+                return p.genre.some(g => g && g.trim() === categoryName);
+            }
+            return p.genre && p.genre.trim() === categoryName;
+        });
+    }
+    
+    setTimeout(() => {
+        loadingEl.classList.add('hidden');
+        if (filteredPodcasts.length === 0) {
+            gridEl.innerHTML = '<div class="empty"><p>No podcasts in this category</p></div>';
+        } else {
+            renderPodcasts(filteredPodcasts, gridEl);
+        }
+        gridEl.classList.remove('hidden');
+    }, 300);
+}
+
+// Open podcast (adds to history)
+function openPodcast(podcastId) {
+    addToHistory(podcastId);
+    renderSidebar(); // Update sidebar
+    openEpisodes(podcastId);
+}
+
+// Add episode to history
+function addEpisodeToHistory(episodeId, podcastId) {
+    const history = getHistory();
+    // Remove if already exists
+    const filtered = history.filter(item => item.episodeId !== episodeId);
+    // Add to front
+    filtered.unshift({ episodeId, podcastId, timestamp: Date.now() });
+    // Keep only MAX_HISTORY items
+    const limited = filtered.slice(0, MAX_HISTORY);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(limited));
+    renderSidebar(); // Update sidebar
+    debouncedSync(); // Sync to server if enabled
+}
+
+// Clear history
+function clearHistory() {
+    if (confirm('Clear all listening history?')) {
+        localStorage.removeItem(HISTORY_KEY);
+        renderSidebar();
+        debouncedSync(); // Sync to server if enabled
+        if (currentPage === 'history') {
+            loadHistoryPage();
+        }
+    }
+}
+
+// Load history page
+function loadHistoryPage() {
+    const loadingEl = document.getElementById('history-loading');
+    const listEl = document.getElementById('history-list');
+    
+    loadingEl.classList.remove('hidden');
+    listEl.innerHTML = '';
+    
+    setTimeout(() => {
+        const history = getHistory();
+        loadingEl.classList.add('hidden');
+        
+        if (history.length === 0) {
+            listEl.innerHTML = '<div class="empty"><p>No listening history</p></div>';
+            return;
+        }
+        
+        // History is already sorted by most recent (newest first)
+        listEl.innerHTML = history.map(item => {
+            const episode = allEpisodes.find(e => e.id === item.episodeId);
+            const podcast = podcasts.find(p => p.id === item.podcastId);
+            if (!episode || !podcast) return '';
+            
+            const progress = getEpisodeProgress(episode.id);
+            const isCompleted = progress >= 95; // Consider 95%+ as completed
+            const progressBar = `<div class="progress-bar"><div class="progress-fill" style="width: ${progress}%"></div></div>`;
+            const isFavorite = isEpisodeFavorited(episode.id);
+            const isCurrentEpisode = currentEpisode && currentEpisode.id === episode.id;
+            const isEpisodePlaying = isCurrentEpisode && isPlaying;
+            return `
+                <div class="episode-item ${isCompleted ? 'episode-completed' : ''} ${isCurrentEpisode ? 'episode-playing' : ''}">
+                    <div class="episode-item-image">
+                        <img src="${podcast.image_url || getPlaceholderImage()}" 
+                             alt="${escapeHtml(podcast.title || '')}" 
+                             class="episode-list-artwork"
+                             onerror="this.src='${getPlaceholderImage()}'">
+                    </div>
+                    <button class="btn-episode-play ${isEpisodePlaying ? 'playing' : ''}" onclick="event.stopPropagation(); ${isEpisodePlaying ? 'togglePlayPause()' : `playEpisode(${JSON.stringify(episode).replace(/"/g, '&quot;')})`}" title="${isEpisodePlaying ? 'Pause' : 'Play'}">
+                        <span class="episode-play-icon" data-episode-id="${episode.id}">${isEpisodePlaying ? '⏸' : '▶'}</span>
+                    </button>
+                    <div class="episode-item-main" onclick="openEpisodeDetail('${episode.id}', '${podcast.id}')">
+                        <div class="episode-title">${escapeHtml(episode.title || 'Untitled Episode')}</div>
+                        <div class="episode-meta">
+                            <span onclick="event.stopPropagation(); openEpisodes('${podcast.id}')" style="cursor: pointer; text-decoration: underline;">${escapeHtml(podcast.title || 'Unknown Podcast')}</span>
+                            ${episode.pub_date ? `<span>• ${formatDate(episode.pub_date)}</span>` : ''}
+                            ${episode.duration_seconds ? `<span>• ${formatDuration(episode.duration_seconds)}</span>` : ''}
+                            <span>• ${formatDate(item.timestamp)}</span>
+                            ${progress > 0 ? `<span class="episode-progress-text">${Math.round(progress)}%</span>` : ''}
+                        </div>
+                        ${progressBar}
+                    </div>
+                    <button class="btn-favorite ${isFavorite ? 'favorited' : ''}" onclick="event.stopPropagation(); toggleEpisodeFavorite('${episode.id}', '${podcast.id}')" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+                        ${isFavorite ? '❤️' : '🤍'}
+                    </button>
+                </div>
+            `;
+        }).filter(Boolean).join('');
+    }, 300);
+}
+
+// Open episode detail page
+function openEpisodeDetail(episodeId, podcastId) {
+    const episode = allEpisodes.find(e => e.id === episodeId);
+    const podcast = podcasts.find(p => p.id === podcastId);
+    
+    if (!episode || !podcast) return;
+    
+    displayedEpisode = episode; // Store the episode being viewed separately
+    currentPodcast = podcast; // Keep currentPodcast for navigation context
+    navigateTo('episode');
+}
+
+// Handle URL parameters from SEO pages (e.g., ?episode=123&podcast=456)
+function handleURLParams() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const episodeId = urlParams.get('episode');
+    const podcastId = urlParams.get('podcast');
+    
+    if (episodeId && podcastId) {
+        // Open the episode detail page
+        openEpisodeDetail(episodeId, podcastId);
+        // Clean up URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (podcastId) {
+        // Just open the podcast episodes page
+        const podcast = podcasts.find(p => p.id === podcastId);
+        if (podcast) {
+            currentPodcast = podcast;
+            navigateTo('episodes');
+            // Clean up URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+    }
+}
+
+// Load episode detail page
+function loadEpisodeDetailPage() {
+    if (!displayedEpisode || !currentPodcast) return;
+    
+    const contentEl = document.getElementById('episode-detail-content');
+    const titleEl = document.getElementById('episode-page-title');
+    
+    titleEl.textContent = displayedEpisode.title || 'Episode';
+    const progress = getEpisodeProgress(displayedEpisode.id);
+    
+    // Check if this episode is currently playing
+    // Compare the displayed episode with the currently playing episode
+    let isCurrentlyPlaying = false;
+    if (displayedEpisode && currentEpisode && isPlaying) {
+        isCurrentlyPlaying = displayedEpisode.id === currentEpisode.id;
+    }
+    
+    const isFavorite = isEpisodeFavorited(displayedEpisode.id);
+    contentEl.innerHTML = `
+        <div class="episode-detail">
+            <div class="episode-detail-header">
+                <img src="${currentPodcast.image_url || getPlaceholderImage()}" alt="${escapeHtml(currentPodcast.title || '')}" class="episode-detail-artwork" onerror="this.src='${getPlaceholderImage()}'">
+                <div class="episode-detail-info">
+                    <h2>${escapeHtml(displayedEpisode.title || 'Untitled Episode')}</h2>
+                    <p class="episode-detail-podcast" onclick="openEpisodes('${currentPodcast.id}')">${escapeHtml(currentPodcast.title || 'Unknown Podcast')}</p>
+                    <div class="episode-detail-meta">
+                        ${displayedEpisode.pub_date ? `<span>${formatDate(displayedEpisode.pub_date)}</span>` : ''}
+                        ${displayedEpisode.duration_seconds ? `<span>• ${formatDuration(displayedEpisode.duration_seconds)}</span>` : ''}
+                    </div>
+                </div>
+            </div>
+            <div class="episode-detail-controls">
+                <button id="episode-detail-play-btn" class="btn-play-large ${isCurrentlyPlaying ? 'playing' : ''}" onclick="${isCurrentlyPlaying ? 'togglePlayPause()' : `playEpisode(${JSON.stringify(displayedEpisode).replace(/"/g, '&quot;')})`}">
+                    <span id="episode-detail-play-icon">${isCurrentlyPlaying ? '⏸' : '▶'}</span> <span id="episode-detail-play-text">${isCurrentlyPlaying ? 'Pause' : 'Play Episode'}</span>
+                </button>
+                <button class="btn-favorite-episode-detail ${isFavorite ? 'favorited' : ''}" onclick="toggleEpisodeFavorite('${displayedEpisode.id}', '${currentPodcast.id}')" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+                    ${isFavorite ? '❤️' : '🤍'}
+                </button>
+            </div>
+            ${displayedEpisode.description ? `<div class="episode-detail-description">${sanitizeHtml(displayedEpisode.description)}</div>` : ''}
+            ${progress > 0 && progress < 100 ? `
+                <div class="episode-detail-progress">
+                    <div class="progress-bar-large">
+                        <div class="progress-fill" style="width: ${progress}%"></div>
+                    </div>
+                    <div class="episode-detail-progress-text">
+                        <span>${Math.round(progress)}% complete</span>
+                        <span>Resume from ${formatTime((progress / 100) * (displayedEpisode.duration_seconds || 0))}</span>
+                    </div>
+                </div>
+            ` : ''}
+        </div>
+    `;
+}
+
+// Go back from episode detail
+function goBackFromEpisode() {
+    if (currentPodcast) {
+        navigateTo('episodes');
+    } else {
+        navigateTo('grid');
+    }
+}
+
+// Get history
+function getHistory() {
+    try {
+        return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+    } catch (e) {
+        return [];
+    }
+}
+
+// Load all episodes for search
+async function loadAllEpisodes() {
+    try {
+        const episodes = await apiService.fetchAllEpisodes();
+        // Enrich with podcast info
+        allEpisodes = episodes.map(ep => {
+            const podcast = podcasts.find(p => p.id === ep.podcast_id);
+            return { ...ep, podcast_title: podcast?.title || 'Unknown Podcast', podcast_image: podcast?.image_url };
+        });
+        
+        // Re-extract categories to include "Daily" if any podcast now has 200+ episodes
+        extractCategories();
+        renderSidebar();
+    } catch (error) {
+        console.error('Error loading all episodes:', error);
+    }
+}
+
+// Get episode count for a podcast
+function getPodcastEpisodeCount(podcastId) {
+    // First check allEpisodes (comprehensive list)
+    let count = allEpisodes.filter(ep => ep.podcast_id === podcastId).length;
+    
+    // If count is 0, check the episodes cache (in case episodes were loaded individually)
+    if (count === 0 && episodesCache[podcastId]) {
+        count = episodesCache[podcastId].length;
+    }
+    
+    // If we found episodes in cache but not in allEpisodes, update allEpisodes
+    if (count > 0 && episodesCache[podcastId] && allEpisodes.filter(ep => ep.podcast_id === podcastId).length === 0) {
+        // Add episodes from cache to allEpisodes if they're not already there
+        episodesCache[podcastId].forEach(episode => {
+            if (!allEpisodes.find(e => e.id === episode.id)) {
+                const podcast = podcasts.find(p => p.id === episode.podcast_id);
+                allEpisodes.push({
+                    ...episode,
+                    podcast_title: podcast?.title || 'Unknown Podcast',
+                    podcast_image: podcast?.image_url
+                });
+            }
+        });
+        // Recalculate count from updated allEpisodes
+        count = allEpisodes.filter(ep => ep.podcast_id === podcastId).length;
+    }
+    
+    return count;
+}
+
+// Check if a podcast is a "Daily" podcast (200+ episodes)
+function isDailyPodcast(podcastId) {
+    const count = getPodcastEpisodeCount(podcastId);
+    return count >= 200;
+}
+
+// Get episode count display text (Daily for 200+, count for limited series)
+function getEpisodeCountDisplay(podcastId) {
+    const count = getPodcastEpisodeCount(podcastId);
+    if (count === 0) return null;
+    if (count >= 200) {
+        return 'Daily';
+    }
+    return `${count} ${count === 1 ? 'episode' : 'episodes'}`;
+}
+
+// Words to exclude from author names
+const EXCLUDED_AUTHOR_WORDS = [
+    'sol good media',
+    'sol good network',
+    'public domain',
+    'solgoodmedia',
+    'solgoodnetwork',
+    'solgoodmedia.com'
+];
+
+// Check if author should be hidden (entire author name matches excluded words)
+function shouldHideAuthor(author) {
+    if (!author) return true;
+    const authorLower = author.toLowerCase().trim();
+    return EXCLUDED_AUTHOR_WORDS.some(word => authorLower === word);
+}
+
+// Clean author text by removing excluded words
+function cleanAuthorText(author) {
+    if (!author) return '';
+    let cleaned = author.trim();
+    
+    // Remove excluded words/phrases from the author text
+    EXCLUDED_AUTHOR_WORDS.forEach(word => {
+        // Remove word if it appears standalone (case insensitive)
+        const regex = new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
+        cleaned = cleaned.replace(regex, '').trim();
+    });
+    
+    // Clean up extra spaces and punctuation
+    cleaned = cleaned.replace(/\s+/g, ' ').replace(/^[,\s\-]+|[,\s\-]+$/g, '').trim();
+    
+    return cleaned;
+}
+
+// Filter podcasts by episode duration
+function filterPodcastsByDuration(podcastsToFilter) {
+    if (durationFilter === 'all') {
+        return podcastsToFilter;
+    }
+    
+    return podcastsToFilter.filter(podcast => {
+        const podcastEpisodes = allEpisodes.filter(ep => ep.podcast_id === podcast.id);
+        
+        // Check if any episode matches the duration filter
+        return podcastEpisodes.some(episode => {
+            const durationMinutes = (episode.duration_seconds || 0) / 60;
+            
+            switch (durationFilter) {
+                case 'under10':
+                    return durationMinutes > 0 && durationMinutes < 10;
+                case '10-30':
+                    return durationMinutes >= 10 && durationMinutes <= 30;
+                case '30-60':
+                    return durationMinutes > 30 && durationMinutes <= 60;
+                case '60plus':
+                    return durationMinutes > 60;
+                default:
+                    return true;
+            }
+        });
+    });
+}
+
+// Sort podcasts based on current sort mode
+function sortPodcasts(podcastsToSort) {
+    const sorted = [...podcastsToSort];
+    
+    switch (sortMode) {
+        case 'title-asc':
+            sorted.sort((a, b) => {
+                const titleA = (a.title || '').toLowerCase();
+                const titleB = (b.title || '').toLowerCase();
+                return titleA.localeCompare(titleB);
+            });
+            break;
+        case 'title-desc':
+            sorted.sort((a, b) => {
+                const titleA = (a.title || '').toLowerCase();
+                const titleB = (b.title || '').toLowerCase();
+                return titleB.localeCompare(titleA);
+            });
+            break;
+    }
+    
+    return sorted;
+}
+
+// Apply duration filter
+function applyDurationFilter() {
+    const filterSelect = document.getElementById('duration-filter');
+    durationFilter = filterSelect.value;
+    
+    // Re-render with filtered podcasts
+    const currentPodcasts = currentCategory 
+        ? podcasts.filter(p => {
+            if (p.genre && Array.isArray(p.genre)) {
+                return p.genre.some(g => g && g.trim() === currentCategory);
+            }
+            return p.genre && p.genre.trim() === currentCategory;
+        })
+        : podcasts;
+    
+    renderPodcasts(currentPodcasts);
+}
+
+// Set view mode (grid or list)
+function setViewMode(mode) {
+    viewMode = mode;
+    const gridBtn = document.getElementById('view-grid-btn');
+    const listBtn = document.getElementById('view-list-btn');
+    const gridEl = document.getElementById('podcast-grid');
+    const listEl = document.getElementById('podcast-list');
+    
+    if (mode === 'grid') {
+        gridBtn.classList.add('active');
+        listBtn.classList.remove('active');
+        gridEl.classList.remove('hidden');
+        listEl.classList.add('hidden');
+    } else {
+        listBtn.classList.add('active');
+        gridBtn.classList.remove('active');
+        gridEl.classList.add('hidden');
+        listEl.classList.remove('hidden');
+    }
+    
+    // Re-render with current view mode
+    const currentPodcasts = currentCategory 
+        ? podcasts.filter(p => {
+            if (p.genre && Array.isArray(p.genre)) {
+                return p.genre.some(g => g && g.trim() === currentCategory);
+            }
+            return p.genre && p.genre.trim() === currentCategory;
+        })
+        : podcasts;
+    
+    renderPodcasts(currentPodcasts);
+}
+
+// Apply sorting
+function applySorting() {
+    const sortSelect = document.getElementById('sort-select');
+    sortMode = sortSelect.value;
+    
+    // Re-render with sorted podcasts
+    const currentPodcasts = currentCategory 
+        ? podcasts.filter(p => {
+            if (p.genre && Array.isArray(p.genre)) {
+                return p.genre.some(g => g && g.trim() === currentCategory);
+            }
+            return p.genre && p.genre.trim() === currentCategory;
+        })
+        : podcasts;
+    
+    renderPodcasts(currentPodcasts);
+}
+
+// Update podcast count display
+function updatePodcastCount() {
+    const countEl = document.getElementById('podcast-count');
+    let currentPodcasts = currentCategory 
+        ? podcasts.filter(p => {
+            if (p.genre && Array.isArray(p.genre)) {
+                return p.genre.some(g => g && g.trim() === currentCategory);
+            }
+            return p.genre && p.genre.trim() === currentCategory;
+        })
+        : podcasts;
+    
+    // Apply duration filter to count
+    currentPodcasts = filterPodcastsByDuration(currentPodcasts);
+    
+    if (countEl) {
+        countEl.textContent = `${currentPodcasts.length} ${currentPodcasts.length === 1 ? 'podcast' : 'podcasts'}`;
+    }
+}
+
+// Render podcast grid
+function renderPodcasts(podcastsToRender = podcasts, containerEl = null) {
+    // Filter by duration first
+    const filteredPodcasts = filterPodcastsByDuration(podcastsToRender);
+    
+    // Sort the podcasts
+    const sortedPodcasts = sortPodcasts(filteredPodcasts);
+    
+    // Update count
+    updatePodcastCount();
+    
+    // Render grid view
+    const gridEl = containerEl || document.getElementById('podcast-grid');
+    if (!gridEl) {
+        console.error('podcast-grid element not found');
+        return;
+    }
+    gridEl.innerHTML = sortedPodcasts.map(podcast => {
+        const isFavorite = isPodcastFavorited(podcast.id);
+        return `
+        <div class="podcast-card">
+            <div class="podcast-card-content" onclick="openEpisodes('${podcast.id}')">
+                <img 
+                    src="${podcast.image_url || getPlaceholderImage()}" 
+                    alt="${escapeHtml(podcast.title || 'Podcast')}"
+                    class="podcast-image"
+                    onerror="this.src='${getPlaceholderImage()}'"
+                >
+                <div class="podcast-info">
+                    <div class="podcast-title">${escapeHtml(podcast.title || 'Untitled Podcast')}</div>
+                    ${(() => {
+                        const cleanedAuthor = podcast.author ? cleanAuthorText(podcast.author) : '';
+                        return cleanedAuthor && !shouldHideAuthor(cleanedAuthor) ? `<div class="podcast-author">${escapeHtml(cleanedAuthor)}</div>` : '';
+                    })()}
+                </div>
+            </div>
+            <button class="btn-podcast-favorite ${isFavorite ? 'favorited' : ''}" onclick="event.stopPropagation(); togglePodcastFavorite('${podcast.id}');" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+                ${isFavorite ? '❤️' : '🤍'}
+            </button>
+        </div>
+    `;
+    }).join('');
+    
+    // Render list view
+    const listEl = document.getElementById('podcast-list');
+    if (listEl) {
+        listEl.innerHTML = sortedPodcasts.map(podcast => {
+            const isFavorite = isPodcastFavorited(podcast.id);
+            const cleanedAuthor = podcast.author ? cleanAuthorText(podcast.author) : '';
+            const showAuthor = cleanedAuthor && !shouldHideAuthor(cleanedAuthor);
+            return `
+            <div class="podcast-list-item">
+                <div class="podcast-list-item-content" onclick="openEpisodes('${podcast.id}')">
+                    <div class="podcast-list-image">
+                        <img 
+                            src="${podcast.image_url || getPlaceholderImage()}" 
+                            alt="${escapeHtml(podcast.title || 'Podcast')}"
+                            class="podcast-list-artwork"
+                            onerror="this.src='${getPlaceholderImage()}'"
+                        >
+                    </div>
+                    <div class="podcast-list-info">
+                        <div class="podcast-list-title">${escapeHtml(podcast.title || 'Untitled Podcast')}</div>
+                        ${(() => {
+                            const cleanedAuthor = podcast.author ? cleanAuthorText(podcast.author) : '';
+                            return cleanedAuthor && !shouldHideAuthor(cleanedAuthor) ? `<div class="podcast-list-meta"><span>${escapeHtml(cleanedAuthor)}</span></div>` : '';
+                        })()}
+                    </div>
+                </div>
+                <button class="btn-podcast-favorite-list ${isFavorite ? 'favorited' : ''}" onclick="event.stopPropagation(); togglePodcastFavorite('${podcast.id}');" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+                    ${isFavorite ? '❤️' : '🤍'}
+                </button>
+            </div>
+        `;
+        }).join('');
+    }
+}
+
+// Filter episodes by duration
+function filterEpisodesByDuration(episodesToFilter) {
+    if (episodesDurationFilter === 'all') {
+        return episodesToFilter;
+    }
+    
+    return episodesToFilter.filter(episode => {
+        const durationMinutes = (episode.duration_seconds || 0) / 60;
+        
+        switch (episodesDurationFilter) {
+            case 'under10':
+                return durationMinutes > 0 && durationMinutes < 10;
+            case '10-30':
+                return durationMinutes >= 10 && durationMinutes <= 30;
+            case '30-60':
+                return durationMinutes > 30 && durationMinutes <= 60;
+            case '60plus':
+                return durationMinutes > 60;
+            default:
+                return true;
+        }
+    });
+}
+
+// Sort episodes
+function sortEpisodes(episodesToSort) {
+    const sorted = [...episodesToSort];
+    
+    switch (episodesSortMode) {
+        case 'title-asc':
+            sorted.sort((a, b) => {
+                const titleA = (a.title || '').toLowerCase();
+                const titleB = (b.title || '').toLowerCase();
+                return titleA.localeCompare(titleB);
+            });
+            break;
+        case 'title-desc':
+            sorted.sort((a, b) => {
+                const titleA = (a.title || '').toLowerCase();
+                const titleB = (b.title || '').toLowerCase();
+                return titleB.localeCompare(titleA);
+            });
+            break;
+        case 'date-desc':
+            sorted.sort((a, b) => {
+                const dateA = a.pub_date ? new Date(a.pub_date).getTime() : 0;
+                const dateB = b.pub_date ? new Date(b.pub_date).getTime() : 0;
+                return dateB - dateA;
+            });
+            break;
+        case 'date-asc':
+            sorted.sort((a, b) => {
+                const dateA = a.pub_date ? new Date(a.pub_date).getTime() : 0;
+                const dateB = b.pub_date ? new Date(b.pub_date).getTime() : 0;
+                return dateA - dateB;
+            });
+            break;
+    }
+    
+    return sorted;
+}
+
+// Apply episodes sorting
+function applyEpisodesSorting() {
+    const sortSelect = document.getElementById('episodes-sort-select');
+    episodesSortMode = sortSelect.value;
+    loadAllEpisodesPage();
+}
+
+// Apply episodes duration filter
+function applyEpisodesDurationFilter() {
+    const filterSelect = document.getElementById('episodes-duration-filter');
+    episodesDurationFilter = filterSelect.value;
+    loadAllEpisodesPage();
+}
+
+// Load all episodes page
+function loadAllEpisodesPage() {
+    const listEl = document.getElementById('all-episodes-list');
+    const controlsEl = document.getElementById('episodes-controls');
+    
+    if (!listEl) return;
+    
+    // Show controls
+    if (controlsEl) controlsEl.classList.remove('hidden');
+    
+    listEl.innerHTML = '';
+    
+    setTimeout(() => {
+        if (allEpisodes.length === 0) {
+            listEl.innerHTML = '<div class="empty"><p>No episodes available</p></div>';
+            return;
+        }
+        
+        // Filter by duration first
+        let filteredEpisodes = filterEpisodesByDuration(allEpisodes);
+        
+        // Sort episodes
+        const sortedEpisodes = sortEpisodes(filteredEpisodes);
+        
+        // Update filter selects
+        const sortSelect = document.getElementById('episodes-sort-select');
+        const durationFilterSelect = document.getElementById('episodes-duration-filter');
+        if (sortSelect) sortSelect.value = episodesSortMode;
+        if (durationFilterSelect) durationFilterSelect.value = episodesDurationFilter;
+        
+        const episodesHTML = sortedEpisodes.map(episode => {
+            const podcast = podcasts.find(p => p.id === episode.podcast_id);
+            if (!podcast) return '';
+            
+            const progress = getEpisodeProgress(episode.id);
+            const isCompleted = progress >= 95;
+            const progressBar = `<div class="progress-bar"><div class="progress-fill" style="width: ${progress}%"></div></div>`;
+            const isFavorite = isEpisodeFavorited(episode.id);
+            const isCurrentEpisode = currentEpisode && currentEpisode.id === episode.id;
+            const isEpisodePlaying = isCurrentEpisode && isPlaying;
+            
+            return `
+                <div class="episode-item ${isCompleted ? 'episode-completed' : ''} ${isCurrentEpisode ? 'episode-playing' : ''}">
+                    <div class="episode-item-image">
+                        <img src="${podcast.image_url || getPlaceholderImage()}" 
+                             alt="${escapeHtml(podcast.title || '')}" 
+                             class="episode-list-artwork"
+                             onerror="this.src='${getPlaceholderImage()}'">
+                    </div>
+                    <button class="btn-episode-play ${isEpisodePlaying ? 'playing' : ''}" onclick="event.stopPropagation(); ${isEpisodePlaying ? 'togglePlayPause()' : `playEpisode(${JSON.stringify(episode).replace(/"/g, '&quot;')})`}" title="${isEpisodePlaying ? 'Pause' : 'Play'}">
+                        <span class="episode-play-icon" data-episode-id="${episode.id}">${isEpisodePlaying ? '⏸' : '▶'}</span>
+                    </button>
+                    <div class="episode-item-main" onclick="openEpisodeDetail('${episode.id}', '${podcast.id}')">
+                        <div class="episode-title">${escapeHtml(episode.title || 'Untitled Episode')}</div>
+                        <div class="episode-meta">
+                            <span onclick="event.stopPropagation(); openEpisodes('${podcast.id}')" style="cursor: pointer; text-decoration: underline;">${escapeHtml(podcast.title || 'Unknown Podcast')}</span>
+                            ${episode.pub_date ? `<span>• ${formatDate(episode.pub_date)}</span>` : ''}
+                            ${episode.duration_seconds ? `<span>• ${formatDuration(episode.duration_seconds)}</span>` : ''}
+                            ${progress > 0 ? `<span class="episode-progress-text">${Math.round(progress)}%</span>` : ''}
+                        </div>
+                        ${progressBar}
+                    </div>
+                    <button class="btn-favorite ${isFavorite ? 'favorited' : ''}" onclick="event.stopPropagation(); toggleEpisodeFavorite('${episode.id}', '${podcast.id}')" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+                        ${isFavorite ? '❤️' : '🤍'}
+                    </button>
+                </div>
+            `;
+        }).filter(Boolean).join('');
+        
+        listEl.innerHTML = `<div class="episodes-list-content">${episodesHTML}</div>`;
+    }, 300);
+}
+
+// Open episodes page for a podcast
+async function openEpisodes(podcastId) {
+    currentPodcast = podcasts.find(p => p.id === podcastId);
+    navigateTo('episodes');
+    loadEpisodesPage();
+}
+
+// Determine default sort order for a podcast based on its characteristics
+function getDefaultPodcastSortOrder(podcast, episodes = []) {
+    if (!podcast) return 'date-desc'; // Default to newest first
+    
+    // Check genre for book-related keywords
+    const genres = podcast.genre || [];
+    const genreStr = Array.isArray(genres) ? genres.join(' ').toLowerCase() : String(genres || '').toLowerCase();
+    
+    const bookKeywords = ['book', 'audiobook', 'literature', 'novel', 'chapter', 'storytelling', 'fiction', 'narrative'];
+    const isBookPodcast = bookKeywords.some(keyword => genreStr.includes(keyword));
+    
+    if (isBookPodcast) {
+        return 'date-asc'; // Books should be oldest first (first chapter first)
+    }
+    
+    // Check title for book/chapter indicators
+    const titleStr = (podcast.title || '').toLowerCase();
+    const titleBookKeywords = ['chapter', 'part 1', 'episode 1', 'book', 'audiobook'];
+    const titleSuggestsBook = titleBookKeywords.some(keyword => titleStr.includes(keyword));
+    
+    if (titleSuggestsBook) {
+        return 'date-asc'; // Books should be oldest first
+    }
+    
+    // Check episode titles for chapter/part patterns (strongest indicator)
+    if (episodes && episodes.length > 0) {
+        const episodeTitlePatterns = [
+            /chapter\s+\d+/i,
+            /part\s+\d+/i,
+            /episode\s+0*1[^\d]/i, // Episode 1, Episode 01 (but not Episode 10, 11, etc.)
+            /^chapter\s+\d+/i,
+            /^part\s+\d+/i
+        ];
+        
+        // Check first few episodes for chapter/part patterns
+        const sampleEpisodes = episodes.slice(0, Math.min(5, episodes.length));
+        const hasChapterPattern = sampleEpisodes.some(ep => {
+            const epTitle = (ep.title || '').toLowerCase();
+            return episodeTitlePatterns.some(pattern => pattern.test(epTitle));
+        });
+        
+        if (hasChapterPattern) {
+            return 'date-asc'; // Books/chapters should be oldest first
+        }
+    }
+    
+    // Default: newest first (for daily shows, news, etc.)
+    return 'date-desc';
+}
+
+// Filter podcast episodes by duration
+function filterPodcastEpisodesByDuration(episodesToFilter) {
+    if (podcastEpisodesDurationFilter === 'all') {
+        return episodesToFilter;
+    }
+    
+    return episodesToFilter.filter(episode => {
+        const durationMinutes = (episode.duration_seconds || 0) / 60;
+        
+        switch (podcastEpisodesDurationFilter) {
+            case 'under10':
+                return durationMinutes > 0 && durationMinutes < 10;
+            case '10-30':
+                return durationMinutes >= 10 && durationMinutes <= 30;
+            case '30-60':
+                return durationMinutes > 30 && durationMinutes <= 60;
+            case '60plus':
+                return durationMinutes > 60;
+            default:
+                return true;
+        }
+    });
+}
+
+// Sort podcast episodes
+function sortPodcastEpisodes(episodesToSort) {
+    const sorted = [...episodesToSort];
+    
+    switch (podcastEpisodesSortMode) {
+        case 'title-asc':
+            sorted.sort((a, b) => {
+                const titleA = (a.title || '').toLowerCase();
+                const titleB = (b.title || '').toLowerCase();
+                return titleA.localeCompare(titleB);
+            });
+            break;
+        case 'title-desc':
+            sorted.sort((a, b) => {
+                const titleA = (a.title || '').toLowerCase();
+                const titleB = (b.title || '').toLowerCase();
+                return titleB.localeCompare(titleA);
+            });
+            break;
+        case 'date-desc':
+            sorted.sort((a, b) => {
+                const dateA = a.pub_date ? new Date(a.pub_date).getTime() : 0;
+                const dateB = b.pub_date ? new Date(b.pub_date).getTime() : 0;
+                return dateB - dateA;
+            });
+            break;
+        case 'date-asc':
+            sorted.sort((a, b) => {
+                const dateA = a.pub_date ? new Date(a.pub_date).getTime() : 0;
+                const dateB = b.pub_date ? new Date(b.pub_date).getTime() : 0;
+                return dateA - dateB;
+            });
+            break;
+    }
+    
+    return sorted;
+}
+
+// Restore podcast sort preferences from localStorage
+function restorePodcastSortPreferences() {
+    try {
+        const stored = localStorage.getItem(PODCAST_SORT_PREFERENCES_KEY);
+        if (stored) {
+            podcastSortPreferences = JSON.parse(stored);
+        }
+    } catch (e) {
+        console.error('Error restoring podcast sort preferences:', e);
+        podcastSortPreferences = {};
+    }
+}
+
+// Save podcast sort preferences to localStorage
+function savePodcastSortPreferences() {
+    try {
+        localStorage.setItem(PODCAST_SORT_PREFERENCES_KEY, JSON.stringify(podcastSortPreferences));
+        debouncedSync(); // Sync to server if enabled
+    } catch (e) {
+        console.error('Error saving podcast sort preferences:', e);
+    }
+}
+
+// Apply podcast episodes sorting
+function applyPodcastEpisodesSorting() {
+    const sortSelect = document.getElementById('podcast-episodes-sort-select');
+    podcastEpisodesSortMode = sortSelect.value;
+    // Store user's preference for this podcast
+    if (currentPodcast) {
+        podcastSortPreferences[currentPodcast.id] = podcastEpisodesSortMode;
+        savePodcastSortPreferences();
+    }
+    loadEpisodesPage();
+}
+
+// Apply podcast episodes duration filter
+function applyPodcastEpisodesDurationFilter() {
+    const filterSelect = document.getElementById('podcast-episodes-duration-filter');
+    podcastEpisodesDurationFilter = filterSelect.value;
+    loadEpisodesPage();
+}
+
+// Load episodes page
+async function loadEpisodesPage() {
+    if (!currentPodcast) return;
+    
+    const loadingEl = document.getElementById('episodes-loading');
+    const listEl = document.getElementById('episodes-list');
+    const titleEl = document.getElementById('episodes-page-title');
+    const controlsEl = document.getElementById('podcast-episodes-controls');
+    
+    titleEl.textContent = currentPodcast.title || 'Episodes';
+    loadingEl.classList.remove('hidden');
+    listEl.innerHTML = '';
+    
+    try {
+        let episodes;
+        
+        // Check cache first
+        if (episodesCache[currentPodcast.id]) {
+            episodes = episodesCache[currentPodcast.id];
+        } else {
+            episodes = await apiService.fetchEpisodes(currentPodcast.id);
+            episodesCache[currentPodcast.id] = episodes;
+            
+            // Add episodes to allEpisodes if not already present (for accurate counting)
+            episodes.forEach(episode => {
+                if (!allEpisodes.find(e => e.id === episode.id)) {
+                    allEpisodes.push({
+                        ...episode,
+                        podcast_title: currentPodcast.title || 'Unknown Podcast',
+                        podcast_image: currentPodcast.image_url
+                    });
+                }
+            });
+            
+            // Re-extract categories to include "Daily" if this podcast now has 200+ episodes
+            extractCategories();
+            renderSidebar();
+            
+            // Update podcast display to reflect new episode counts
+            if (currentPage !== 'episodes') {
+                renderPodcasts(podcasts);
+            }
+        }
+        
+        loadingEl.classList.add('hidden');
+        
+        if (episodes.length === 0) {
+            if (controlsEl) controlsEl.classList.add('hidden');
+            listEl.innerHTML = '<div class="empty"><p>No episodes available</p></div>';
+        } else {
+            // Set default sort order based on podcast characteristics (only if user hasn't set a preference)
+            const podcastId = currentPodcast.id;
+            if (!podcastSortPreferences[podcastId]) {
+                // First time loading this podcast - use its default sort order
+                // Pass episodes to help detect chapter/part patterns
+                const defaultSort = getDefaultPodcastSortOrder(currentPodcast, episodes);
+                podcastEpisodesSortMode = defaultSort;
+                podcastSortPreferences[podcastId] = defaultSort;
+                savePodcastSortPreferences(); // Save the default preference
+            } else {
+                // User has set a preference for this podcast - use it
+                podcastEpisodesSortMode = podcastSortPreferences[podcastId];
+            }
+            
+            // Show controls
+            if (controlsEl) controlsEl.classList.remove('hidden');
+            
+            // Sort episodes (no duration filtering on podcast episodes page)
+            const sortedEpisodes = sortPodcastEpisodes(episodes);
+            
+            // Update sort select
+            const sortSelect = document.getElementById('podcast-episodes-sort-select');
+            if (sortSelect) sortSelect.value = podcastEpisodesSortMode;
+            
+            // Check if podcast is favorited
+            const isPodcastFavorite = isPodcastFavorited(currentPodcast.id);
+            
+            // Create header with cover art and gradient
+            // Ensure we have the latest podcast data with description
+            const latestPodcast = podcasts.find(p => p.id === currentPodcast.id) || currentPodcast;
+            const hasDescription = latestPodcast.description && latestPodcast.description.trim().length > 0;
+            
+            const headerHTML = `
+                <div class="episodes-page-header" id="episodes-page-header">
+                    <div class="episodes-page-header-content">
+                        <img src="${latestPodcast.image_url || getPlaceholderImage()}" 
+                             alt="${escapeHtml(latestPodcast.title || '')}" 
+                             class="episodes-page-artwork"
+                             onload="extractColorFromImage(this)"
+                             onerror="this.src='${getPlaceholderImage()}'">
+                        ${hasDescription ? `<div class="episodes-page-description">${sanitizeHtml(latestPodcast.description)}</div>` : ''}
+                    </div>
+                    <button class="btn-podcast-favorite-episodes ${isPodcastFavorite ? 'favorited' : ''}" onclick="event.stopPropagation(); togglePodcastFavorite('${latestPodcast.id}');" title="${isPodcastFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+                        ${isPodcastFavorite ? '❤️' : '🤍'}
+                    </button>
+                </div>
+            `;
+            
+            const episodesHTML = sortedEpisodes.map(episode => {
+                const progress = getEpisodeProgress(episode.id);
+                const isCompleted = progress >= 95; // Consider 95%+ as completed
+                const progressBar = `<div class="progress-bar"><div class="progress-fill" style="width: ${progress}%"></div></div>`;
+                const isFavorite = isEpisodeFavorited(episode.id);
+                const isCurrentEpisode = currentEpisode && currentEpisode.id === episode.id;
+                const isEpisodePlaying = isCurrentEpisode && isPlaying;
+                
+                return `
+                    <div class="episode-item ${isCompleted ? 'episode-completed' : ''} ${isCurrentEpisode ? 'episode-playing' : ''}">
+                        <div class="episode-item-image">
+                            <img src="${currentPodcast.image_url || getPlaceholderImage()}" 
+                                 alt="${escapeHtml(currentPodcast.title || '')}" 
+                                 class="episode-list-artwork"
+                                 onerror="this.src='${getPlaceholderImage()}'">
+                        </div>
+                        <button class="btn-episode-play ${isEpisodePlaying ? 'playing' : ''}" onclick="event.stopPropagation(); ${isEpisodePlaying ? 'togglePlayPause()' : `playEpisode(${JSON.stringify(episode).replace(/"/g, '&quot;')})`}" title="${isEpisodePlaying ? 'Pause' : 'Play'}">
+                            <span class="episode-play-icon" data-episode-id="${episode.id}">${isEpisodePlaying ? '⏸' : '▶'}</span>
+                        </button>
+                        <div class="episode-item-main" onclick="openEpisodeDetail('${episode.id}', '${currentPodcast.id}')">
+                            <div class="episode-title">${escapeHtml(episode.title || 'Untitled Episode')}</div>
+                            <div class="episode-meta">
+                                ${episode.pub_date ? `<span>${formatDate(episode.pub_date)}</span>` : ''}
+                                ${episode.duration_seconds ? `<span>${formatDuration(episode.duration_seconds)}</span>` : ''}
+                                ${progress > 0 ? `<span class="episode-progress-text">${Math.round(progress)}%</span>` : ''}
+                            </div>
+                            ${progressBar}
+                        </div>
+                        <button class="btn-favorite ${isFavorite ? 'favorited' : ''}" onclick="event.stopPropagation(); toggleEpisodeFavorite('${episode.id}', '${currentPodcast.id}')" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+                            ${isFavorite ? '❤️' : '🤍'}
+                        </button>
+                    </div>
+                `;
+            }).join('');
+            
+            listEl.innerHTML = headerHTML + `<div class="episodes-list-content">${episodesHTML}</div>`;
+        }
+    } catch (error) {
+        console.error('Error loading episodes:', error);
+        loadingEl.classList.add('hidden');
+        if (controlsEl) controlsEl.classList.add('hidden');
+        listEl.innerHTML = `<div class="error"><p>Error loading episodes: ${escapeHtml(error.message)}</p></div>`;
+    }
+}
+
+// Load player page
+function loadPlayerPage() {
+    const contentEl = document.getElementById('player-page-content');
+    
+    if (!currentEpisode) {
+        contentEl.innerHTML = `
+            <div class="player-page-empty">
+                <p>No episode selected</p>
+                <p class="subtitle">Start playing an episode to see it here</p>
+            </div>
+        `;
+        return;
+    }
+    
+    const podcastTitle = currentPodcast ? currentPodcast.title : 'Unknown Podcast';
+    const progress = getEpisodeProgress(currentEpisode.id);
+    const currentTime = audioPlayer?.currentTime || 0;
+    const duration = audioPlayer?.duration || 0;
+    
+    const artworkUrl = currentPodcast?.image_url || getPlaceholderImage();
+    contentEl.innerHTML = `
+        <div class="player-page-episode" style="background: linear-gradient(135deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.1) 100%), url('${artworkUrl}') center/cover no-repeat;">
+            <div class="player-page-backdrop"></div>
+            <div class="player-page-content-wrapper">
+                <div class="player-page-artwork-container">
+                    ${currentPodcast?.image_url ? `<img src="${artworkUrl}" alt="${escapeHtml(podcastTitle)}" class="player-page-artwork" onerror="this.src='${getPlaceholderImage()}'">` : ''}
+                </div>
+                <div class="player-page-info">
+                    <h2>${escapeHtml(currentEpisode.title || 'Untitled Episode')}</h2>
+                    <p class="player-page-podcast" onclick="openEpisodes('${currentPodcast?.id || ''}')" style="cursor: pointer; text-decoration: underline;">${escapeHtml(podcastTitle)}</p>
+                    ${currentEpisode.description ? `<div class="player-page-description">${sanitizeHtml(currentEpisode.description)}</div>` : ''}
+                    <div class="player-page-controls-large">
+                        <button class="btn-skip-circular-large" onclick="skipBackward()" title="Skip back 10s">
+                            <svg class="skip-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                <path d="M11 18 L5 12 L11 6" />
+                                <path d="M19 18 L13 12 L19 6" />
+                            </svg>
+                            <span class="skip-number">-10</span>
+                        </button>
+                        <button id="play-pause-btn-player-page" class="btn-play-pause-large" onclick="togglePlayPause()">
+                            <span id="play-icon-player-page">${isPlaying ? '⏸' : '▶'}</span>
+                        </button>
+                        <button class="btn-skip-circular-large" onclick="skipForward()" title="Skip forward 30s">
+                            <svg class="skip-arrow forward" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                <path d="M13 18 L19 12 L13 6" />
+                                <path d="M5 18 L11 12 L5 6" />
+                            </svg>
+                            <span class="skip-number">+30</span>
+                        </button>
+                    </div>
+                    <div class="player-page-progress">
+                        <div class="progress-bar-large" onclick="seekToPositionOnPlayerPage(event)">
+                            <div class="progress-fill" style="width: ${progress}%"></div>
+                        </div>
+                        <div class="player-page-time">
+                            <span id="player-page-current-time">${formatTime(currentTime)}</span>
+                            <span id="player-page-duration">${formatTime(duration)}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Seek to position on player page
+function seekToPositionOnPlayerPage(event) {
+    if (!audioPlayer || !currentEpisode) return;
+    
+    const progressBar = event.currentTarget;
+    const rect = progressBar.getBoundingClientRect();
+    const percent = (event.clientX - rect.left) / rect.width;
+    const newTime = percent * audioPlayer.duration;
+    
+    if (!isNaN(newTime) && isFinite(newTime)) {
+        audioPlayer.currentTime = Math.max(0, Math.min(newTime, audioPlayer.duration));
+    }
+}
+
+// Set search mode
+function setSearchMode(mode) {
+    searchMode = mode;
+    document.getElementById('search-mode-episodes').classList.toggle('active', mode === 'episodes');
+    document.getElementById('search-mode-podcasts').classList.toggle('active', mode === 'podcasts');
+    
+    const topSearchInput = document.getElementById('top-search-input');
+    topSearchInput.placeholder = mode === 'episodes' ? 'Search episodes...' : 'Search podcasts...';
+    
+    // If no search query, navigate to show all items
+    if (!topSearchInput.value || topSearchInput.value.trim() === '') {
+        if (mode === 'podcasts') {
+            // Navigate to grid page to show all podcasts
+            navigateTo('grid');
+        } else {
+            // Navigate to all episodes page
+            navigateTo('all-episodes');
+        }
+    } else {
+        // Re-run search if there's a value
+        handleSearch(topSearchInput.value);
+    }
+}
+
+// Handle search input
+function handleSearchInput(value) {
+    if (value && value.trim() !== '') {
+        // Navigate to search page if not already there
+        if (currentPage !== 'search') {
+            navigateTo('search');
+        }
+        handleSearch(value);
+    } else {
+        // If search is cleared, show all items based on mode
+        if (currentPage === 'search') {
+            if (searchMode === 'podcasts') {
+                navigateTo('grid');
+            } else {
+                navigateTo('all-episodes');
+            }
+        }
+    }
+}
+
+// Handle search focus
+function handleSearchFocus() {
+    // Only navigate to search if there's a value, otherwise show all items
+    const topSearchInput = document.getElementById('top-search-input');
+    if (topSearchInput && topSearchInput.value && topSearchInput.value.trim() !== '') {
+        navigateTo('search');
+    } else {
+        // Show all items based on current mode
+        if (searchMode === 'podcasts') {
+            navigateTo('grid');
+        } else {
+            navigateTo('all-episodes');
+        }
+    }
+}
+
+// Search functionality
+function handleSearch(query) {
+    const resultsEl = document.getElementById('search-results');
+    const titleEl = document.getElementById('search-page-title');
+    if (!resultsEl) return;
+    
+    if (!query || query.trim() === '') {
+        resultsEl.innerHTML = '<div class="empty"><p>Start typing to search...</p></div>';
+        if (titleEl) titleEl.textContent = 'Search';
+        return;
+    }
+    
+    if (titleEl) titleEl.textContent = 'Search Results';
+    const searchTerm = query.toLowerCase();
+    
+    if (searchMode === 'episodes') {
+        // Search episodes
+        const matches = allEpisodes.filter(ep => 
+            (ep.title || '').toLowerCase().includes(searchTerm) ||
+            (ep.description || '').toLowerCase().includes(searchTerm)
+        );
+        
+        if (matches.length === 0) {
+            resultsEl.innerHTML = '<div class="empty"><p>No episodes found</p></div>';
+            return;
+        }
+        
+        resultsEl.innerHTML = matches.map(episode => {
+            const podcast = podcasts.find(p => p.id === episode.podcast_id);
+            const isFavorite = podcast ? isEpisodeFavorited(episode.id) : false;
+            return `
+                <div class="search-result-item">
+                    <div class="search-result-main" onclick="openEpisodeDetail('${episode.id}', '${podcast?.id || ''}')">
+                        <div class="search-result-image">
+                            ${podcast?.image_url ? `<img src="${podcast.image_url}" alt="${escapeHtml(podcast.title || '')}" onerror="this.src='${getPlaceholderImage()}'">` : '<div class="placeholder-image"></div>'}
+                        </div>
+                        <div class="search-result-info">
+                            <div class="search-result-title">${escapeHtml(episode.title || 'Untitled Episode')}</div>
+                            <div class="search-result-meta">
+                                <span onclick="event.stopPropagation(); openEpisodes('${podcast?.id || ''}')" style="cursor: pointer; text-decoration: underline;">${escapeHtml(podcast?.title || 'Unknown Podcast')}</span>
+                                ${episode.pub_date ? `<span>• ${formatDate(episode.pub_date)}</span>` : ''}
+                                ${episode.duration_seconds ? `<span>• ${formatDuration(episode.duration_seconds)}</span>` : ''}
+                            </div>
+                            ${episode.description ? `<div class="search-result-description">${sanitizeHtml(episode.description.substring(0, 150))}...</div>` : ''}
+                        </div>
+                    </div>
+                    ${podcast ? `<button class="btn-favorite ${isFavorite ? 'favorited' : ''}" onclick="event.stopPropagation(); toggleEpisodeFavorite('${episode.id}', '${podcast.id}')" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+                        ${isFavorite ? '❤️' : '🤍'}
+                    </button>` : ''}
+                </div>
+            `;
+        }).join('');
+    } else {
+        // Search podcasts
+        const matches = podcasts.filter(p => {
+            const title = (p.title || '').toLowerCase();
+            const author = (p.author || '').toLowerCase();
+            return title.includes(searchTerm) || author.includes(searchTerm);
+        });
+        
+        if (matches.length === 0) {
+            resultsEl.innerHTML = '<div class="empty"><p>No podcasts found</p></div>';
+            return;
+        }
+        
+        resultsEl.innerHTML = matches.map(podcast => {
+            const isFavorite = isPodcastFavorited(podcast.id);
+            return `
+                <div class="search-result-item podcast-result">
+                    <div class="search-result-main" onclick="openEpisodes('${podcast.id}')">
+                        <div class="search-result-image">
+                            ${podcast.image_url ? `<img src="${podcast.image_url}" alt="${escapeHtml(podcast.title || '')}" onerror="this.src='${getPlaceholderImage()}'">` : '<div class="placeholder-image"></div>'}
+                        </div>
+                        <div class="search-result-info">
+                            <div class="search-result-title">${escapeHtml(podcast.title || 'Untitled Podcast')}</div>
+                            ${(() => {
+                                const cleanedAuthor = podcast.author ? cleanAuthorText(podcast.author) : '';
+                                return cleanedAuthor && !shouldHideAuthor(cleanedAuthor) ? `<div class="search-result-meta">
+                                    <span>${escapeHtml(cleanedAuthor)}</span>
+                                </div>` : '';
+                            })()}
+                            ${podcast.description ? `<div class="search-result-description">${sanitizeHtml(podcast.description.substring(0, 200))}...</div>` : ''}
+                        </div>
+                    </div>
+                    <button class="btn-podcast-favorite-search ${isFavorite ? 'favorited' : ''}" onclick="event.stopPropagation(); togglePodcastFavorite('${podcast.id}');" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+                        ${isFavorite ? '❤️' : '🤍'}
+                    </button>
+                </div>
+            `;
+        }).join('');
+    }
+}
+
+// Play episode from search
+function playEpisodeFromSearch(episode) {
+    const podcast = podcasts.find(p => p.id === episode.podcast_id);
+    currentPodcast = podcast;
+    playEpisode(episode);
+    navigateTo('episode');
+}
+
+// Play episode
+function playEpisode(episode) {
+    if (!episode.audio_url) {
+        alert('This episode has no audio URL available.');
+        return;
+    }
+    
+    // Save previous progress if switching episodes
+    if (currentEpisode && currentEpisode.id !== episode.id) {
+        saveProgress();
+    }
+    
+    currentEpisode = episode;
+    
+    // Find podcast if not set
+    if (!currentPodcast || currentPodcast.id !== episode.podcast_id) {
+        currentPodcast = podcasts.find(p => p.id === episode.podcast_id);
+    }
+    
+    // Add to history
+    if (currentPodcast) {
+        addEpisodeToHistory(episode.id, currentPodcast.id);
+    }
+    
+    audioPlayer.src = episode.audio_url;
+    audioPlayer.load();
+    
+    // Restore progress for this episode
+    const savedProgress = getEpisodeProgress(episode.id);
+    if (savedProgress > 0 && savedProgress < 95) {
+        const savedTime = (savedProgress / 100) * (episode.duration_seconds || 0);
+        audioPlayer.addEventListener('loadedmetadata', () => {
+            if (audioPlayer.duration && savedTime < audioPlayer.duration) {
+                audioPlayer.currentTime = savedTime;
+            }
+        }, { once: true });
+    }
+    
+    // Update player UI
+    updatePlayerBar();
+    
+    // Show player bar
+    document.getElementById('player-bar').classList.remove('hidden');
+    
+    // Play audio
+    audioPlayer.play();
+    isPlaying = true;
+    updatePlayPauseButton();
+    
+    // Update pages if we're on them
+    if (currentPage === 'player') {
+        loadPlayerPage();
+    } else if (currentPage === 'episode') {
+        // If we're on the episode detail page, check if we should update displayedEpisode
+        // Only update if the displayed episode is the one we just started playing
+        if (!displayedEpisode || displayedEpisode.id === currentEpisode.id) {
+            displayedEpisode = currentEpisode; // Update to show the playing episode
+        }
+        loadEpisodeDetailPage();
+    }
+    
+    // Update episode detail page if visible
+    if (document.getElementById('episode-detail-content')) {
+        updatePlayPauseButton();
+    }
+    
+    // Update episode list if visible (use in-place update to preserve scroll and button handlers)
+    // Note: updatePlayPauseButton() will handle the in-place updates, so we don't need to reload
+    // Only reload if we're on a different page that shows episodes
+    if (currentPage === 'history') {
+        loadHistoryPage();
+    } else if (currentPage === 'all-episodes') {
+        loadAllEpisodesPage();
+    }
+    // For episodes page, updatePlayPauseButton() already handles in-place updates
+}
+
+// Skip backward 10 seconds
+function skipBackward() {
+    if (!audioPlayer || !currentEpisode) return;
+    audioPlayer.currentTime = Math.max(0, audioPlayer.currentTime - 10);
+}
+
+// Skip forward 30 seconds
+function skipForward() {
+    if (!audioPlayer || !currentEpisode) return;
+    audioPlayer.currentTime = Math.min(audioPlayer.duration, audioPlayer.currentTime + 30);
+}
+
+// Toggle play/pause
+function togglePlayPause() {
+    if (!currentEpisode) return;
+    
+    if (isPlaying) {
+        audioPlayer.pause();
+        isPlaying = false;
+    } else {
+        audioPlayer.play();
+        isPlaying = true;
+    }
+    updatePlayPauseButton();
+}
+
+// Helper function to play episode by ID (used by onclick handlers)
+window.playEpisodeById = function(episodeId) {
+    const episode = findEpisodeById(episodeId);
+    if (episode) {
+        playEpisode(episode);
+    } else {
+        console.error(`Episode not found: ${episodeId}`);
+    }
+};
+
+// Helper function to find episode by ID
+function findEpisodeById(episodeId) {
+    // Try to find from allEpisodes first
+    let episode = allEpisodes.find(e => String(e.id) === String(episodeId));
+    
+    // If not found and we're on episodes page, try to get from cache
+    if (!episode && currentPodcast && episodesCache[currentPodcast.id]) {
+        episode = episodesCache[currentPodcast.id].find(e => String(e.id) === String(episodeId));
+    }
+    
+    return episode;
+}
+
+// Update episode list in-place without reloading (preserves scroll position)
+function updateEpisodeListInPlace() {
+    // Save scroll position - check multiple possible containers
+    let container = null;
+    let scrollPosition = 0;
+    
+    // Try to find the scrollable container
+    if (currentPage === 'episodes') {
+        container = document.getElementById('episodes-list');
+    } else if (currentPage === 'all-episodes') {
+        container = document.getElementById('all-episodes-list');
+    } else if (currentPage === 'history') {
+        container = document.getElementById('history-list');
+    } else if (currentPage === 'favorites') {
+        container = document.getElementById('favorites-content');
+    }
+    
+    // If still no container found, try the class selector as fallback
+    if (!container) {
+        container = document.querySelector('.episodes-full-page');
+    }
+    
+    // If no specific container, use window
+    if (container) {
+        scrollPosition = container.scrollTop || 0;
+    } else {
+        scrollPosition = window.scrollY || document.documentElement.scrollTop || 0;
+    }
+    
+    // Update all episode items
+    const episodeItems = document.querySelectorAll('.episode-item');
+    episodeItems.forEach(item => {
+        const playButton = item.querySelector('.btn-episode-play');
+        const playIcon = item.querySelector('.episode-play-icon');
+        
+        if (!playIcon || !playButton) return;
+        
+        const episodeId = playIcon.getAttribute('data-episode-id');
+        if (!episodeId) return;
+        
+        // Check if this is the currently playing episode
+        const isCurrentEpisode = currentEpisode && String(episodeId) === String(currentEpisode.id);
+        const isEpisodePlaying = isCurrentEpisode && isPlaying;
+        
+        // Update play icon
+        playIcon.textContent = isEpisodePlaying ? '⏸' : '▶';
+        
+        // Update button class
+        if (isEpisodePlaying) {
+            playButton.classList.add('playing');
+        } else {
+            playButton.classList.remove('playing');
+        }
+        
+        // Store episode ID in data attribute for easy lookup
+        playButton.setAttribute('data-episode-id', episodeId);
+        
+        // Remove old onclick attribute and set new one using the helper function
+        playButton.removeAttribute('onclick');
+        if (isEpisodePlaying) {
+            playButton.onclick = function(e) {
+                e.stopPropagation();
+                togglePlayPause();
+            };
+        } else {
+            playButton.onclick = function(e) {
+                e.stopPropagation();
+                const episode = findEpisodeById(episodeId);
+                if (episode) {
+                    playEpisode(episode);
+                }
+            };
+        }
+        
+        playButton.setAttribute('title', isEpisodePlaying ? 'Pause' : 'Play');
+        
+        // Update episode item highlighting
+        if (isCurrentEpisode) {
+            item.classList.add('episode-playing');
+        } else {
+            item.classList.remove('episode-playing');
+        }
+    });
+    
+    // Restore scroll position after a brief delay to ensure DOM updates are complete
+    setTimeout(() => {
+        if (container) {
+            container.scrollTop = scrollPosition;
+        } else {
+            window.scrollTo(0, scrollPosition);
+        }
+    }, 0);
+}
+
+// Helper function to find episode data for an item
+function findEpisodeDataForItem(item, episodeId) {
+    // Try to find from allEpisodes first
+    let episode = allEpisodes.find(e => String(e.id) === String(episodeId));
+    
+    // If not found and we're on episodes page, try to get from cache
+    if (!episode && currentPodcast && episodesCache[currentPodcast.id]) {
+        episode = episodesCache[currentPodcast.id].find(e => String(e.id) === String(episodeId));
+    }
+    
+    return episode;
+}
+
+// Update play/pause button
+function updatePlayPauseButton() {
+    const icon = document.getElementById('play-icon-bar');
+    if (icon) {
+        icon.textContent = isPlaying ? '⏸' : '▶';
+    }
+    // Also update player page button if it exists
+    const playerPageIcon = document.getElementById('play-icon-player-page');
+    if (playerPageIcon) {
+        playerPageIcon.textContent = isPlaying ? '⏸' : '▶';
+    }
+    // Update episode detail page button - only if the displayed episode matches the playing episode
+    const episodeDetailIcon = document.getElementById('episode-detail-play-icon');
+    const episodeDetailText = document.getElementById('episode-detail-play-text');
+    const episodeDetailBtn = document.getElementById('episode-detail-play-btn');
+    if (episodeDetailIcon && episodeDetailText && episodeDetailBtn) {
+        // Only update if we're viewing the episode that's actually playing
+        const isDisplayedEpisodePlaying = displayedEpisode && currentEpisode && displayedEpisode.id === currentEpisode.id;
+        if (isDisplayedEpisodePlaying) {
+            episodeDetailIcon.textContent = isPlaying ? '⏸' : '▶';
+            episodeDetailText.textContent = isPlaying ? 'Pause' : 'Play Episode';
+            if (isPlaying) {
+                episodeDetailBtn.classList.add('playing');
+                episodeDetailBtn.setAttribute('onclick', 'togglePlayPause()');
+            } else {
+                episodeDetailBtn.classList.remove('playing');
+                episodeDetailBtn.setAttribute('onclick', `playEpisode(${JSON.stringify(currentEpisode).replace(/"/g, '&quot;')})`);
+            }
+        } else if (displayedEpisode) {
+            // If viewing a different episode, show "Play Episode"
+            episodeDetailIcon.textContent = '▶';
+            episodeDetailText.textContent = 'Play Episode';
+            episodeDetailBtn.classList.remove('playing');
+            episodeDetailBtn.setAttribute('onclick', `playEpisode(${JSON.stringify(displayedEpisode).replace(/"/g, '&quot;')})`);
+        }
+    }
+    
+    // Update episode list play buttons and highlighting in-place (preserve scroll position)
+    if (currentPage === 'episodes' && currentPodcast) {
+        updateEpisodeListInPlace();
+    }
+    
+    // Update history page play buttons and highlighting in-place
+    if (currentPage === 'history') {
+        updateEpisodeListInPlace();
+    }
+    
+    // Update all-episodes page if visible
+    if (currentPage === 'all-episodes') {
+        updateEpisodeListInPlace();
+    }
+    
+    // Update favorites page if visible
+    if (currentPage === 'favorites') {
+        updateEpisodeListInPlace();
+    }
+    
+    // Update episode detail page favorite button if visible
+    if (currentPage === 'episode' && displayedEpisode) {
+        const favoriteBtn = document.querySelector('.btn-favorite-episode-detail');
+        if (favoriteBtn) {
+            const isFavorite = isEpisodeFavorited(displayedEpisode.id);
+            favoriteBtn.classList.toggle('favorited', isFavorite);
+            favoriteBtn.innerHTML = isFavorite ? '❤️' : '🤍';
+            favoriteBtn.setAttribute('title', isFavorite ? 'Remove from favorites' : 'Add to favorites');
+        }
+    }
+}
+
+// Update player bar info
+function updatePlayerBar() {
+    if (!currentEpisode) return;
+    
+    document.getElementById('player-bar-title').textContent = currentEpisode.title || 'Now Playing';
+    document.getElementById('player-bar-episode').textContent = currentPodcast ? currentPodcast.title : 'Podcast';
+    
+    // Update artwork
+    const imgEl = document.getElementById('player-bar-image');
+    if (imgEl && currentPodcast?.image_url) {
+        imgEl.src = currentPodcast.image_url;
+        imgEl.style.display = 'block';
+    }
+}
+
+// Seek to position in progress bar
+function seekToPosition(event) {
+    if (!audioPlayer || !currentEpisode) return;
+    
+    const progressBar = document.getElementById('player-bar-progress');
+    const rect = progressBar.getBoundingClientRect();
+    const percent = (event.clientX - rect.left) / rect.width;
+    const newTime = percent * audioPlayer.duration;
+    
+    if (!isNaN(newTime) && isFinite(newTime)) {
+        audioPlayer.currentTime = Math.max(0, Math.min(newTime, audioPlayer.duration));
+    }
+}
+
+// Setup audio player event listeners
+function setupAudioPlayer() {
+    if (!audioPlayer) return;
+    
+    audioPlayer.addEventListener('play', () => {
+        isPlaying = true;
+        updatePlayPauseButton();
+    });
+    
+    audioPlayer.addEventListener('pause', () => {
+        isPlaying = false;
+        updatePlayPauseButton();
+    });
+    
+    audioPlayer.addEventListener('loadedmetadata', () => {
+        const duration = formatTime(audioPlayer.duration);
+        document.getElementById('duration-bar').textContent = duration;
+        if (currentPage === 'player') {
+            loadPlayerPage();
+        }
+    });
+    
+    audioPlayer.addEventListener('timeupdate', () => {
+        const current = formatTime(audioPlayer.currentTime);
+        document.getElementById('current-time-bar').textContent = current;
+        
+        // Update progress bar
+        if (audioPlayer.duration) {
+            const progress = (audioPlayer.currentTime / audioPlayer.duration) * 100;
+            const progressFill = document.getElementById('player-bar-progress-fill');
+            if (progressFill) {
+                progressFill.style.width = `${progress}%`;
+            }
+        }
+        
+        // Save progress every 5 seconds
+        if (Math.floor(audioPlayer.currentTime) % 5 === 0) {
+            saveProgress();
+        }
+        
+        // Update player page if visible
+        if (currentPage === 'player' && document.getElementById('player-page-content')) {
+            const progress = audioPlayer.duration ? (audioPlayer.currentTime / audioPlayer.duration) * 100 : 0;
+            const progressFill = document.querySelector('.player-page-progress .progress-fill');
+            if (progressFill) {
+                progressFill.style.width = `${progress}%`;
+            }
+            const currentTimeEl = document.getElementById('player-page-current-time');
+            const durationEl = document.getElementById('player-page-duration');
+            if (currentTimeEl) {
+                currentTimeEl.textContent = current;
+            }
+            if (durationEl && audioPlayer.duration) {
+                durationEl.textContent = formatTime(audioPlayer.duration);
+            }
+        }
+        
+        // Update episode detail page if visible
+        if (currentPage === 'episode') {
+            const progress = audioPlayer.duration ? (audioPlayer.currentTime / audioPlayer.duration) * 100 : 0;
+            const progressBars = document.querySelectorAll('.episode-detail .progress-fill');
+            progressBars.forEach(bar => {
+                bar.style.width = `${progress}%`;
+            });
+        }
+        
+        // Update progress bars in episode lists (episodes page, all episodes, history, etc.)
+        if (currentEpisode && audioPlayer.duration) {
+            const progress = (audioPlayer.currentTime / audioPlayer.duration) * 100;
+            // Find all episode items that are currently playing
+            const playingEpisodeItems = document.querySelectorAll('.episode-item.episode-playing');
+            playingEpisodeItems.forEach(item => {
+                const progressFill = item.querySelector('.progress-bar .progress-fill');
+                if (progressFill) {
+                    progressFill.style.width = `${progress}%`;
+                }
+                // Also update the progress text percentage
+                const progressText = item.querySelector('.episode-progress-text');
+                if (progressText) {
+                    progressText.textContent = `${Math.round(progress)}%`;
+                }
+            });
+        }
+    });
+    
+    audioPlayer.addEventListener('ended', () => {
+        isPlaying = false;
+        updatePlayPauseButton();
+        // Mark as completed
+        if (currentEpisode) {
+            saveEpisodeProgress(currentEpisode.id, 100);
+        }
+    });
+    
+    // Save progress before page unload
+    window.addEventListener('beforeunload', () => {
+        saveProgress();
+    });
+}
+
+// Save progress to localStorage
+function saveProgress() {
+    if (!currentEpisode || !audioPlayer || !audioPlayer.duration) return;
+    
+    const progress = (audioPlayer.currentTime / audioPlayer.duration) * 100;
+    saveEpisodeProgress(currentEpisode.id, progress);
+}
+
+// Save episode progress
+function saveEpisodeProgress(episodeId, progress) {
+    try {
+        const allProgress = JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}');
+        allProgress[episodeId] = {
+            progress: progress,
+            timestamp: Date.now()
+        };
+        localStorage.setItem(PROGRESS_KEY, JSON.stringify(allProgress));
+        debouncedSync(); // Sync to server if enabled
+    } catch (e) {
+        console.error('Error saving progress:', e);
+    }
+}
+
+// Get episode progress
+function getEpisodeProgress(episodeId) {
+    try {
+        const allProgress = JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}');
+        return allProgress[episodeId]?.progress || 0;
+    } catch (e) {
+        return 0;
+    }
+}
+
+// Restore progress when page loads
+function restoreProgress() {
+    // Progress is restored when episode is played
+}
+
+// Format time (seconds to MM:SS or HH:MM:SS)
+function formatTime(seconds) {
+    if (!seconds || isNaN(seconds)) return '0:00';
+    
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    
+    if (hrs > 0) {
+        return `${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
+    return `${mins}:${String(secs).padStart(2, '0')}`;
+}
+
+// Format duration (seconds to human readable)
+function formatDuration(seconds) {
+    if (!seconds) return '';
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    if (hrs > 0) {
+        return `${hrs}h ${mins}m`;
+    }
+    return `${mins}m`;
+}
+
+// Format date
+function formatDate(dateString) {
+    if (!dateString) return '';
+    try {
+        if (typeof dateString === 'number') {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+            
+            if (diffMins < 1) return 'Just now';
+            if (diffMins < 60) return `${diffMins}m ago`;
+            if (diffHours < 24) return `${diffHours}h ago`;
+            if (diffDays < 7) return `${diffDays}d ago`;
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        }
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    } catch (e) {
+        return dateString;
+    }
+}
+
+// Get placeholder image
+function getPlaceholderImage() {
+    return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iIzE5MUEyNCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM2NjYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=';
+}
+
+// Extract dominant color from image for gradient
+window.extractColorFromImage = async function(img) {
+    try {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = img.naturalWidth || img.width;
+        canvas.height = img.naturalHeight || img.height;
+        ctx.drawImage(img, 0, 0);
+        
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        
+        // Sample colors from center area
+        const centerX = Math.floor(canvas.width / 2);
+        const centerY = Math.floor(canvas.height / 2);
+        const sampleSize = Math.min(50, Math.floor(canvas.width * 0.3));
+        
+        let r = 0, g = 0, b = 0, count = 0;
+        
+        for (let y = centerY - sampleSize; y < centerY + sampleSize; y += 5) {
+            for (let x = centerX - sampleSize; x < centerX + sampleSize; x += 5) {
+                if (x >= 0 && x < canvas.width && y >= 0 && y < canvas.height) {
+                    const idx = (y * canvas.width + x) * 4;
+                    r += data[idx];
+                    g += data[idx + 1];
+                    b += data[idx + 2];
+                    count++;
+                }
+            }
+        }
+        
+        if (count > 0) {
+            r = Math.floor(r / count);
+            g = Math.floor(g / count);
+            b = Math.floor(b / count);
+            
+            // Make it slightly darker and more muted for subtle gradient
+            r = Math.floor(r * 0.7);
+            g = Math.floor(g * 0.7);
+            b = Math.floor(b * 0.7);
+            
+            const headerEl = document.getElementById('episodes-page-header');
+            if (headerEl) {
+                headerEl.style.background = `linear-gradient(180deg, rgba(${r}, ${g}, ${b}, 0.15) 0%, rgba(${r}, ${g}, ${b}, 0) 100%)`;
+            }
+        }
+    } catch (e) {
+        // Fallback if color extraction fails
+        console.log('Color extraction failed, using default');
+    }
+};
+
+// Escape HTML to prevent XSS
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Sanitize HTML to allow safe tags (like links) while preventing XSS
+function sanitizeHtml(html) {
+    if (!html) return '';
+    
+    // Create a temporary div to parse the HTML
+    const temp = document.createElement('div');
+    temp.innerHTML = html;
+    
+    // List of allowed HTML tags
+    const allowedTags = ['a', 'p', 'br', 'strong', 'em', 'b', 'i', 'u', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'span', 'div'];
+    
+    // Allowed attributes for anchor tags
+    const allowedAttributes = {
+        'a': ['href', 'target', 'rel'],
+        'span': ['style'],
+        'div': ['style'],
+        'p': ['style']
+    };
+    
+    // Recursively sanitize the DOM tree
+    function sanitizeNode(node) {
+        if (node.nodeType === Node.TEXT_NODE) {
+            return node.cloneNode(true);
+        }
+        
+        if (node.nodeType === Node.ELEMENT_NODE) {
+            const tagName = node.tagName.toLowerCase();
+            
+            // Remove disallowed tags and script tags
+            if (!allowedTags.includes(tagName) || tagName === 'script' || tagName === 'iframe' || tagName === 'object' || tagName === 'embed') {
+                // Return its children as document fragment
+                const fragment = document.createDocumentFragment();
+                Array.from(node.childNodes).forEach(child => {
+                    const sanitized = sanitizeNode(child);
+                    if (sanitized) {
+                        fragment.appendChild(sanitized);
+                    }
+                });
+                return fragment;
+            }
+            
+            // Create a new element with the same tag
+            const newNode = document.createElement(tagName);
+            
+            // Copy allowed attributes
+            const allowedAttrs = allowedAttributes[tagName] || [];
+            Array.from(node.attributes).forEach(attr => {
+                if (allowedAttrs.includes(attr.name.toLowerCase())) {
+                    // Special handling for href to ensure it's safe
+                    if (attr.name.toLowerCase() === 'href') {
+                        const href = attr.value;
+                        // Allow http, https, mailto, and relative URLs
+                        if (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('mailto:') || href.startsWith('/') || href.startsWith('#')) {
+                            newNode.setAttribute('href', href);
+                            // Ensure rel="noopener" for external links
+                            if ((href.startsWith('http://') || href.startsWith('https://')) && !href.startsWith(window.location.origin)) {
+                                newNode.setAttribute('rel', 'noopener noreferrer');
+                                newNode.setAttribute('target', '_blank');
+                            }
+                        }
+                    } else {
+                        newNode.setAttribute(attr.name, attr.value);
+                    }
+                }
+            });
+            
+            // Recursively sanitize children
+            Array.from(node.childNodes).forEach(child => {
+                const sanitized = sanitizeNode(child);
+                if (sanitized) {
+                    if (sanitized.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
+                        Array.from(sanitized.childNodes).forEach(c => newNode.appendChild(c));
+                    } else {
+                        newNode.appendChild(sanitized);
+                    }
+                }
+            });
+            
+            return newNode;
+        }
+        
+        return null;
+    }
+    
+    // Sanitize all nodes in the temp div
+    const fragment = document.createDocumentFragment();
+    Array.from(temp.childNodes).forEach(node => {
+        const sanitized = sanitizeNode(node);
+        if (sanitized) {
+            if (sanitized.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
+                Array.from(sanitized.childNodes).forEach(c => fragment.appendChild(c));
+            } else {
+                fragment.appendChild(sanitized);
+            }
+        }
+    });
+    
+    // Convert back to HTML string
+    temp.innerHTML = '';
+    temp.appendChild(fragment);
+    return temp.innerHTML;
+}
+
+// ============================================
+// Authentication & Sync Functions
+// ============================================
+
+// Setup authentication state listeners
+function setupAuth() {
+    // Handle email confirmation redirect
+    handleEmailConfirmation();
+    
+    // Check if user is already signed in
+    authService.getSession().then(session => {
+        if (session) {
+            updateAuthUI(session.user);
+            syncEnabled = true;
+            // Sync on page load
+            syncFromServer();
+        } else {
+            updateAuthUI(null);
+        }
+    });
+
+    // Listen for auth state changes
+    authService.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_IN' && session) {
+            updateAuthUI(session.user);
+            syncEnabled = true;
+            // Sync local data to server on sign in
+            syncToServer();
+        } else if (event === 'SIGNED_OUT') {
+            updateAuthUI(null);
+            syncEnabled = false;
+            localStorage.removeItem('user_sync_enabled');
+        }
+    });
+}
+
+// Handle email confirmation redirect
+async function handleEmailConfirmation() {
+    const client = authService.getSupabaseClient();
+    if (!client) return;
+    
+    // Check for hash fragments from email confirmation
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const accessToken = hashParams.get('access_token');
+    const type = hashParams.get('type');
+    
+    if (type === 'recovery' || type === 'signup') {
+        // User clicked email confirmation link
+        // Supabase client should handle this automatically, but we can show a message
+        if (accessToken) {
+            // Clear the hash from URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+            // Wait a moment for session to be established
+            setTimeout(async () => {
+                const session = await authService.getSession();
+                if (session) {
+                    updateAuthUI(session.user);
+                    syncEnabled = true;
+                    await syncToServer();
+                    await syncFromServer();
+                    // Show success message
+                    const modal = document.getElementById('auth-modal');
+                    if (modal) {
+                        modal.classList.remove('hidden');
+                        showSignedInView(session.user);
+                        showAuthSuccess('Email confirmed! You are now signed in.');
+                    }
+                }
+            }, 500);
+        }
+    }
+}
+
+// Update auth UI based on user state
+function updateAuthUI(user) {
+    const authButton = document.getElementById('auth-button');
+    if (!authButton) return;
+
+    if (user) {
+        authButton.textContent = user.email ? user.email.split('@')[0] : 'Account';
+        authButton.classList.add('signed-in');
+    } else {
+        authButton.textContent = 'Sign In';
+        authButton.classList.remove('signed-in');
+    }
+}
+
+// Toggle auth modal
+window.toggleAuthModal = async function() {
+    const modal = document.getElementById('auth-modal');
+    const user = await authService.getCurrentUser();
+    
+    if (user) {
+        // If signed in, show account info
+        showSignedInView(user);
+    } else {
+        // Show sign in form
+        switchAuthMode('signin');
+    }
+    
+    modal.classList.toggle('hidden');
+};
+
+// Close auth modal
+window.closeAuthModal = function() {
+    const modal = document.getElementById('auth-modal');
+    modal.classList.add('hidden');
+    clearAuthMessages();
+};
+
+// Switch between sign in and sign up
+window.switchAuthMode = function(mode) {
+    const signinForm = document.getElementById('auth-signin-form');
+    const signupForm = document.getElementById('auth-signup-form');
+    const signedinView = document.getElementById('auth-signedin');
+    const modalTitle = document.getElementById('auth-modal-title');
+    
+    clearAuthMessages();
+    
+    if (mode === 'signup') {
+        signinForm.classList.add('hidden');
+        signupForm.classList.remove('hidden');
+        signedinView.classList.add('hidden');
+        modalTitle.textContent = 'Sign Up';
+    } else {
+        signinForm.classList.remove('hidden');
+        signupForm.classList.add('hidden');
+        signedinView.classList.add('hidden');
+        modalTitle.textContent = 'Sign In';
+    }
+};
+
+// Show signed in view
+function showSignedInView(user) {
+    const signinForm = document.getElementById('auth-signin-form');
+    const signupForm = document.getElementById('auth-signup-form');
+    const signedinView = document.getElementById('auth-signedin');
+    const modalTitle = document.getElementById('auth-modal-title');
+    const userEmail = document.getElementById('auth-user-email');
+    
+    signinForm.classList.add('hidden');
+    signupForm.classList.add('hidden');
+    signedinView.classList.remove('hidden');
+    modalTitle.textContent = 'Account';
+    if (userEmail) {
+        userEmail.textContent = user.email || 'User';
+    }
+    updateSyncStatus('Synced');
+}
+
+// Handle sign in
+window.handleSignIn = async function() {
+    const email = document.getElementById('signin-email').value;
+    const password = document.getElementById('signin-password').value;
+    
+    if (!email || !password) {
+        showAuthError('Please enter email and password');
+        return;
+    }
+    
+    showAuthError('');
+    const result = await authService.signIn(email, password);
+    
+    if (result.success) {
+        showAuthSuccess('Signed in successfully! Syncing your data...');
+        syncEnabled = true;
+        
+        // Sync strategy on sign in:
+        // 1. Upload local data to server (merges with existing server data)
+        // 2. Download server data to local (merges with local, server is source of truth)
+        // This ensures both local and server have the complete merged dataset
+        await syncToServer(); // Upload local data (merges with server)
+        await syncFromServer(); // Download merged data back (updates local)
+        
+        setTimeout(() => {
+            closeAuthModal();
+        }, 1500);
+    } else {
+        showAuthError(result.error || 'Sign in failed');
+    }
+};
+
+// Handle sign up
+window.handleSignUp = async function() {
+    const email = document.getElementById('signup-email').value;
+    const password = document.getElementById('signup-password').value;
+    const passwordConfirm = document.getElementById('signup-password-confirm').value;
+    
+    if (!email || !password || !passwordConfirm) {
+        showAuthError('Please fill in all fields');
+        return;
+    }
+    
+    if (password !== passwordConfirm) {
+        showAuthError('Passwords do not match');
+        return;
+    }
+    
+    if (password.length < 6) {
+        showAuthError('Password must be at least 6 characters');
+        return;
+    }
+    
+    showAuthError('');
+    const result = await authService.signUp(email, password);
+    
+    if (result.success) {
+        showAuthSuccess('Account created! Please check your email to verify your account.');
+        // After signup, user is automatically signed in
+        syncEnabled = true;
+        await syncToServer();
+        setTimeout(() => {
+            closeAuthModal();
+        }, 2000);
+    } else {
+        showAuthError(result.error || 'Sign up failed');
+    }
+};
+
+// Handle sign out
+window.handleSignOut = async function() {
+    const result = await authService.signOut();
+    if (result.success) {
+        syncEnabled = false;
+        updateAuthUI(null);
+        
+        // Note: We keep localStorage data when signing out
+        // This allows users to continue using the app offline
+        // If they sign in with a different account later, data will merge
+        // If they want to clear data, they can do it manually
+        
+        showAuthSuccess('Signed out successfully. Your local data is still saved.');
+        setTimeout(() => {
+            closeAuthModal();
+        }, 1000);
+    } else {
+        showAuthError(result.error || 'Sign out failed');
+    }
+};
+
+// Show auth error message
+function showAuthError(message) {
+    const errorEl = document.getElementById('auth-error');
+    const successEl = document.getElementById('auth-success');
+    if (errorEl) {
+        errorEl.textContent = message;
+        errorEl.classList.toggle('hidden', !message);
+    }
+    if (successEl) {
+        successEl.classList.add('hidden');
+    }
+}
+
+// Show auth success message
+function showAuthSuccess(message) {
+    const errorEl = document.getElementById('auth-error');
+    const successEl = document.getElementById('auth-success');
+    if (successEl) {
+        successEl.textContent = message;
+        successEl.classList.toggle('hidden', !message);
+    }
+    if (errorEl) {
+        errorEl.classList.add('hidden');
+    }
+}
+
+// Clear auth messages
+function clearAuthMessages() {
+    showAuthError('');
+    showAuthSuccess('');
+}
+
+// Update sync status
+function updateSyncStatus(status) {
+    const statusEl = document.getElementById('auth-sync-status');
+    if (statusEl) {
+        statusEl.textContent = status;
+        statusEl.className = 'auth-sync-status';
+        if (status === 'Syncing...') {
+            statusEl.classList.add('syncing');
+        } else if (status.toLowerCase().includes('error')) {
+            statusEl.classList.add('error');
+        }
+    }
+}
+
+// Sync local data to server
+async function syncToServer() {
+    if (!syncEnabled || isSyncing) return;
+    
+    try {
+        isSyncing = true;
+        updateSyncStatus('Syncing...');
+        
+        const userData = {
+            progress: JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}'),
+            history: getHistory(),
+            favorites: getFavorites(),
+            sortPreferences: JSON.parse(localStorage.getItem(PODCAST_SORT_PREFERENCES_KEY) || '{}')
+        };
+        
+        // Fetch existing data and merge
+        const existing = await authService.fetchUserData();
+        if (existing) {
+            // Merge: combine local and server data (arrays get merged, objects get combined)
+            const merged = {
+                progress: { ...existing.progress, ...userData.progress },
+                history: [...new Set([...existing.history, ...userData.history])],
+                favorites: {
+                    podcasts: [...new Set([...existing.favorites.podcasts, ...userData.favorites.podcasts])],
+                    episodes: [...new Set([...existing.favorites.episodes, ...userData.favorites.episodes])]
+                },
+                sortPreferences: { ...existing.sort_preferences, ...userData.sortPreferences }
+            };
+            await authService.syncUserData(merged);
+        } else {
+            // No existing data, just save current
+            await authService.syncUserData(userData);
+        }
+        
+        updateSyncStatus('Synced');
+    } catch (error) {
+        console.error('Sync to server error:', error);
+        updateSyncStatus('Sync error');
+    } finally {
+        isSyncing = false;
+    }
+}
+
+// Sync server data to local
+async function syncFromServer() {
+    if (!syncEnabled || isSyncing) return;
+    
+    try {
+        isSyncing = true;
+        updateSyncStatus('Syncing...');
+        
+        const serverData = await authService.fetchUserData();
+        
+        if (serverData) {
+            // Smart merge: prefer newer data based on timestamps
+            // For arrays (history, favorites): merge and deduplicate
+            // For objects (progress, preferences): merge, prefer server for conflicts but keep local if newer
+            
+            if (serverData.progress) {
+                const localProgress = JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}');
+                // Merge progress: server takes precedence (it's the source of truth when signed in)
+                const merged = { ...localProgress, ...serverData.progress };
+                localStorage.setItem(PROGRESS_KEY, JSON.stringify(merged));
+            }
+            
+            if (serverData.history) {
+                const localHistory = getHistory();
+                // Merge history arrays, deduplicate, keep most recent
+                const combined = [...localHistory, ...serverData.history];
+                // Remove duplicates by episodeId, keep most recent
+                const unique = combined.reduce((acc, item) => {
+                    const existing = acc.find(i => i.episodeId === item.episodeId);
+                    if (!existing || item.timestamp > existing.timestamp) {
+                        if (existing) {
+                            const index = acc.indexOf(existing);
+                            acc[index] = item;
+                        } else {
+                            acc.push(item);
+                        }
+                    }
+                    return acc;
+                }, []);
+                // Sort by timestamp (newest first) and limit
+                unique.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+                localStorage.setItem(HISTORY_KEY, JSON.stringify(unique.slice(0, MAX_HISTORY)));
+            }
+            
+            if (serverData.favorites) {
+                const localFavorites = getFavorites();
+                // Merge favorites: combine arrays and deduplicate
+                const merged = {
+                    podcasts: [...new Set([...localFavorites.podcasts, ...serverData.favorites.podcasts])],
+                    episodes: [...new Set([...localFavorites.episodes, ...serverData.favorites.episodes])]
+                };
+                saveFavorites(merged);
+            }
+            
+            if (serverData.sort_preferences) {
+                const localPrefs = JSON.parse(localStorage.getItem(PODCAST_SORT_PREFERENCES_KEY) || '{}');
+                // Merge preferences: server takes precedence
+                const merged = { ...localPrefs, ...serverData.sort_preferences };
+                localStorage.setItem(PODCAST_SORT_PREFERENCES_KEY, JSON.stringify(merged));
+                restorePodcastSortPreferences();
+            }
+            
+            // Refresh UI
+            renderSidebar();
+            if (currentPage === 'favorites') {
+                loadFavoritesPage();
+            } else if (currentPage === 'history') {
+                loadHistoryPage();
+            }
+        }
+        
+        updateSyncStatus('Synced');
+    } catch (error) {
+        console.error('Sync from server error:', error);
+        updateSyncStatus('Sync error');
+    } finally {
+        isSyncing = false;
+    }
+}
+
+// Debounced sync function (call after data changes)
+let syncTimeout = null;
+function debouncedSync() {
+    if (syncTimeout) {
+        clearTimeout(syncTimeout);
+    }
+    syncTimeout = setTimeout(() => {
+        if (syncEnabled) {
+            syncToServer();
+        }
+    }, 2000); // Sync 2 seconds after last change
+}
+
+// Handle keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+    if (e.key === ' ' && currentEpisode && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        togglePlayPause();
+    } else if (e.key === 'ArrowLeft' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        skipBackward();
+    } else if (e.key === 'ArrowRight' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        skipForward();
+    }
+});
