@@ -54,7 +54,7 @@ class APIService {
   }
 
   async fetchPodcasts() {
-    const query = '?select=id,feed_url,title,author,image_url,genre&order=title.asc';
+    const query = '?select=id,feed_url,title,author,image_url,genre,description&order=title.asc';
     return await this.request(`/podcasts${query}`);
   }
 

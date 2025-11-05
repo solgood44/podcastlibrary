@@ -1,6 +1,7 @@
 import csv
 import os
 import time
+import re
 from datetime import datetime
 from dateutil import parser as dateparser
 import feedparser
@@ -30,6 +31,8 @@ if _batch_size_env and _batch_size_env != "0" and _batch_size_env != "all":
 else:
     BATCH_SIZE = None
 FORCE_REFRESH = os.environ.get("FORCE_REFRESH", "false").lower() == "true"
+# DELETE_MISSING: If true, deletes podcasts from database that are not in the CSV
+DELETE_MISSING = os.environ.get("DELETE_MISSING", "true").lower() == "true"
 
 sb: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -180,6 +183,29 @@ def fetch_and_process(feed_url: str, etag: str | None, last_modified: str | None
         lm_new = r.headers.get("Last-Modified")
 
     parsed = feedparser.parse(content)
+    
+    # Extract itunes:author directly from XML (feedparser doesn't always handle namespaced fields)
+    # Try to extract from raw XML content
+    itunes_author = None
+    try:
+        # Look for <itunes:author> or <itunes_author> tags
+        itunes_author_match = re.search(
+            rb'<itunes:author[^>]*>(.*?)</itunes:author>',
+            content,
+            re.IGNORECASE | re.DOTALL
+        )
+        if not itunes_author_match:
+            # Try without namespace (some feeds use <itunes_author>)
+            itunes_author_match = re.search(
+                rb'<itunes_author[^>]*>(.*?)</itunes_author>',
+                content,
+                re.IGNORECASE | re.DOTALL
+            )
+        if itunes_author_match:
+            itunes_author = itunes_author_match.group(1).decode('utf-8').strip()
+    except Exception:
+        # If extraction fails, continue without it
+        pass
 
     # Extract ALL genres from iTunes category or categories
     genres = []
@@ -271,7 +297,8 @@ def fetch_and_process(feed_url: str, etag: str | None, last_modified: str | None
 
     meta = {
         "title": parsed.feed.get("title"),
-        "author": parsed.feed.get("author") or parsed.feed.get("itunes_author"),
+        # Prioritize itunes:author extracted from XML, then feedparser's itunes_author, then fallback to author
+        "author": itunes_author or parsed.feed.get("itunes_author") or parsed.feed.get("author"),
         "image_url": (parsed.feed.get("image") or {}).get("href") if isinstance(parsed.feed.get("image"), dict) else parsed.feed.get("itunes_image"),
         "description": parsed.feed.get("subtitle") or parsed.feed.get("description"),
         "genre": genre,
@@ -375,6 +402,47 @@ def was_recently_refreshed(last_refreshed_str: str | None, threshold_minutes: in
         return time_diff < threshold_minutes
     except Exception:
         return False
+
+
+def delete_podcasts_not_in_csv(csv_feed_urls: set[str]):
+    """
+    Delete podcasts from database whose feed_url is not in the CSV.
+    Returns the number of podcasts deleted.
+    """
+    if not csv_feed_urls:
+        return 0
+    
+    # Get all podcasts from database
+    def _get_all_podcasts():
+        return sb.table("podcasts").select("feed_url,title").execute().data
+    
+    all_podcasts = retry_db_operation(_get_all_podcasts)
+    if not all_podcasts:
+        return 0
+    
+    # Find podcasts to delete (not in CSV)
+    podcasts_to_delete = []
+    for podcast in all_podcasts:
+        feed_url = podcast.get("feed_url")
+        if feed_url and feed_url not in csv_feed_urls:
+            podcasts_to_delete.append(feed_url)
+    
+    if not podcasts_to_delete:
+        return 0
+    
+    # Delete podcasts not in CSV (episodes cascade automatically)
+    deleted_count = 0
+    for feed_url in podcasts_to_delete:
+        try:
+            def _delete():
+                return sb.table("podcasts").delete().eq("feed_url", feed_url).execute()
+            retry_db_operation(_delete)
+            deleted_count += 1
+        except Exception as e:
+            # Log error but continue deleting others
+            print(f"Error deleting podcast {feed_url}: {e}")
+    
+    return deleted_count
 
 
 def run_once():
@@ -513,11 +581,28 @@ def run_once():
                     console.print(traceback.format_exc())
                 time.sleep(0.05)
 
+    # Delete podcasts not in CSV (if enabled)
+    deleted_count = 0
+    if DELETE_MISSING and not (BATCH_SIZE and BATCH_SIZE > 0):
+        # Only delete missing if processing all feeds (not in batch mode)
+        console.print(f"\n[yellow]Checking for podcasts to delete...[/yellow]")
+        csv_feed_urls = {feed_url for feed_url, _ in feeds}
+        deleted_count = delete_podcasts_not_in_csv(csv_feed_urls)
+        if deleted_count > 0:
+            console.print(f"[red]Deleted {deleted_count} podcast(s) not in CSV[/red]")
+        else:
+            console.print(f"[green]No podcasts to delete (all are in CSV)[/green]")
+    elif DELETE_MISSING and (BATCH_SIZE and BATCH_SIZE > 0):
+        console.print(f"\n[yellow]⚠ Skipping deletion check (batch mode is active)[/yellow]")
+        console.print(f"[yellow]   Set DELETE_MISSING=false to disable deletion, or process all feeds to enable it[/yellow]")
+
     console.print(f"\n[bold green]✓ Complete![/bold green]")
     console.print(f"  [green]Processed:[/green] {processed}")
     console.print(f"  [yellow]Skipped:[/yellow] {skipped}")
     console.print(f"  [red]Errors:[/red] {errors}")
     console.print(f"  [blue]New episodes added:[/blue] {new_episodes_added}")
+    if deleted_count > 0:
+        console.print(f"  [red]Deleted (not in CSV):[/red] {deleted_count}")
 
 
 if __name__ == "__main__":

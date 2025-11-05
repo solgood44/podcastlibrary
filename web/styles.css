@@ -895,10 +895,18 @@ body {
     padding: 48px 24px 32px;
     display: flex;
     justify-content: center;
-    align-items: center;
+    align-items: flex-start;
     background: linear-gradient(180deg, rgba(0, 0, 0, 0.1) 0%, transparent 100%);
     transition: background 0.3s ease;
     position: relative;
+}
+
+.episodes-page-header-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 600px;
+    width: 100%;
 }
 
 .btn-podcast-favorite-episodes {
@@ -941,6 +949,32 @@ body {
     border-radius: 12px;
     object-fit: cover;
     box-shadow: 0 8px 24px var(--shadow-lg);
+    margin-bottom: 24px;
+}
+
+.episodes-page-description {
+    font-size: 15px;
+    color: var(--text-secondary);
+    line-height: 1.7;
+    text-align: left;
+    width: 100%;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    margin-top: 8px;
+}
+
+.episodes-page-description a {
+    color: var(--accent);
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.episodes-page-description a:hover {
+    color: var(--accent-hover);
+    text-decoration: underline;
 }
 
 .episodes-list-content {
@@ -1683,48 +1717,6 @@ body {
 .btn-podcast-favorite-search.favorited:hover {
     background: var(--bg-hover);
     color: #ff3b5c;
-}
-
-/* Navigation Bar */
-.nav-bar {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background: var(--bg-secondary);
-    border-top: 1px solid var(--border);
-    display: flex;
-    justify-content: space-around;
-    padding: 8px 0 calc(8px + env(safe-area-inset-bottom));
-    z-index: 90;
-    backdrop-filter: blur(10px);
-}
-
-.nav-btn {
-    background: none;
-    border: none;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    padding: 8px 16px;
-    cursor: pointer;
-    color: var(--text-tertiary);
-    transition: color 0.2s;
-    font-size: 12px;
-}
-
-.nav-btn.active {
-    color: var(--accent);
-}
-
-.nav-icon {
-    font-size: 24px;
-}
-
-.nav-label {
-    font-size: 11px;
-    font-weight: 500;
 }
 
 /* Persistent Player Bar */

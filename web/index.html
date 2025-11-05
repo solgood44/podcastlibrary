@@ -64,31 +64,6 @@
             <button id="auth-button" class="btn-auth" onclick="toggleAuthModal()">Sign In</button>
         </div>
     </header>
-    
-    <!-- Navigation (Hidden) -->
-    <nav class="nav-bar hidden">
-        <button class="nav-btn active" data-page="grid" onclick="navigateTo('grid')">
-            <span class="nav-icon">📚</span>
-            <span class="nav-label">Library</span>
-        </button>
-        <button class="nav-btn" data-page="episodes" onclick="navigateTo('episodes')">
-            <span class="nav-icon">📻</span>
-            <span class="nav-label">Episodes</span>
-        </button>
-        <button class="nav-btn" data-page="player" onclick="navigateTo('player')">
-            <span class="nav-icon">🎵</span>
-            <span class="nav-label">Player</span>
-        </button>
-        <button class="nav-btn" data-page="search" onclick="navigateTo('search')">
-            <span class="nav-icon">🔍</span>
-            <span class="nav-label">Search</span>
-        </button>
-        <button class="nav-btn" data-page="history" onclick="navigateTo('history')">
-            <span class="nav-icon">🕒</span>
-            <span class="nav-label">History</span>
-        </button>
-    </nav>
-
     <!-- Main Content Area -->
     <main class="main-content">
         <!-- Grid Page -->
@@ -380,5 +355,10 @@
     <script src="api.js"></script>
     <script src="auth.js"></script>
     <script src="app.js"></script>
+    <!-- Vercel Analytics -->
+    <script type="module">
+        import { inject } from 'https://esm.sh/@vercel/analytics@1';
+        inject();
+    </script>
 </body>
 </html>

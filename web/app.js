@@ -147,15 +147,6 @@ function setupRouting() {
 function navigateTo(page, param = null) {
     showPage(page);
     
-    // Update nav buttons
-    document.querySelectorAll('.nav-btn').forEach(btn => {
-        btn.classList.remove('active');
-    });
-    const navBtn = document.querySelector(`[data-page="${page}"]`);
-    if (navBtn) {
-        navBtn.classList.add('active');
-    }
-    
     // Close sidebar only on mobile
     if (isMobileScreen()) {
         const sidebar = document.getElementById('sidebar');
@@ -1604,14 +1595,21 @@ async function loadEpisodesPage() {
             const isPodcastFavorite = isPodcastFavorited(currentPodcast.id);
             
             // Create header with cover art and gradient
+            // Ensure we have the latest podcast data with description
+            const latestPodcast = podcasts.find(p => p.id === currentPodcast.id) || currentPodcast;
+            const hasDescription = latestPodcast.description && latestPodcast.description.trim().length > 0;
+            
             const headerHTML = `
                 <div class="episodes-page-header" id="episodes-page-header">
-                    <img src="${currentPodcast.image_url || getPlaceholderImage()}" 
-                         alt="${escapeHtml(currentPodcast.title || '')}" 
-                         class="episodes-page-artwork"
-                         onload="extractColorFromImage(this)"
-                         onerror="this.src='${getPlaceholderImage()}'">
-                    <button class="btn-podcast-favorite-episodes ${isPodcastFavorite ? 'favorited' : ''}" onclick="event.stopPropagation(); togglePodcastFavorite('${currentPodcast.id}');" title="${isPodcastFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+                    <div class="episodes-page-header-content">
+                        <img src="${latestPodcast.image_url || getPlaceholderImage()}" 
+                             alt="${escapeHtml(latestPodcast.title || '')}" 
+                             class="episodes-page-artwork"
+                             onload="extractColorFromImage(this)"
+                             onerror="this.src='${getPlaceholderImage()}'">
+                        ${hasDescription ? `<div class="episodes-page-description">${sanitizeHtml(latestPodcast.description)}</div>` : ''}
+                    </div>
+                    <button class="btn-podcast-favorite-episodes ${isPodcastFavorite ? 'favorited' : ''}" onclick="event.stopPropagation(); togglePodcastFavorite('${latestPodcast.id}');" title="${isPodcastFavorite ? 'Remove from favorites' : 'Add to favorites'}">
                         ${isPodcastFavorite ? '❤️' : '🤍'}
                     </button>
                 </div>
