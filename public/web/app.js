@@ -13,7 +13,8 @@ let categories = []; // All unique categories
 let currentCategory = null; // Currently viewed category
 let authors = []; // All unique authors
 let currentAuthor = null; // Currently viewed author
-let authorsViewMode = 'grid'; // 'grid' or 'list' for authors page
+let authorsSortMode = 'count-desc'; // 'count-desc' or 'name-asc' for authors page
+let authorDescriptions = {}; // Cache for author descriptions (will be loaded from API later)
 let searchMode = 'episodes'; // 'episodes' or 'podcasts'
 let viewMode = 'grid'; // 'grid' or 'list'
 let sortMode = 'title-asc'; // 'title-asc', 'title-desc'
@@ -287,6 +288,21 @@ function setupRouting() {
                 currentPodcast = podcast;
                 navigateTo('episodes');
                 loadEpisodesPage();
+                return;
+            }
+        }
+        
+        // Handle /author/[slug] paths
+        const authorMatch = path.match(/^\/author\/([^\/]+)/);
+        if (authorMatch) {
+            const slug = authorMatch[1];
+            // Find author by matching slug
+            if (authors.length === 0) {
+                extractAuthors();
+            }
+            const author = authors.find(a => generateSlug(a) === slug);
+            if (author) {
+                showAuthorPage(author);
                 return;
             }
         }
@@ -903,13 +919,11 @@ function showCategoryPage(categoryName) {
 function loadAuthorsPage() {
     const loadingEl = document.getElementById('authors-loading');
     const contentEl = document.getElementById('authors-content');
-    const gridEl = document.getElementById('authors-grid');
     const listEl = document.getElementById('authors-list');
     
     loadingEl.classList.remove('hidden');
     contentEl.classList.add('hidden');
-    gridEl.classList.add('hidden');
-    listEl.classList.add('hidden');
+    listEl.innerHTML = '';
     
     // Make sure authors are extracted
     if (authors.length === 0) {
@@ -921,44 +935,45 @@ function loadAuthorsPage() {
         
         if (authors.length === 0) {
             contentEl.classList.add('hidden');
-            gridEl.innerHTML = '<div class="empty"><p>No authors available</p></div>';
-            gridEl.classList.remove('hidden');
+            listEl.innerHTML = '<div class="empty"><p>No authors available</p></div>';
             return;
         }
         
         contentEl.classList.remove('hidden');
+        // Update sort select to match current sort mode
+        const sortSelect = document.getElementById('authors-sort-select');
+        if (sortSelect) {
+            sortSelect.value = authorsSortMode;
+        }
         renderAuthors();
         updateAuthorsCount();
-        setAuthorsViewMode(authorsViewMode);
     }, 300);
 }
 
-// Render authors in grid or list view
+// Render authors in list view (sorted)
 function renderAuthors() {
-    const gridEl = document.getElementById('authors-grid');
     const listEl = document.getElementById('authors-list');
     
     // Clear existing content
-    gridEl.innerHTML = '';
     listEl.innerHTML = '';
     
-    authors.forEach(author => {
+    // Sort authors based on current sort mode
+    let sortedAuthors = [...authors];
+    if (authorsSortMode === 'count-desc') {
+        // Sort by podcast count (most to least)
+        sortedAuthors.sort((a, b) => {
+            const countA = getAuthorPodcastCount(a);
+            const countB = getAuthorPodcastCount(b);
+            return countB - countA; // Descending order
+        });
+    } else if (authorsSortMode === 'name-asc') {
+        // Sort alphabetically
+        sortedAuthors.sort((a, b) => a.localeCompare(b));
+    }
+    
+    sortedAuthors.forEach(author => {
         const podcastCount = getAuthorPodcastCount(author);
-        
-        // Grid view item
-        const gridItem = document.createElement('div');
-        gridItem.className = 'podcast-card';
-        gridItem.onclick = () => showAuthor(author);
-        gridItem.innerHTML = `
-            <div class="podcast-card-image">
-                <div class="podcast-card-image-placeholder">✍️</div>
-            </div>
-            <div class="podcast-card-info">
-                <h3 class="podcast-card-title">${escapeHtml(author)}</h3>
-                <p class="podcast-card-meta">${podcastCount} ${podcastCount === 1 ? 'podcast' : 'podcasts'}</p>
-            </div>
-        `;
-        gridEl.appendChild(gridItem);
+        const authorSlug = generateSlug(author);
         
         // List view item
         const listItem = document.createElement('div');
@@ -987,24 +1002,12 @@ function getAuthorPodcastCount(author) {
     }).length;
 }
 
-// Set authors view mode
-function setAuthorsViewMode(mode) {
-    authorsViewMode = mode;
-    const gridEl = document.getElementById('authors-grid');
-    const listEl = document.getElementById('authors-list');
-    const gridBtn = document.getElementById('authors-view-grid-btn');
-    const listBtn = document.getElementById('authors-view-list-btn');
-    
-    if (mode === 'grid') {
-        gridEl.classList.remove('hidden');
-        listEl.classList.add('hidden');
-        if (gridBtn) gridBtn.classList.add('active');
-        if (listBtn) listBtn.classList.remove('active');
-    } else {
-        gridEl.classList.add('hidden');
-        listEl.classList.remove('hidden');
-        if (gridBtn) gridBtn.classList.remove('active');
-        if (listBtn) listBtn.classList.add('active');
+// Apply authors sorting
+function applyAuthorsSorting() {
+    const sortSelect = document.getElementById('authors-sort-select');
+    if (sortSelect) {
+        authorsSortMode = sortSelect.value;
+        renderAuthors();
     }
 }
 
@@ -1016,9 +1019,12 @@ function updateAuthorsCount() {
     }
 }
 
-// Show author (navigate to author detail page)
+// Show author (navigate to author detail page using slug)
 function showAuthor(authorName) {
     currentAuthor = authorName;
+    const authorSlug = generateSlug(authorName);
+    // Update URL to use slug
+    window.history.pushState({ author: authorName, page: 'author' }, '', `/author/${authorSlug}`);
     navigateTo('author', authorName);
 }
 
@@ -1026,12 +1032,14 @@ function showAuthor(authorName) {
 function showAuthorPage(authorName) {
     currentAuthor = authorName;
     const loadingEl = document.getElementById('author-loading');
-    const gridEl = document.getElementById('author-grid');
+    const contentEl = document.getElementById('author-content');
+    const descriptionEl = document.getElementById('author-description');
+    const podcastsGridEl = document.getElementById('author-podcasts-grid');
     const titleEl = document.getElementById('author-page-title');
     
     titleEl.textContent = authorName;
     loadingEl.classList.remove('hidden');
-    gridEl.classList.add('hidden');
+    contentEl.classList.add('hidden');
     
     // Filter podcasts by author
     const filteredPodcasts = podcasts.filter(p => {
@@ -1043,12 +1051,23 @@ function showAuthorPage(authorName) {
     
     setTimeout(() => {
         loadingEl.classList.add('hidden');
-        if (filteredPodcasts.length === 0) {
-            gridEl.innerHTML = '<div class="empty"><p>No podcasts by this author</p></div>';
+        contentEl.classList.remove('hidden');
+        
+        // Load description (from cache, will be loaded from API later)
+        const description = authorDescriptions[authorName] || null;
+        if (description) {
+            descriptionEl.innerHTML = `<p>${escapeHtml(description)}</p>`;
+            descriptionEl.querySelector('.author-description-placeholder')?.remove();
         } else {
-            renderPodcasts(filteredPodcasts, gridEl);
+            descriptionEl.innerHTML = '<p class="author-description-placeholder">No description available yet.</p>';
         }
-        gridEl.classList.remove('hidden');
+        
+        // Render podcasts
+        if (filteredPodcasts.length === 0) {
+            podcastsGridEl.innerHTML = '<div class="empty"><p>No podcasts by this author</p></div>';
+        } else {
+            renderPodcasts(filteredPodcasts, podcastsGridEl);
+        }
     }, 300);
 }
 
@@ -1203,6 +1222,23 @@ function handleURLParams() {
             window.history.replaceState({ podcastId: podcast.id, page: 'episodes' }, '', path);
             navigateTo('episodes');
             loadEpisodesPage();
+            return;
+        }
+    }
+    
+    // Check for /author/[slug] path
+    const authorMatch = path.match(/^\/author\/([^\/]+)/);
+    if (authorMatch) {
+        const slug = authorMatch[1];
+        // Make sure authors are extracted
+        if (authors.length === 0) {
+            extractAuthors();
+        }
+        const author = authors.find(a => generateSlug(a) === slug);
+        if (author) {
+            // Update URL to match the path
+            window.history.replaceState({ author: author, page: 'author' }, '', path);
+            showAuthorPage(author);
             return;
         }
     }

@@ -1686,6 +1686,46 @@ body {
     overflow: hidden;
 }
 
+/* Author Detail Page */
+.author-detail-content {
+    padding: 24px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.author-description {
+    background: var(--bg-card);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 32px;
+    border: 1px solid var(--border);
+}
+
+.author-description p {
+    font-size: 15px;
+    color: var(--text-secondary);
+    line-height: 1.7;
+    margin: 0;
+}
+
+.author-description-placeholder {
+    color: var(--text-tertiary);
+    font-style: italic;
+}
+
+.author-podcasts-section {
+    margin-top: 32px;
+}
+
+.author-section-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
 .episode-detail {
     padding: 32px;
 }

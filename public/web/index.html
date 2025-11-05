@@ -29,19 +29,16 @@
                 <span class="sidebar-item-title">Favorites</span>
                 <span id="sidebar-favorites-count" class="sidebar-item-count">0</span>
             </div>
+            <div class="sidebar-item" onclick="navigateTo('authors')">
+                <span class="sidebar-item-icon">✍️</span>
+                <span class="sidebar-item-title">Authors</span>
+            </div>
         </div>
         
         <div class="sidebar-section">
             <h3 class="sidebar-section-title">Categories</h3>
             <div id="sidebar-categories" class="sidebar-categories">
                 <p class="sidebar-empty">Loading categories...</p>
-            </div>
-        </div>
-        
-        <div class="sidebar-section">
-            <div class="sidebar-item" onclick="navigateTo('authors')">
-                <span class="sidebar-item-icon">✍️</span>
-                <span class="sidebar-item-title">Authors</span>
             </div>
         </div>
     </div>
@@ -218,13 +215,12 @@
             </div>
             <div id="authors-content" class="podcast-controls hidden">
                 <div class="controls-left">
-                    <div class="view-toggle">
-                        <button id="authors-view-grid-btn" class="view-btn active" onclick="setAuthorsViewMode('grid')" title="Grid View">
-                            <span>⊞</span>
-                        </button>
-                        <button id="authors-view-list-btn" class="view-btn" onclick="setAuthorsViewMode('list')" title="List View">
-                            <span>☰</span>
-                        </button>
+                    <div class="sort-controls">
+                        <label for="authors-sort-select" class="sort-label">Sort:</label>
+                        <select id="authors-sort-select" class="sort-select" onchange="applyAuthorsSorting()">
+                            <option value="count-desc">Most Podcasts</option>
+                            <option value="name-asc">A-Z</option>
+                        </select>
                     </div>
                 </div>
                 <div class="controls-right">
@@ -232,8 +228,7 @@
                 </div>
             </div>
             <div id="authors-container">
-                <div id="authors-grid" class="podcast-grid hidden"></div>
-                <div id="authors-list" class="podcast-list hidden"></div>
+                <div id="authors-list" class="podcast-list"></div>
             </div>
         </div>
 
@@ -245,9 +240,17 @@
             </div>
             <div id="author-loading" class="loading hidden">
                 <div class="spinner"></div>
-                <p>Loading podcasts...</p>
+                <p>Loading author...</p>
             </div>
-            <div id="author-grid" class="podcast-grid hidden"></div>
+            <div id="author-content" class="author-detail-content hidden">
+                <div id="author-description" class="author-description">
+                    <p class="author-description-placeholder">No description available yet.</p>
+                </div>
+                <div id="author-podcasts-section">
+                    <h2 class="author-section-title">Podcasts</h2>
+                    <div id="author-podcasts-grid" class="podcast-grid"></div>
+                </div>
+            </div>
         </div>
 
         <!-- Episode Detail Page -->
