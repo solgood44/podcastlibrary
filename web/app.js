@@ -1748,13 +1748,14 @@ async function loadEpisodesPage() {
                              class="episodes-page-artwork"
                              onload="extractColorFromImage(this)"
                              onerror="this.src='${getPlaceholderImage()}'">
-                        ${hasDescription ? `<div class="episodes-page-description">${sanitizeHtml(latestPodcast.description)}</div>` : ''}
                     </div>
                     <button class="btn-podcast-favorite-episodes ${isPodcastFavorite ? 'favorited' : ''}" onclick="event.stopPropagation(); togglePodcastFavorite('${latestPodcast.id}');" title="${isPodcastFavorite ? 'Remove from favorites' : 'Add to favorites'}">
                         ${isPodcastFavorite ? '❤️' : '🤍'}
                     </button>
                 </div>
             `;
+            
+            const descriptionHTML = hasDescription ? `<div class="episodes-page-description-full">${sanitizeHtml(latestPodcast.description)}</div>` : '';
             
             const episodesHTML = sortedEpisodes.map(episode => {
                 const progress = getEpisodeProgress(episode.id);
@@ -1791,7 +1792,7 @@ async function loadEpisodesPage() {
                 `;
             }).join('');
             
-            listEl.innerHTML = headerHTML + `<div class="episodes-list-content">${episodesHTML}</div>`;
+            listEl.innerHTML = headerHTML + descriptionHTML + `<div class="episodes-list-content">${episodesHTML}</div>`;
         }
     } catch (error) {
         console.error('Error loading episodes:', error);

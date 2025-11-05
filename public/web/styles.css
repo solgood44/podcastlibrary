@@ -977,6 +977,28 @@ body {
     text-decoration: underline;
 }
 
+.episodes-page-description-full {
+    font-size: 15px;
+    color: var(--text-secondary);
+    line-height: 1.7;
+    text-align: left;
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 32px 24px;
+}
+
+.episodes-page-description-full a {
+    color: var(--accent);
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.episodes-page-description-full a:hover {
+    color: var(--accent-hover);
+    text-decoration: underline;
+}
+
 .episodes-list-content {
     padding: 24px;
 }
