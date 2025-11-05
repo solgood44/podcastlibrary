@@ -1,7 +1,31 @@
 import { fetchPodcastBySlug, fetchEpisodesByPodcastId, generateSlug } from '../../lib/supabase';
 import Head from 'next/head';
+import { useEffect } from 'react';
+import { useRouter } from 'next/router';
 
 export default function PodcastPage({ podcast, episodes, error }) {
+  const router = useRouter();
+
+  useEffect(() => {
+    // Redirect real users to SPA (keep SEO page for bots)
+    // Check if it's a bot/crawler by looking at user agent
+    if (typeof window !== 'undefined' && podcast && !error) {
+      const userAgent = navigator.userAgent.toLowerCase();
+      const isBot = /bot|crawler|spider|crawling|googlebot|bingbot|slurp|duckduckbot|baiduspider|yandexbot|sogou|exabot|facebot|ia_archiver/i.test(userAgent);
+      
+      // Only redirect if it's NOT a bot
+      if (!isBot) {
+        // Redirect to SPA version, preserving the URL
+        const slug = generateSlug(podcast.title || '');
+        if (slug) {
+          // Store the path in sessionStorage so SPA can route correctly
+          sessionStorage.setItem('pendingRoute', `/podcast/${slug}`);
+          window.location.replace(`/web/`);
+        }
+      }
+    }
+  }, [podcast, error, router]);
+
   if (error || !podcast) {
     return (
       <>
@@ -187,6 +211,11 @@ export default function PodcastPage({ podcast, episodes, error }) {
                     <a 
                       href={`/web/?episode=${episode.id}&podcast=${podcast.id}`}
                       className="podcast-seo-listen-btn"
+                      onClick={(e) => {
+                        // Preserve the podcast slug when navigating
+                        const slug = generateSlug(podcast.title || '');
+                        sessionStorage.setItem('pendingRoute', `/podcast/${slug}`);
+                      }}
                     >
                       Listen on Podcast Library →
                     </a>
@@ -206,6 +235,11 @@ export default function PodcastPage({ podcast, episodes, error }) {
           <a 
             href={`/web/?podcast=${podcast.id}`} 
             className="podcast-seo-cta-btn"
+            onClick={(e) => {
+              // Preserve the podcast slug when navigating
+              const slug = generateSlug(podcast.title || '');
+              sessionStorage.setItem('pendingRoute', `/podcast/${slug}`);
+            }}
           >
             Open Podcast Library →
           </a>
