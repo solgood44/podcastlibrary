@@ -30,6 +30,18 @@ const FAVORITES_KEY = 'podcast_favorites';
 const PODCAST_SORT_PREFERENCES_KEY = 'podcast_sort_preferences';
 const MAX_HISTORY = 50;
 
+// Generate URL-friendly slug from title
+function generateSlug(title) {
+    if (!title) return '';
+    
+    return title
+        .toLowerCase()
+        .trim()
+        .replace(/[^\w\s-]/g, '') // Remove special characters
+        .replace(/[\s_-]+/g, '-') // Replace spaces and underscores with hyphens
+        .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
+}
+
 // Initialize app when DOM loads
 document.addEventListener('DOMContentLoaded', () => {
     audioPlayer = document.getElementById('audio-player');
@@ -145,6 +157,33 @@ function toggleSidebar() {
 function setupRouting() {
     // Set initial page
     showPage('grid');
+    
+    // Handle browser back/forward navigation
+    window.addEventListener('popstate', (event) => {
+        const path = window.location.pathname;
+        
+        // Handle /podcast/[slug] paths
+        const podcastMatch = path.match(/^\/podcast\/([^\/]+)/);
+        if (podcastMatch) {
+            const slug = podcastMatch[1];
+            const podcast = podcasts.find(p => generateSlug(p.title || '') === slug);
+            if (podcast) {
+                currentPodcast = podcast;
+                navigateTo('episodes');
+                loadEpisodesPage();
+                return;
+            }
+        }
+        
+        // Handle /web/ root path
+        if (path === '/web/' || path === '/web' || path === '/') {
+            navigateTo('grid');
+            currentPodcast = null;
+            return;
+        }
+    });
+    
+    // Note: Initial URL path check is handled in handleURLParams() after podcasts load
 }
 
 function navigateTo(page, param = null) {
@@ -160,6 +199,11 @@ function navigateTo(page, param = null) {
     
     // Load page-specific content
     if (page === 'grid') {
+        // Update URL if not already on /web/
+        if (window.location.pathname !== '/web/' && window.location.pathname !== '/web') {
+            window.history.pushState({ page: 'grid' }, '', '/web/');
+        }
+        currentPodcast = null; // Clear current podcast when going to grid
         // Set search mode to podcasts when viewing grid
         if (searchMode !== 'podcasts') {
             setSearchMode('podcasts');
@@ -246,14 +290,19 @@ function showPage(page) {
 
 // Go back to library from episodes
 function goBackToLibrary() {
+    currentPodcast = null;
+    window.history.pushState({ page: 'grid' }, '', '/web/');
     navigateTo('grid');
 }
 
 // Go back to episodes from player
 function goBackToEpisode() {
     if (currentPodcast) {
+        const slug = generateSlug(currentPodcast.title || '');
+        window.history.pushState({ podcastId: currentPodcast.id, page: 'episodes' }, '', `/podcast/${slug}`);
         navigateTo('episodes');
     } else {
+        window.history.pushState({ page: 'grid' }, '', '/web/');
         navigateTo('grid');
     }
 }
@@ -820,6 +869,22 @@ function openEpisodeDetail(episodeId, podcastId) {
 
 // Handle URL parameters from SEO pages (e.g., ?episode=123&podcast=456)
 function handleURLParams() {
+    const path = window.location.pathname;
+    
+    // Check for /podcast/[slug] path
+    const podcastMatch = path.match(/^\/podcast\/([^\/]+)/);
+    if (podcastMatch) {
+        const slug = podcastMatch[1];
+        const podcast = podcasts.find(p => generateSlug(p.title || '') === slug);
+        if (podcast) {
+            currentPodcast = podcast;
+            navigateTo('episodes');
+            loadEpisodesPage();
+            return;
+        }
+    }
+    
+    // Handle query parameters
     const urlParams = new URLSearchParams(window.location.search);
     const episodeId = urlParams.get('episode');
     const podcastId = urlParams.get('podcast');
@@ -827,16 +892,23 @@ function handleURLParams() {
     if (episodeId && podcastId) {
         // Open the episode detail page
         openEpisodeDetail(episodeId, podcastId);
-        // Clean up URL
-        window.history.replaceState({}, document.title, window.location.pathname);
+        // Clean up URL - keep current path or go to podcast slug
+        const podcast = podcasts.find(p => p.id === podcastId);
+        if (podcast) {
+            const slug = generateSlug(podcast.title || '');
+            window.history.replaceState({}, document.title, `/podcast/${slug}`);
+        } else {
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
     } else if (podcastId) {
         // Just open the podcast episodes page
         const podcast = podcasts.find(p => p.id === podcastId);
         if (podcast) {
             currentPodcast = podcast;
+            const slug = generateSlug(podcast.title || '');
             navigateTo('episodes');
-            // Clean up URL
-            window.history.replaceState({}, document.title, window.location.pathname);
+            window.history.replaceState({}, document.title, `/podcast/${slug}`);
+            loadEpisodesPage();
         }
     }
 }
@@ -899,8 +971,11 @@ function loadEpisodeDetailPage() {
 // Go back from episode detail
 function goBackFromEpisode() {
     if (currentPodcast) {
+        const slug = generateSlug(currentPodcast.title || '');
+        window.history.pushState({ podcastId: currentPodcast.id, page: 'episodes' }, '', `/podcast/${slug}`);
         navigateTo('episodes');
     } else {
+        window.history.pushState({ page: 'grid' }, '', '/web/');
         navigateTo('grid');
     }
 }
@@ -1385,6 +1460,14 @@ function loadAllEpisodesPage() {
 // Open episodes page for a podcast
 async function openEpisodes(podcastId) {
     currentPodcast = podcasts.find(p => p.id === podcastId);
+    
+    // Update URL with podcast slug
+    if (currentPodcast) {
+        const slug = generateSlug(currentPodcast.title || '');
+        const newPath = `/podcast/${slug}`;
+        window.history.pushState({ podcastId: podcastId, page: 'episodes' }, '', newPath);
+    }
+    
     navigateTo('episodes');
     loadEpisodesPage();
 }
