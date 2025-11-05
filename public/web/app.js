@@ -42,12 +42,117 @@ function generateSlug(title) {
         .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
 }
 
+// Audio prefetching cache
+const prefetchedAudio = new Set();
+const prefetchAudioLink = new Map(); // Map of episode ID to link element
+
+// Prefetch audio for an episode (loads metadata and starts buffering)
+function prefetchEpisodeAudio(episode) {
+    if (!episode || !episode.audio_url || prefetchedAudio.has(episode.id)) {
+        return;
+    }
+    
+    // Mark as prefetched
+    prefetchedAudio.add(episode.id);
+    
+    // Create a link element for prefetching
+    const link = document.createElement('link');
+    link.rel = 'prefetch';
+    link.as = 'audio';
+    link.href = episode.audio_url;
+    link.crossOrigin = 'anonymous';
+    document.head.appendChild(link);
+    prefetchAudioLink.set(episode.id, link);
+    
+    // Also create a hidden audio element to start buffering
+    // This is more aggressive but ensures faster playback
+    const hiddenAudio = document.createElement('audio');
+    hiddenAudio.preload = 'metadata';
+    hiddenAudio.src = episode.audio_url;
+    hiddenAudio.crossOrigin = 'anonymous';
+    hiddenAudio.style.display = 'none';
+    document.body.appendChild(hiddenAudio);
+    
+    // Clean up after a delay if not used
+    setTimeout(() => {
+        if (audioPlayer?.src !== episode.audio_url) {
+            hiddenAudio.remove();
+        }
+    }, 30000); // Keep for 30 seconds
+}
+
+// Setup audio prefetching on episode hover/visibility
+function setupAudioPrefetching() {
+    // Use event delegation for hover events on episode items
+    document.addEventListener('mouseenter', (e) => {
+        const episodeItem = e.target.closest('.episode-item');
+        if (episodeItem) {
+            // Find the episode data from the onclick handler or data attribute
+            const playBtn = episodeItem.querySelector('.btn-episode-play');
+            if (playBtn && playBtn.onclick) {
+                // Try to extract episode from onclick handler
+                // This is a bit hacky, but we can add data attributes instead
+                const episodeId = episodeItem.querySelector('.episode-play-icon')?.getAttribute('data-episode-id');
+                if (episodeId) {
+                    const episode = allEpisodes.find(ep => ep.id === episodeId);
+                    if (episode) {
+                        prefetchEpisodeAudio(episode);
+                    }
+                }
+            }
+        }
+    }, true);
+    
+    // Also prefetch episodes that are visible in viewport
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const episodeItem = entry.target;
+                const episodeId = episodeItem.querySelector('.episode-play-icon')?.getAttribute('data-episode-id');
+                if (episodeId) {
+                    const episode = allEpisodes.find(ep => ep.id === episodeId);
+                    if (episode) {
+                        prefetchEpisodeAudio(episode);
+                    }
+                }
+            }
+        });
+    }, {
+        rootMargin: '100px' // Start prefetching 100px before episode is visible
+    });
+    
+    // Observe episode items when they're added to DOM
+    const observeEpisodeItems = () => {
+        document.querySelectorAll('.episode-item').forEach(item => {
+            observer.observe(item);
+        });
+    };
+    
+    // Observe initially and after DOM updates
+    observeEpisodeItems();
+    
+    // Re-observe after episodes are loaded (they're loaded dynamically)
+    // Use MutationObserver to watch for episode items being added
+    const mutationObserver = new MutationObserver(() => {
+        observeEpisodeItems();
+    });
+    
+    // Start observing after a short delay to let initial page load
+    setTimeout(() => {
+        mutationObserver.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    }, 500);
+}
+
 // Initialize app when DOM loads
 document.addEventListener('DOMContentLoaded', () => {
     audioPlayer = document.getElementById('audio-player');
     setupAudioPlayer();
     setupRouting();
     setupAuth(); // Initialize authentication
+    setupAudioPrefetching(); // Setup audio prefetching
     // Set initial search mode based on default page (grid = podcasts)
     setSearchMode('podcasts');
     loadPodcasts().then(() => {
@@ -2066,30 +2171,81 @@ function playEpisode(episode) {
         addEpisodeToHistory(episode.id, currentPodcast.id);
     }
     
-    audioPlayer.src = episode.audio_url;
-    audioPlayer.load();
-    
-    // Restore progress for this episode
-    const savedProgress = getEpisodeProgress(episode.id);
-    if (savedProgress > 0 && savedProgress < 95) {
-        const savedTime = (savedProgress / 100) * (episode.duration_seconds || 0);
-        audioPlayer.addEventListener('loadedmetadata', () => {
-            if (audioPlayer.duration && savedTime < audioPlayer.duration) {
-                audioPlayer.currentTime = savedTime;
-            }
-        }, { once: true });
-    }
-    
-    // Update player UI
+    // Update player UI immediately for better UX
     updatePlayerBar();
     
     // Show player bar
     document.getElementById('player-bar').classList.remove('hidden');
     
-    // Play audio
-    audioPlayer.play();
-    isPlaying = true;
-    updatePlayPauseButton();
+    // Set source - only change if different episode
+    const currentSrc = audioPlayer.src.split('?')[0]; // Remove query params for comparison
+    const newSrc = episode.audio_url.split('?')[0];
+    
+    if (currentSrc !== newSrc) {
+        // New episode - set source and wait for it to be ready
+        audioPlayer.src = episode.audio_url;
+        // Don't call load() - setting src triggers automatic loading
+        // Remove preload attribute to allow faster initial loading
+        audioPlayer.removeAttribute('preload');
+        
+        // Restore progress for this episode
+        const savedProgress = getEpisodeProgress(episode.id);
+        if (savedProgress > 0 && savedProgress < 95) {
+            const savedTime = (savedProgress / 100) * (episode.duration_seconds || 0);
+            audioPlayer.addEventListener('loadedmetadata', () => {
+                if (audioPlayer.duration && savedTime < audioPlayer.duration) {
+                    audioPlayer.currentTime = savedTime;
+                }
+            }, { once: true });
+        }
+        
+        // Wait for audio to be ready before playing - this is key for faster playback
+        let playHandlerAttached = false;
+        const playWhenReady = () => {
+            if (playHandlerAttached) return;
+            playHandlerAttached = true;
+            
+            // Try to play - if it fails due to autoplay restrictions, user can click play
+            const playPromise = audioPlayer.play();
+            if (playPromise !== undefined) {
+                playPromise
+                    .then(() => {
+                        isPlaying = true;
+                        updatePlayPauseButton();
+                    })
+                    .catch(error => {
+                        // Autoplay was prevented - this is fine, user will click play
+                        console.log('Autoplay prevented:', error);
+                        isPlaying = false;
+                        updatePlayPauseButton();
+                    });
+            } else {
+                isPlaying = true;
+                updatePlayPauseButton();
+            }
+        };
+        
+        // Use canplay event for faster start (doesn't wait for full buffer)
+        // This fires as soon as enough data is loaded to start playing
+        audioPlayer.addEventListener('canplay', playWhenReady, { once: true });
+        
+        // Also listen for canplaythrough as a backup
+        audioPlayer.addEventListener('canplaythrough', playWhenReady, { once: true });
+        
+        // If audio is already ready (e.g., cached), play immediately
+        if (audioPlayer.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+            playWhenReady();
+        }
+    } else {
+        // Same episode - just resume playback
+        audioPlayer.play().then(() => {
+            isPlaying = true;
+            updatePlayPauseButton();
+        }).catch(() => {
+            isPlaying = false;
+            updatePlayPauseButton();
+        });
+    }
     
     // Update pages if we're on them
     if (currentPage === 'player') {
