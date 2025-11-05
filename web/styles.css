@@ -985,12 +985,63 @@ body {
     max-width: 900px;
     margin: 0 auto;
     padding: 32px 24px;
+    padding-bottom: 16px;
     overflow: visible !important;
     white-space: normal !important;
     word-wrap: break-word;
     display: block;
     position: relative;
     z-index: 1;
+}
+
+.description-preview {
+    margin-bottom: 0;
+}
+
+.description-full {
+    margin-top: 8px;
+}
+
+.description-full.hidden {
+    /* Keep in DOM for SEO but visually hidden */
+    /* SEO-friendly hidden: text is still readable by search engines */
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+}
+
+.btn-description-toggle {
+    background: transparent;
+    border: none;
+    color: var(--accent);
+    font-size: 14px;
+    font-weight: 500;
+    padding: 8px 0;
+    margin-top: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: color 0.2s;
+    text-align: left;
+    width: 100%;
+}
+
+.btn-description-toggle:hover {
+    color: var(--accent-hover);
+    text-decoration: underline;
+}
+
+.toggle-icon {
+    font-size: 12px;
+    transition: transform 0.2s;
+    display: inline-block;
 }
 
 .episodes-page-description-full a {

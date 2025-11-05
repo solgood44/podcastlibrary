@@ -1860,7 +1860,34 @@ async function loadEpisodesPage() {
                 </div>
             `;
             
-            const descriptionHTML = hasDescription ? `<div class="episodes-page-description-full">${sanitizeHtml(latestPodcast.description)}</div>` : '';
+            // Create collapsible description for better mobile UX (full text stays in HTML for SEO)
+            let descriptionHTML = '';
+            if (hasDescription) {
+                const fullDescription = sanitizeHtml(latestPodcast.description);
+                // Extract first 1-2 sentences (approximately 150-200 chars or until second sentence)
+                const sentences = latestPodcast.description.match(/[^.!?]+[.!?]+/g) || [latestPodcast.description];
+                const previewText = sentences.length > 1 
+                    ? sentences.slice(0, 2).join(' ').trim()
+                    : (latestPodcast.description.length > 200 
+                        ? latestPodcast.description.substring(0, 200).trim() + '...'
+                        : latestPodcast.description);
+                const previewHtml = sanitizeHtml(previewText);
+                const hasMore = fullDescription.length > previewText.length || sentences.length > 2;
+                
+                descriptionHTML = `
+                    <div class="episodes-page-description-full" data-full-description="${escapeHtml(fullDescription)}">
+                        <div class="description-preview">${previewHtml}</div>
+                        ${hasMore ? `
+                            <!-- Full description kept in HTML for SEO but visually hidden -->
+                            <div class="description-full hidden">${fullDescription}</div>
+                            <button class="btn-description-toggle" onclick="window.toggleDescription(this)">
+                                <span class="toggle-text">See more</span>
+                                <span class="toggle-icon">▼</span>
+                            </button>
+                        ` : ''}
+                    </div>
+                `;
+            }
             
             const episodesHTML = sortedEpisodes.map(episode => {
                 const progress = getEpisodeProgress(episode.id);
@@ -2286,6 +2313,35 @@ function skipForward() {
     if (!audioPlayer || !currentEpisode) return;
     audioPlayer.currentTime = Math.min(audioPlayer.duration, audioPlayer.currentTime + 30);
 }
+
+// Toggle description expand/collapse (make globally available for onclick)
+window.toggleDescription = function(button) {
+    const container = button.closest('.episodes-page-description-full');
+    if (!container) return;
+    
+    const preview = container.querySelector('.description-preview');
+    const full = container.querySelector('.description-full');
+    const toggleText = button.querySelector('.toggle-text');
+    const toggleIcon = button.querySelector('.toggle-icon');
+    
+    if (!full || !preview) return;
+    
+    const isExpanded = !full.classList.contains('hidden');
+    
+    if (isExpanded) {
+        // Collapse
+        full.classList.add('hidden');
+        preview.classList.remove('hidden');
+        toggleText.textContent = 'See more';
+        toggleIcon.textContent = '▼';
+    } else {
+        // Expand
+        full.classList.remove('hidden');
+        preview.classList.add('hidden');
+        toggleText.textContent = 'See less';
+        toggleIcon.textContent = '▲';
+    }
+};
 
 // Toggle play/pause
 function togglePlayPause() {
