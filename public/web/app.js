@@ -2347,7 +2347,7 @@ function skipForward() {
 
 // Toggle description expand/collapse (make globally available for onclick)
 window.toggleDescription = function(button) {
-    const container = button.closest('.episodes-page-description-compact');
+    const container = button.closest('.episodes-page-description-full');
     if (!container) return;
     
     const preview = container.querySelector('.description-preview');

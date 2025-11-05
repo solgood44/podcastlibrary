@@ -4,9 +4,11 @@
   "description": "Podcast Library with SEO-optimized pages",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "npm run sync-web && next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "sync-web": "node sync-web.js",
+    "precommit": "npm run sync-web"
   },
   "dependencies": {
     "next": "^14.0.0",
