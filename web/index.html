@@ -78,6 +78,10 @@
                 <button id="search-mode-episodes" class="search-mode-btn active" onclick="setSearchMode('episodes')">Episodes</button>
                 <button id="search-mode-podcasts" class="search-mode-btn" onclick="setSearchMode('podcasts')">Podcasts</button>
             </div>
+            <select id="search-mode-dropdown" class="search-mode-dropdown" onchange="setSearchMode(this.value)">
+                <option value="episodes" selected>Episodes</option>
+                <option value="podcasts">Podcasts</option>
+            </select>
             <input 
                 type="text" 
                 id="top-search-input" 
@@ -87,7 +91,6 @@
                 onfocus="handleSearchFocus()"
             >
         </div>
-        <div class="top-bar-spacer"></div>
         <div id="auth-button-container" class="auth-button-container">
             <button id="auth-button" class="btn-auth" onclick="toggleAuthModal()">Sign In</button>
         </div>

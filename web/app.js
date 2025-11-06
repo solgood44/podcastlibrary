@@ -2612,6 +2612,12 @@ function setSearchMode(mode) {
     document.getElementById('search-mode-episodes').classList.toggle('active', mode === 'episodes');
     document.getElementById('search-mode-podcasts').classList.toggle('active', mode === 'podcasts');
     
+    // Update dropdown if it exists
+    const dropdown = document.getElementById('search-mode-dropdown');
+    if (dropdown) {
+        dropdown.value = mode;
+    }
+    
     const topSearchInput = document.getElementById('top-search-input');
     topSearchInput.placeholder = mode === 'episodes' ? 'Search episodes...' : 'Search podcasts...';
     

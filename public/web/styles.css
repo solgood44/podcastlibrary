@@ -105,6 +105,7 @@ body {
     display: flex;
     align-items: center;
     gap: 12px;
+    min-width: 0;
 }
 
 .search-mode-toggle {
@@ -137,6 +138,35 @@ body {
     border-color: var(--accent);
 }
 
+.search-mode-dropdown {
+    display: none;
+    flex-shrink: 0;
+    padding: 8px 12px;
+    font-size: 13px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23ffffff' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    padding-right: 32px;
+}
+
+.search-mode-dropdown:hover {
+    background-color: var(--bg-hover);
+    border-color: var(--border-light);
+}
+
+.search-mode-dropdown:focus {
+    outline: none;
+    border-color: var(--accent);
+    background-color: var(--bg-card);
+}
+
 .top-search-input {
     flex: 1;
     min-width: 200px;
@@ -159,10 +189,6 @@ body {
     color: var(--text-tertiary);
 }
 
-.top-bar-spacer {
-    width: 48px;
-    flex-shrink: 0;
-}
 
 /* Sidebar */
 .sidebar {
@@ -2509,12 +2535,27 @@ body {
     }
     
     .top-bar {
-        padding: 0 12px;
-        gap: 12px;
+        padding: 0 8px;
+        gap: 8px;
+        justify-content: space-between;
     }
     
     .top-bar-search-container {
-        gap: 8px;
+        flex: 1;
+        min-width: 0;
+        max-width: none;
+        margin: 0;
+        gap: 6px;
+    }
+    
+    .search-mode-toggle {
+        display: none;
+    }
+    
+    .search-mode-dropdown {
+        display: block;
+        padding: 8px 28px 8px 10px;
+        font-size: 12px;
     }
     
     .search-mode-btn {
@@ -2524,8 +2565,20 @@ body {
     
     .top-search-input {
         font-size: 14px;
-        padding: 10px 16px;
-        min-width: 120px;
+        padding: 10px 14px;
+        min-width: 0;
+        flex: 1;
+    }
+    
+    .auth-button-container {
+        flex-shrink: 0;
+        margin-left: 4px;
+    }
+    
+    .btn-auth {
+        padding: 8px 12px;
+        font-size: 13px;
+        white-space: nowrap;
     }
     
     .podcast-controls {
