@@ -747,15 +747,19 @@ body {
 }
 
 .podcast-author-link {
-    color: var(--text-tertiary);
-    text-decoration: none;
-    transition: color 0.2s;
+    color: var(--accent);
+    text-decoration: underline;
+    text-decoration-color: var(--accent);
+    text-underline-offset: 2px;
+    transition: all 0.2s;
     cursor: pointer;
+    font-weight: 500;
 }
 
 .podcast-author-link:hover {
-    color: var(--accent);
-    text-decoration: underline;
+    color: var(--accent-hover);
+    text-decoration-color: var(--accent-hover);
+    text-decoration-thickness: 2px;
 }
 
 .podcast-list-author-link {
@@ -842,8 +846,48 @@ body {
     align-items: center;
     gap: 16px;
     flex: 1;
-    cursor: pointer;
+    cursor: default;
     min-width: 0;
+}
+
+.author-list-item .podcast-list-item-content {
+    cursor: default;
+}
+
+.author-list-item:hover {
+    background: var(--bg-hover);
+}
+
+.btn-view-author-pods {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.btn-view-author-pods:hover {
+    background: var(--accent-hover);
+    transform: translateX(2px);
+    box-shadow: 0 4px 12px rgba(29, 185, 84, 0.3);
+}
+
+.btn-view-author-pods .btn-icon {
+    font-size: 16px;
+    transition: transform 0.2s;
+}
+
+.btn-view-author-pods:hover .btn-icon {
+    transform: translateX(2px);
 }
 
 .podcast-list-image {
@@ -853,6 +897,23 @@ body {
     border-radius: 8px;
     overflow: hidden;
     background: var(--bg-tertiary);
+}
+
+.podcast-list-item-image {
+    width: 80px;
+    height: 80px;
+    flex-shrink: 0;
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--bg-tertiary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.podcast-list-item-image-placeholder {
+    font-size: 32px;
+    color: var(--text-secondary);
 }
 
 .podcast-list-artwork {

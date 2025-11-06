@@ -1112,18 +1112,23 @@ function renderAuthors() {
         const podcastCount = getAuthorPodcastCount(author);
         const authorSlug = generateSlug(author);
         
-        // List view item
+        // List view item with clear call-to-action button
         const listItem = document.createElement('div');
-        listItem.className = 'podcast-list-item';
-        listItem.onclick = () => showAuthor(author);
+        listItem.className = 'podcast-list-item author-list-item';
         listItem.innerHTML = `
-            <div class="podcast-list-item-image">
-                <div class="podcast-list-item-image-placeholder">✍️</div>
+            <div class="podcast-list-item-content">
+                <div class="podcast-list-item-image">
+                    <div class="podcast-list-item-image-placeholder">✍️</div>
+                </div>
+                <div class="podcast-list-item-info">
+                    <h3 class="podcast-list-item-title">${escapeHtml(author)}</h3>
+                    <p class="podcast-list-item-meta">${podcastCount} ${podcastCount === 1 ? 'podcast' : 'podcasts'}</p>
+                </div>
             </div>
-            <div class="podcast-list-item-info">
-                <h3 class="podcast-list-item-title">${escapeHtml(author)}</h3>
-                <p class="podcast-list-item-meta">${podcastCount} ${podcastCount === 1 ? 'podcast' : 'podcasts'}</p>
-            </div>
+            <button class="btn-view-author-pods" onclick="showAuthor('${escapeHtml(author)}')" title="View podcasts by ${escapeHtml(author)}">
+                <span>View Pods</span>
+                <span class="btn-icon">→</span>
+            </button>
         `;
         listEl.appendChild(listItem);
     });
