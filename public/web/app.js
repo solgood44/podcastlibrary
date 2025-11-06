@@ -1631,6 +1631,14 @@ function cleanAuthorText(author) {
     if (!author) return '';
     let cleaned = author.trim();
     
+    // Decode HTML entities (like &amp; to &)
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = cleaned;
+    cleaned = tempDiv.textContent || tempDiv.innerText || cleaned;
+    
+    // Replace & with "and" for better readability (e.g., "Lawrence & Leslie" -> "Lawrence and Leslie")
+    cleaned = cleaned.replace(/\s*&\s*/g, ' and ');
+    
     // Remove excluded words/phrases from the author text
     EXCLUDED_AUTHOR_WORDS.forEach(word => {
         // Remove word if it appears standalone (case insensitive)
@@ -1807,10 +1815,12 @@ function renderPodcasts(podcastsToRender = podcasts, containerEl = null) {
                 <div class="podcast-info">
                     <div class="podcast-title">${escapeHtml(podcast.title || 'Untitled Podcast')}</div>
                     ${(() => {
+                        // Don't show author link if we're on the author page
+                        if (currentAuthor) return '';
                         const cleanedAuthor = podcast.author ? cleanAuthorText(podcast.author) : '';
                         if (cleanedAuthor && !shouldHideAuthor(cleanedAuthor)) {
                             const authorSlug = generateSlug(cleanedAuthor);
-                            return `<div class="podcast-author" onclick="event.stopPropagation(); showAuthor('${escapeHtml(cleanedAuthor)}');"><a href="/author/${authorSlug}" class="podcast-author-link">${escapeHtml(cleanedAuthor)}</a></div>`;
+                            return `<div class="podcast-author" onclick="event.stopPropagation(); event.preventDefault(); showAuthor('${escapeHtml(cleanedAuthor)}'); return false;"><a href="/author/${authorSlug}" class="podcast-author-link" onclick="event.stopPropagation(); event.preventDefault(); showAuthor('${escapeHtml(cleanedAuthor)}'); return false;">${escapeHtml(cleanedAuthor)}</a></div>`;
                         }
                         return '';
                     })()}
@@ -1844,10 +1854,12 @@ function renderPodcasts(podcastsToRender = podcasts, containerEl = null) {
                     <div class="podcast-list-info">
                         <div class="podcast-list-title">${escapeHtml(podcast.title || 'Untitled Podcast')}</div>
                         ${(() => {
+                            // Don't show author link if we're on the author page
+                            if (currentAuthor) return '';
                             const cleanedAuthor = podcast.author ? cleanAuthorText(podcast.author) : '';
                             if (cleanedAuthor && !shouldHideAuthor(cleanedAuthor)) {
                                 const authorSlug = generateSlug(cleanedAuthor);
-                                return `<div class="podcast-list-meta" onclick="event.stopPropagation(); showAuthor('${escapeHtml(cleanedAuthor)}');"><span><a href="/author/${authorSlug}" class="podcast-list-author-link">${escapeHtml(cleanedAuthor)}</a></span></div>`;
+                                return `<div class="podcast-list-meta" onclick="event.stopPropagation(); event.preventDefault(); showAuthor('${escapeHtml(cleanedAuthor)}'); return false;"><span><a href="/author/${authorSlug}" class="podcast-list-author-link" onclick="event.stopPropagation(); event.preventDefault(); showAuthor('${escapeHtml(cleanedAuthor)}'); return false;">${escapeHtml(cleanedAuthor)}</a></span></div>`;
                             }
                             return '';
                         })()}
@@ -2614,9 +2626,15 @@ function handleSearch(query) {
                             <div class="search-result-title">${escapeHtml(podcast.title || 'Untitled Podcast')}</div>
                             ${(() => {
                                 const cleanedAuthor = podcast.author ? cleanAuthorText(podcast.author) : '';
-                                return cleanedAuthor && !shouldHideAuthor(cleanedAuthor) ? `<div class="search-result-meta">
-                                    <span>${escapeHtml(cleanedAuthor)}</span>
-                                </div>` : '';
+                                if (cleanedAuthor && !shouldHideAuthor(cleanedAuthor)) {
+                                    const authorSlug = generateSlug(cleanedAuthor);
+                                    return `<div class="search-result-meta">
+                                        <span onclick="event.stopPropagation(); event.preventDefault(); showAuthor('${escapeHtml(cleanedAuthor)}'); return false;" style="cursor: pointer; color: var(--accent); text-decoration: underline;">
+                                            ${escapeHtml(cleanedAuthor)}
+                                        </span>
+                                    </div>`;
+                                }
+                                return '';
                             })()}
                             ${podcast.description ? `<div class="search-result-description">${sanitizeHtml(podcast.description.substring(0, 200))}...</div>` : ''}
                         </div>
