@@ -43,13 +43,19 @@ const EXCLUDED_AUTHORS = [
     'solgood media',
     'sol goodmedia',
     'public domain',
-    'publicdomain'
+    'publicdomain',
+    'audiobooks'
 ].map(a => a.toLowerCase());
 
 // Function to check if an author should be excluded (handles variations)
 function shouldExcludeAuthor(author) {
     if (!author) return true;
     const authorLower = author.toLowerCase().trim();
+    
+    // Exclude authors containing ".com"
+    if (authorLower.includes('.com')) {
+        return true;
+    }
     
     // Direct match
     if (EXCLUDED_AUTHORS.includes(authorLower)) {
@@ -663,6 +669,7 @@ function extractAuthors() {
 function renderSidebar() {
     renderHistory();
     renderFavorites();
+    renderAuthorsCount();
     renderCategories();
 }
 
@@ -672,7 +679,7 @@ function renderHistory() {
     const history = getHistory();
     
     if (historyEl) {
-        historyEl.textContent = history.length;
+        historyEl.textContent = String(history.length);
     }
 }
 
@@ -683,7 +690,16 @@ function renderFavorites() {
     const totalCount = favorites.podcasts.length + favorites.episodes.length + favorites.authors.length;
     
     if (favoritesEl) {
-        favoritesEl.textContent = totalCount;
+        favoritesEl.textContent = String(totalCount);
+    }
+}
+
+// Render authors count in sidebar
+function renderAuthorsCount() {
+    const authorsEl = document.getElementById('sidebar-authors-count');
+    if (authorsEl) {
+        const count = authors && Array.isArray(authors) ? authors.length : 0;
+        authorsEl.textContent = String(count);
     }
 }
 
@@ -893,7 +909,7 @@ function loadFavoritesPage() {
                     <div class="podcast-list-item author-list-item">
                         <div class="podcast-list-item-content" onclick="showAuthor('${escapeHtml(author)}')">
                             <div class="podcast-list-item-image">
-                                <div class="podcast-list-item-image-placeholder">✍️</div>
+                                <div class="podcast-list-item-image-placeholder"></div>
                             </div>
                             <div class="podcast-list-item-info">
                                 <h3 class="podcast-list-item-title">${escapeHtml(author)}</h3>
@@ -1202,7 +1218,7 @@ function renderAuthors() {
         listItem.innerHTML = `
             <div class="podcast-list-item-content">
                 <div class="podcast-list-item-image">
-                    <div class="podcast-list-item-image-placeholder">✍️</div>
+                    <div class="podcast-list-item-image-placeholder"></div>
                 </div>
                 <div class="podcast-list-item-info">
                     <h3 class="podcast-list-item-title">${escapeHtml(author)}</h3>
@@ -1718,6 +1734,12 @@ const EXCLUDED_AUTHOR_WORDS = [
 function shouldHideAuthor(author) {
     if (!author) return true;
     const authorLower = author.toLowerCase().trim();
+    
+    // Exclude authors containing ".com"
+    if (authorLower.includes('.com')) {
+        return true;
+    }
+    
     return EXCLUDED_AUTHOR_WORDS.some(word => authorLower === word);
 }
 
