@@ -1708,6 +1708,29 @@ body {
     margin: 0;
 }
 
+.author-description-content {
+    font-size: 15px;
+    color: var(--text-secondary);
+    line-height: 1.7;
+}
+
+.author-description-content .description-preview {
+    margin-bottom: 0;
+}
+
+.author-description-content .description-full {
+    margin-top: 8px;
+}
+
+.author-description-content .description-full.hidden {
+    display: none;
+}
+
+.author-description-content .description-full:not(.hidden) {
+    display: block;
+    margin-top: 8px;
+}
+
 .author-description-placeholder {
     color: var(--text-tertiary);
     font-style: italic;

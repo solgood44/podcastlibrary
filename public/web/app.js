@@ -1112,9 +1112,38 @@ async function showAuthorPage(authorName) {
         loadingEl.classList.add('hidden');
         contentEl.classList.remove('hidden');
         
-        // Display description
+        // Display description with "see more" functionality
         if (description) {
-            descriptionEl.innerHTML = `<p>${escapeHtml(description)}</p>`;
+            const fullDescription = sanitizeHtml(description);
+            const originalDescription = description;
+            
+            // Extract first 1-2 sentences (approximately 200-250 chars or until second sentence)
+            const sentences = originalDescription.match(/[^.!?]+[.!?]+/g) || [originalDescription];
+            const previewText = sentences.length > 1 
+                ? sentences.slice(0, 2).join(' ').trim()
+                : (originalDescription.length > 250 
+                    ? originalDescription.substring(0, 250).trim() + '...'
+                    : originalDescription);
+            const previewHtml = sanitizeHtml(previewText);
+            
+            // Only show toggle if preview text is actually shorter than full description
+            const originalPreviewLength = previewText.length;
+            const originalFullLength = originalDescription.length;
+            const hasMore = originalFullLength > originalPreviewLength;
+            
+            descriptionEl.innerHTML = `
+                <div class="author-description-content">
+                    <div class="description-preview">${previewHtml}</div>
+                    ${hasMore ? `
+                        <!-- Full description kept in HTML for SEO but visually hidden -->
+                        <div class="description-full hidden">${fullDescription}</div>
+                        <button class="btn-description-toggle" onclick="window.toggleAuthorDescription(this)">
+                            <span class="toggle-text">See more</span>
+                            <span class="toggle-icon">▼</span>
+                        </button>
+                    ` : ''}
+                </div>
+            `;
             const placeholder = descriptionEl.querySelector('.author-description-placeholder');
             if (placeholder) placeholder.remove();
         } else {
@@ -2627,6 +2656,35 @@ function skipForward() {
 // Toggle description expand/collapse (make globally available for onclick)
 window.toggleDescription = function(button) {
     const container = button.closest('.episodes-page-description-compact');
+    if (!container) return;
+    
+    const preview = container.querySelector('.description-preview');
+    const full = container.querySelector('.description-full');
+    const toggleText = button.querySelector('.toggle-text');
+    const toggleIcon = button.querySelector('.toggle-icon');
+    
+    if (!full || !preview) return;
+    
+    const isExpanded = !full.classList.contains('hidden');
+    
+    if (isExpanded) {
+        // Collapse
+        full.classList.add('hidden');
+        preview.style.display = 'block';
+        toggleText.textContent = 'See more';
+        toggleIcon.textContent = '▼';
+    } else {
+        // Expand
+        full.classList.remove('hidden');
+        preview.style.display = 'none';
+        toggleText.textContent = 'See less';
+        toggleIcon.textContent = '▲';
+    }
+};
+
+// Toggle author description expand/collapse (make globally available for onclick)
+window.toggleAuthorDescription = function(button) {
+    const container = button.closest('.author-description-content');
     if (!container) return;
     
     const preview = container.querySelector('.description-preview');
