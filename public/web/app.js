@@ -1398,9 +1398,13 @@ function addEpisodeToHistory(episodeId, podcastId) {
 // Clear history
 function clearHistory() {
     if (confirm('Clear all listening history?')) {
-        localStorage.removeItem(HISTORY_KEY);
+        // Set empty array explicitly (not just remove key) so sync knows it was intentionally cleared
+        localStorage.setItem(HISTORY_KEY, JSON.stringify([]));
         renderSidebar();
-        debouncedSync(); // Sync to server if enabled
+        // Sync immediately (not debounced) to ensure empty history replaces server history
+        if (syncEnabled) {
+            syncToServer();
+        }
         if (currentPage === 'history') {
             loadHistoryPage();
         }
@@ -3998,21 +4002,28 @@ async function syncToServer() {
         const existing = await authService.fetchUserData();
         if (existing) {
             // Merge: combine local and server data (arrays get merged, objects get combined)
-            // For history: merge arrays and deduplicate by episodeId, keeping most recent
-            const combinedHistory = [...(existing.history || []), ...userData.history];
-            const uniqueHistory = combinedHistory.reduce((acc, item) => {
-                const existing = acc.find(i => i.episodeId === item.episodeId);
-                if (!existing || item.timestamp > existing.timestamp) {
-                    if (existing) {
-                        const index = acc.indexOf(existing);
-                        acc[index] = item;
-                    } else {
-                        acc.push(item);
+            // For history: if local is empty, replace server history (user cleared it)
+            // Otherwise merge arrays and deduplicate by episodeId, keeping most recent
+            let uniqueHistory;
+            if (userData.history.length === 0) {
+                // Local history is empty (intentionally cleared), replace server history
+                uniqueHistory = [];
+            } else {
+                const combinedHistory = [...(existing.history || []), ...userData.history];
+                uniqueHistory = combinedHistory.reduce((acc, item) => {
+                    const existing = acc.find(i => i.episodeId === item.episodeId);
+                    if (!existing || item.timestamp > existing.timestamp) {
+                        if (existing) {
+                            const index = acc.indexOf(existing);
+                            acc[index] = item;
+                        } else {
+                            acc.push(item);
+                        }
                     }
-                }
-                return acc;
-            }, []);
-            uniqueHistory.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+                    return acc;
+                }, []);
+                uniqueHistory.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+            }
             
             // For favorites: merge arrays and deduplicate
             // Episodes are objects with id property, so we need to deduplicate by id
@@ -4076,24 +4087,30 @@ async function syncFromServer() {
             
             if (serverData.history) {
                 const localHistory = getHistory();
-                // Merge history arrays, deduplicate, keep most recent
-                const combined = [...localHistory, ...serverData.history];
-                // Remove duplicates by episodeId, keep most recent
-                const unique = combined.reduce((acc, item) => {
-                    const existing = acc.find(i => i.episodeId === item.episodeId);
-                    if (!existing || item.timestamp > existing.timestamp) {
-                        if (existing) {
-                            const index = acc.indexOf(existing);
-                            acc[index] = item;
-                        } else {
-                            acc.push(item);
+                // If local history is empty (intentionally cleared), don't merge server history back
+                // Otherwise merge history arrays, deduplicate, keep most recent
+                if (localHistory.length === 0) {
+                    // Local history was cleared, keep it empty
+                    localStorage.setItem(HISTORY_KEY, JSON.stringify([]));
+                } else {
+                    const combined = [...localHistory, ...serverData.history];
+                    // Remove duplicates by episodeId, keep most recent
+                    const unique = combined.reduce((acc, item) => {
+                        const existing = acc.find(i => i.episodeId === item.episodeId);
+                        if (!existing || item.timestamp > existing.timestamp) {
+                            if (existing) {
+                                const index = acc.indexOf(existing);
+                                acc[index] = item;
+                            } else {
+                                acc.push(item);
+                            }
                         }
-                    }
-                    return acc;
-                }, []);
-                // Sort by timestamp (newest first) and limit
-                unique.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-                localStorage.setItem(HISTORY_KEY, JSON.stringify(unique.slice(0, MAX_HISTORY)));
+                        return acc;
+                    }, []);
+                    // Sort by timestamp (newest first) and limit
+                    unique.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+                    localStorage.setItem(HISTORY_KEY, JSON.stringify(unique.slice(0, MAX_HISTORY)));
+                }
             }
             
             if (serverData.favorites) {
