@@ -239,6 +239,14 @@
             </div>
             <div id="authors-content" class="podcast-controls hidden">
                 <div class="controls-left">
+                    <div class="view-toggle">
+                        <button id="authors-view-grid-btn" class="view-btn active" onclick="setAuthorsViewMode('grid')" title="Grid View">
+                            <span>⊞</span>
+                        </button>
+                        <button id="authors-view-list-btn" class="view-btn" onclick="setAuthorsViewMode('list')" title="List View">
+                            <span>☰</span>
+                        </button>
+                    </div>
                     <div class="sort-controls">
                         <label for="authors-sort-select" class="sort-label">Sort:</label>
                         <select id="authors-sort-select" class="sort-select" onchange="applyAuthorsSorting()">
@@ -252,7 +260,8 @@
                 </div>
             </div>
             <div id="authors-container">
-                <div id="authors-list" class="podcast-list"></div>
+                <div id="authors-grid" class="podcast-grid"></div>
+                <div id="authors-list" class="podcast-list hidden"></div>
             </div>
         </div>
 

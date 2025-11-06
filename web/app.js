@@ -14,6 +14,7 @@ let currentCategory = null; // Currently viewed category
 let authors = []; // All unique authors
 let currentAuthor = null; // Currently viewed author
 let authorsSortMode = 'count-desc'; // 'count-desc' or 'name-asc' for authors page
+let authorsViewMode = 'grid'; // 'grid' or 'list' for authors page
 let authorDescriptions = {}; // Cache for author descriptions (will be loaded from API later)
 let searchMode = 'episodes'; // 'episodes' or 'podcasts'
 let viewMode = 'grid'; // 'grid' or 'list'
@@ -680,7 +681,7 @@ function renderHistory() {
 function renderFavorites() {
     const favoritesEl = document.getElementById('sidebar-favorites-count');
     const favorites = getFavorites();
-    const totalCount = favorites.podcasts.length + favorites.episodes.length;
+    const totalCount = favorites.podcasts.length + favorites.episodes.length + favorites.authors.length;
     
     if (favoritesEl) {
         favoritesEl.textContent = totalCount;
@@ -693,10 +694,11 @@ function getFavorites() {
         const stored = JSON.parse(localStorage.getItem(FAVORITES_KEY) || '{}');
         return {
             podcasts: stored.podcasts || [],
-            episodes: stored.episodes || []
+            episodes: stored.episodes || [],
+            authors: stored.authors || []
         };
     } catch (e) {
-        return { podcasts: [], episodes: [] };
+        return { podcasts: [], episodes: [], authors: [] };
     }
 }
 
@@ -706,6 +708,7 @@ function saveFavorites(favorites) {
         // Ensure favorites object has required structure
         if (!favorites.podcasts) favorites.podcasts = [];
         if (!favorites.episodes) favorites.episodes = [];
+        if (!favorites.authors) favorites.authors = [];
         
         localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
         renderSidebar(); // This calls renderFavorites() internally
@@ -729,6 +732,55 @@ function isPodcastFavorited(podcastId) {
 function isEpisodeFavorited(episodeId) {
     const favorites = getFavorites();
     return favorites.episodes.some(e => e.id === String(episodeId));
+}
+
+// Check if author is favorited
+function isAuthorFavorited(authorName) {
+    const favorites = getFavorites();
+    return favorites.authors.includes(String(authorName));
+}
+
+// Toggle author favorite
+function toggleAuthorFavorite(authorName) {
+    try {
+        if (!authorName) {
+            console.error('toggleAuthorFavorite: authorName is missing');
+            return;
+        }
+        
+        const favorites = getFavorites();
+        
+        // Ensure authors array exists
+        if (!Array.isArray(favorites.authors)) {
+            favorites.authors = [];
+        }
+        
+        const name = String(authorName);
+        const index = favorites.authors.indexOf(name);
+        
+        if (index > -1) {
+            // Remove from favorites
+            favorites.authors.splice(index, 1);
+        } else {
+            // Add to favorites
+            favorites.authors.push(name);
+        }
+        
+        saveFavorites(favorites);
+        
+        // Re-render authors to update favorite buttons
+        renderAuthors();
+        
+        // Update sidebar favorites count
+        renderFavorites();
+        
+        // Update favorites page if on it
+        if (currentPage === 'favorites') {
+            loadFavoritesPage();
+        }
+    } catch (error) {
+        console.error('Error toggling author favorite:', error);
+    }
 }
 
 // Toggle podcast favorite
@@ -825,12 +877,38 @@ function loadFavoritesPage() {
         
         if (!contentEl) return;
         
-        if (favorites.podcasts.length === 0 && favorites.episodes.length === 0) {
-            contentEl.innerHTML = '<div class="empty"><p>No favorites yet</p><p class="subtitle">Tap the heart icon on podcasts or episodes to add them to favorites</p></div>';
+        if (favorites.podcasts.length === 0 && favorites.episodes.length === 0 && favorites.authors.length === 0) {
+            contentEl.innerHTML = '<div class="empty"><p>No favorites yet</p><p class="subtitle">Tap the heart icon on podcasts, episodes, or authors to add them to favorites</p></div>';
             return;
         }
         
         let html = '';
+        
+        // Render favorite authors
+        if (favorites.authors.length > 0) {
+            html += '<div class="favorites-section"><h2 class="favorites-section-title">Favorite Authors</h2><div class="podcast-grid">';
+            const favoriteAuthors = authors.filter(a => favorites.authors.includes(String(a)));
+            favoriteAuthors.forEach(author => {
+                const podcastCount = getAuthorPodcastCount(author);
+                html += `
+                    <div class="podcast-card">
+                        <div class="podcast-card-content" onclick="showAuthor('${escapeHtml(author)}')">
+                            <div class="podcast-image" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; font-size: 3rem;">
+                                ✍️
+                            </div>
+                            <div class="podcast-info">
+                                <div class="podcast-title">${escapeHtml(author)}</div>
+                                <div class="podcast-author">${podcastCount} ${podcastCount === 1 ? 'podcast' : 'podcasts'}</div>
+                            </div>
+                        </div>
+                        <button class="btn-podcast-favorite favorited" onclick="event.stopPropagation(); toggleAuthorFavorite('${escapeHtml(author)}');" title="Remove from favorites">
+                            ❤️
+                        </button>
+                    </div>
+                `;
+            });
+            html += '</div></div>';
+        }
         
         // Render favorite podcasts
         if (favorites.podcasts.length > 0) {
@@ -1082,18 +1160,25 @@ function loadAuthorsPage() {
         if (sortSelect) {
             sortSelect.value = authorsSortMode;
         }
+        // Update view mode buttons
+        const gridBtn = document.getElementById('authors-view-grid-btn');
+        const listBtn = document.getElementById('authors-view-list-btn');
+        if (gridBtn && listBtn) {
+            if (authorsViewMode === 'grid') {
+                gridBtn.classList.add('active');
+                listBtn.classList.remove('active');
+            } else {
+                listBtn.classList.add('active');
+                gridBtn.classList.remove('active');
+            }
+        }
         renderAuthors();
         updateAuthorsCount();
     }, 300);
 }
 
-// Render authors in list view (sorted)
+// Render authors in grid or list view (sorted)
 function renderAuthors() {
-    const listEl = document.getElementById('authors-list');
-    
-    // Clear existing content
-    listEl.innerHTML = '';
-    
     // Sort authors based on current sort mode
     let sortedAuthors = [...authors];
     if (authorsSortMode === 'count-desc') {
@@ -1108,30 +1193,59 @@ function renderAuthors() {
         sortedAuthors.sort((a, b) => a.localeCompare(b));
     }
     
-    sortedAuthors.forEach(author => {
-        const podcastCount = getAuthorPodcastCount(author);
-        const authorSlug = generateSlug(author);
-        
-        // List view item with clear call-to-action button
-        const listItem = document.createElement('div');
-        listItem.className = 'podcast-list-item author-list-item';
-        listItem.innerHTML = `
-            <div class="podcast-list-item-content">
-                <div class="podcast-list-item-image">
-                    <div class="podcast-list-item-image-placeholder">✍️</div>
+    // Render grid view
+    const gridEl = document.getElementById('authors-grid');
+    if (gridEl) {
+        gridEl.innerHTML = sortedAuthors.map(author => {
+            const podcastCount = getAuthorPodcastCount(author);
+            const authorSlug = generateSlug(author);
+            const isFavorite = isAuthorFavorited(author);
+            
+            return `
+                <div class="podcast-card">
+                    <div class="podcast-card-content" onclick="showAuthor('${escapeHtml(author)}')">
+                        <div class="podcast-image" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; font-size: 3rem;">
+                            ✍️
+                        </div>
+                        <div class="podcast-info">
+                            <div class="podcast-title">${escapeHtml(author)}</div>
+                            <div class="podcast-author">${podcastCount} ${podcastCount === 1 ? 'podcast' : 'podcasts'}</div>
+                        </div>
+                    </div>
+                    <button class="btn-podcast-favorite ${isFavorite ? 'favorited' : ''}" onclick="event.stopPropagation(); toggleAuthorFavorite('${escapeHtml(author)}');" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+                        ${isFavorite ? '❤️' : '🤍'}
+                    </button>
                 </div>
-                <div class="podcast-list-item-info">
-                    <h3 class="podcast-list-item-title">${escapeHtml(author)}</h3>
-                    <p class="podcast-list-item-meta">${podcastCount} ${podcastCount === 1 ? 'podcast' : 'podcasts'}</p>
+            `;
+        }).join('');
+    }
+    
+    // Render list view
+    const listEl = document.getElementById('authors-list');
+    if (listEl) {
+        listEl.innerHTML = sortedAuthors.map(author => {
+            const podcastCount = getAuthorPodcastCount(author);
+            const authorSlug = generateSlug(author);
+            const isFavorite = isAuthorFavorited(author);
+            
+            return `
+                <div class="podcast-list-item author-list-item">
+                    <div class="podcast-list-item-content" onclick="showAuthor('${escapeHtml(author)}')">
+                        <div class="podcast-list-item-image">
+                            <div class="podcast-list-item-image-placeholder">✍️</div>
+                        </div>
+                        <div class="podcast-list-item-info">
+                            <h3 class="podcast-list-item-title">${escapeHtml(author)}</h3>
+                            <p class="podcast-list-item-meta">${podcastCount} ${podcastCount === 1 ? 'podcast' : 'podcasts'}</p>
+                        </div>
+                    </div>
+                    <button class="btn-podcast-favorite-list ${isFavorite ? 'favorited' : ''}" onclick="event.stopPropagation(); toggleAuthorFavorite('${escapeHtml(author)}');" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+                        ${isFavorite ? '❤️' : '🤍'}
+                    </button>
                 </div>
-            </div>
-            <button class="btn-view-author-pods" onclick="showAuthor('${escapeHtml(author)}')" title="View podcasts by ${escapeHtml(author)}">
-                <span>View Pods</span>
-                <span class="btn-icon">→</span>
-            </button>
-        `;
-        listEl.appendChild(listItem);
-    });
+            `;
+        }).join('');
+    }
 }
 
 // Get count of podcasts by author
@@ -1142,6 +1256,30 @@ function getAuthorPodcastCount(author) {
         }
         return false;
     }).length;
+}
+
+// Set authors view mode (grid or list)
+function setAuthorsViewMode(mode) {
+    authorsViewMode = mode;
+    const gridBtn = document.getElementById('authors-view-grid-btn');
+    const listBtn = document.getElementById('authors-view-list-btn');
+    const gridEl = document.getElementById('authors-grid');
+    const listEl = document.getElementById('authors-list');
+    
+    if (mode === 'grid') {
+        gridBtn.classList.add('active');
+        listBtn.classList.remove('active');
+        gridEl.classList.remove('hidden');
+        listEl.classList.add('hidden');
+    } else {
+        listBtn.classList.add('active');
+        gridBtn.classList.remove('active');
+        gridEl.classList.add('hidden');
+        listEl.classList.remove('hidden');
+    }
+    
+    // Re-render authors with current view mode
+    renderAuthors();
 }
 
 // Apply authors sorting
@@ -3795,8 +3933,9 @@ async function syncToServer() {
                 progress: { ...existing.progress, ...userData.progress },
                 history: [...new Set([...existing.history, ...userData.history])],
                 favorites: {
-                    podcasts: [...new Set([...existing.favorites.podcasts, ...userData.favorites.podcasts])],
-                    episodes: [...new Set([...existing.favorites.episodes, ...userData.favorites.episodes])]
+                    podcasts: [...new Set([...existing.favorites.podcasts || [], ...userData.favorites.podcasts])],
+                    episodes: [...new Set([...existing.favorites.episodes || [], ...userData.favorites.episodes])],
+                    authors: [...new Set([...(existing.favorites.authors || []), ...userData.favorites.authors])]
                 },
                 sortPreferences: { ...existing.sort_preferences, ...userData.sortPreferences }
             };
@@ -3863,8 +4002,9 @@ async function syncFromServer() {
                 const localFavorites = getFavorites();
                 // Merge favorites: combine arrays and deduplicate
                 const merged = {
-                    podcasts: [...new Set([...localFavorites.podcasts, ...serverData.favorites.podcasts])],
-                    episodes: [...new Set([...localFavorites.episodes, ...serverData.favorites.episodes])]
+                    podcasts: [...new Set([...localFavorites.podcasts, ...(serverData.favorites.podcasts || [])])],
+                    episodes: [...new Set([...localFavorites.episodes, ...(serverData.favorites.episodes || [])])],
+                    authors: [...new Set([...localFavorites.authors, ...(serverData.favorites.authors || [])])]
                 };
                 saveFavorites(merged);
             }
