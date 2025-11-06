@@ -17,10 +17,21 @@ export function middleware(request) {
     }
   }
 
+  // For author routes, redirect real users to SPA, keep for bots
+  if (pathname.startsWith('/author/')) {
+    // Only redirect if NOT a bot
+    if (!isBot) {
+      // Redirect to SPA, preserving the path in sessionStorage via query param
+      const redirectUrl = new URL('/web/', request.url);
+      redirectUrl.searchParams.set('_route', pathname);
+      return NextResponse.redirect(redirectUrl);
+    }
+  }
+
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: '/podcast/:path*',
+  matcher: ['/podcast/:path*', '/author/:path*'],
 };
 

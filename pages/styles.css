@@ -76,6 +76,17 @@ body {
   margin-bottom: 0.5rem;
 }
 
+.podcast-seo-author-link {
+  color: var(--accent);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.podcast-seo-author-link:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+}
+
 .podcast-seo-genres {
   font-size: 0.9rem;
   color: var(--text-tertiary);
@@ -118,6 +129,22 @@ body {
   border: 1px solid var(--border);
   border-radius: 8px;
   transition: all 0.2s;
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+
+.podcast-seo-episode-image {
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.podcast-seo-episode-content {
+  flex: 1;
+  min-width: 0;
 }
 
 .podcast-seo-episode-card:hover {
@@ -132,6 +159,16 @@ body {
   margin-bottom: 0.75rem;
   margin-top: 0;
   color: var(--text-primary);
+}
+
+.podcast-seo-episode-title a {
+  color: var(--text-primary);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.podcast-seo-episode-title a:hover {
+  color: var(--accent);
 }
 
 .podcast-seo-episode-meta {

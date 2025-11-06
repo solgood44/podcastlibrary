@@ -143,7 +143,7 @@ export default function PodcastPage({ podcast, episodes, error }) {
             
             {podcast.author && (
               <p className="podcast-seo-author">
-                By {podcast.author}
+                By <a href={`/author/${generateSlug(podcast.author)}`} className="podcast-seo-author-link">{podcast.author}</a>
               </p>
             )}
             

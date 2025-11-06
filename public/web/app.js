@@ -226,6 +226,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     handleResize();
+    
+    // Check if player bar is already visible on page load
+    const playerBar = document.getElementById('player-bar');
+    if (playerBar && !playerBar.classList.contains('hidden')) {
+        document.body.classList.add('player-bar-visible');
+    }
 });
 
 // Handle window resize to adjust sidebar behavior
@@ -2262,6 +2268,7 @@ async function loadEpisodesPage() {
                         </div>
                     </div>
                     <div class="episodes-header-right">
+                        ${episodes.length > 1 ? `
                         <div class="episodes-header-controls">
                             <div class="sort-controls-inline">
                                 <label for="podcast-episodes-sort-select-inline" class="sort-label-inline">Sort:</label>
@@ -2273,6 +2280,7 @@ async function loadEpisodesPage() {
                                 </select>
                             </div>
                         </div>
+                        ` : ''}
                         <button class="btn-podcast-favorite-episodes-compact ${isPodcastFavorite ? 'favorited' : ''}" onclick="event.stopPropagation(); togglePodcastFavorite('${latestPodcast.id}');" title="${isPodcastFavorite ? 'Remove from favorites' : 'Add to favorites'}">
                             ${isPodcastFavorite ? '❤️' : '🤍'}
                         </button>
@@ -2642,7 +2650,9 @@ function playEpisode(episode) {
     updatePlayerBar();
     
     // Show player bar
-    document.getElementById('player-bar').classList.remove('hidden');
+    const playerBar = document.getElementById('player-bar');
+    playerBar.classList.remove('hidden');
+    document.body.classList.add('player-bar-visible');
     
     // Set source - only change if different episode
     const currentSrc = audioPlayer.src.split('?')[0]; // Remove query params for comparison

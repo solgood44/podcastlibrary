@@ -7,6 +7,7 @@ export async function getServerSideProps({ res }) {
   const robotsTxt = `User-agent: *
 Allow: /
 Allow: /podcast/
+Allow: /author/
 Disallow: /api/
 Disallow: /_next/
 
