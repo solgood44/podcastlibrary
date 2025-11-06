@@ -67,6 +67,17 @@ class APIService {
     const query = '?select=id,podcast_id,title,description,audio_url,pub_date,duration_seconds&order=pub_date.desc';
     return await this.request(`/episodes${query}`);
   }
+
+  async fetchAuthorDescriptions() {
+    const query = '?select=name,description&order=name.asc';
+    return await this.request(`/authors${query}`);
+  }
+
+  async fetchAuthorDescription(authorName) {
+    const query = `?select=name,description&name=eq.${encodeURIComponent(authorName)}`;
+    const results = await this.request(`/authors${query}`);
+    return results.length > 0 ? results[0] : null;
+  }
 }
 
 // Create singleton instance

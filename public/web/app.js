@@ -39,8 +39,35 @@ const EXCLUDED_AUTHORS = [
     'solgoodmedia',
     'solgoodmedia.com',
     'sol good network',
-    'public domain'
+    'sol good media',
+    'solgood media',
+    'sol goodmedia',
+    'public domain',
+    'publicdomain'
 ].map(a => a.toLowerCase());
+
+// Function to check if an author should be excluded (handles variations)
+function shouldExcludeAuthor(author) {
+    if (!author) return true;
+    const authorLower = author.toLowerCase().trim();
+    
+    // Direct match
+    if (EXCLUDED_AUTHORS.includes(authorLower)) {
+        return true;
+    }
+    
+    // Partial match for "sol good" variations
+    if (authorLower.includes('sol good') || authorLower.includes('solgood')) {
+        return true;
+    }
+    
+    // Check for "public domain" variations
+    if (authorLower.includes('public domain') || authorLower.includes('publicdomain')) {
+        return true;
+    }
+    
+    return false;
+}
 
 // Generate URL-friendly slug from title
 function generateSlug(title) {
@@ -464,6 +491,21 @@ async function loadPodcasts() {
         extractCategories();
         extractAuthors();
         
+        // Load author descriptions
+        try {
+            const descriptions = await apiService.fetchAuthorDescriptions();
+            // Convert array to object for easy lookup
+            authorDescriptions = {};
+            descriptions.forEach(author => {
+                if (author.name && author.description) {
+                    authorDescriptions[author.name] = author.description;
+                }
+            });
+        } catch (error) {
+            console.warn('Could not load author descriptions:', error);
+            // Continue without descriptions - they'll be loaded on-demand
+        }
+        
         loadingEl.classList.add('hidden');
         
         if (podcasts.length === 0) {
@@ -517,7 +559,7 @@ function extractAuthors() {
         if (podcast.author && typeof podcast.author === 'string') {
             const author = podcast.author.trim();
             // Check if author should be excluded
-            if (author && !EXCLUDED_AUTHORS.includes(author.toLowerCase())) {
+            if (author && !shouldExcludeAuthor(author)) {
                 authorSet.add(author);
             }
         }
@@ -1029,7 +1071,7 @@ function showAuthor(authorName) {
 }
 
 // Show author page (podcasts by author)
-function showAuthorPage(authorName) {
+async function showAuthorPage(authorName) {
     currentAuthor = authorName;
     const loadingEl = document.getElementById('author-loading');
     const contentEl = document.getElementById('author-content');
@@ -1049,15 +1091,32 @@ function showAuthorPage(authorName) {
         return false;
     });
     
+    // Load description (from cache or API)
+    let description = authorDescriptions[authorName] || null;
+    
+    // If not in cache, try to fetch from API
+    if (!description) {
+        try {
+            const authorData = await apiService.fetchAuthorDescription(authorName);
+            if (authorData && authorData.description) {
+                description = authorData.description;
+                // Cache it for future use
+                authorDescriptions[authorName] = description;
+            }
+        } catch (error) {
+            console.warn('Could not fetch author description:', error);
+        }
+    }
+    
     setTimeout(() => {
         loadingEl.classList.add('hidden');
         contentEl.classList.remove('hidden');
         
-        // Load description (from cache, will be loaded from API later)
-        const description = authorDescriptions[authorName] || null;
+        // Display description
         if (description) {
             descriptionEl.innerHTML = `<p>${escapeHtml(description)}</p>`;
-            descriptionEl.querySelector('.author-description-placeholder')?.remove();
+            const placeholder = descriptionEl.querySelector('.author-description-placeholder');
+            if (placeholder) placeholder.remove();
         } else {
             descriptionEl.innerHTML = '<p class="author-description-placeholder">No description available yet.</p>';
         }
