@@ -449,6 +449,91 @@ function showPage(page) {
     if (pageEl) {
         pageEl.classList.remove('hidden');
     }
+    updatePageTitle(page);
+}
+
+// Update page title and meta tags based on current page
+function updatePageTitle(page) {
+    const baseTitle = 'Podcast Library';
+    let title = baseTitle;
+    let description = 'Discover and listen to thousands of podcasts, audiobooks, and audio content.';
+    let image = 'https://podcastlibrary.org/web/og-image.svg';
+    let url = 'https://podcastlibrary.org' + window.location.pathname;
+    
+    if (page === 'episodes' && currentPodcast) {
+        title = `${currentPodcast.title || 'Podcast'} - ${baseTitle}`;
+        description = currentPodcast.description 
+            ? sanitizeHtml(currentPodcast.description).substring(0, 200) + '...'
+            : `Listen to ${currentPodcast.title || 'this podcast'}`;
+        image = currentPodcast.image_url || image;
+        url = `https://podcastlibrary.org/podcast/${generateSlug(currentPodcast.title || '')}`;
+    } else if (page === 'author' && currentAuthor) {
+        title = `${currentAuthor} - Author - ${baseTitle}`;
+        description = authorDescriptions[currentAuthor] 
+            ? sanitizeHtml(authorDescriptions[currentAuthor]).substring(0, 200) + '...'
+            : `Explore podcasts by ${currentAuthor}`;
+        url = `https://podcastlibrary.org/author/${generateSlug(currentAuthor)}`;
+    } else if (page === 'episode' && displayedEpisode && currentPodcast) {
+        title = `${displayedEpisode.title || 'Episode'} - ${currentPodcast.title || 'Podcast'} - ${baseTitle}`;
+        description = displayedEpisode.description 
+            ? sanitizeHtml(displayedEpisode.description).substring(0, 200) + '...'
+            : `Listen to ${displayedEpisode.title || 'this episode'}`;
+        image = displayedEpisode.image_url || currentPodcast.image_url || image;
+        url = `https://podcastlibrary.org/podcast/${generateSlug(currentPodcast.title || '')}`;
+    } else if (page === 'category' && currentCategory) {
+        title = `${currentCategory} - ${baseTitle}`;
+        description = `Browse podcasts in the ${currentCategory} category`;
+    } else if (page === 'authors') {
+        title = `Authors - ${baseTitle}`;
+        description = 'Browse all podcast authors and discover their works';
+    } else if (page === 'favorites') {
+        title = `Favorites - ${baseTitle}`;
+        description = 'Your favorite podcasts and episodes';
+    } else if (page === 'history') {
+        title = `History - ${baseTitle}`;
+        description = 'Your recently played episodes';
+    } else if (page === 'search') {
+        title = `Search - ${baseTitle}`;
+        description = 'Search for podcasts and episodes';
+    }
+    
+    // Update document title
+    document.title = title;
+    
+    // Update meta tags for social sharing
+    updateMetaTag('og:title', title);
+    updateMetaTag('og:description', description);
+    updateMetaTag('og:image', image);
+    updateMetaTag('og:url', url);
+    updateMetaTag('twitter:title', title);
+    updateMetaTag('twitter:description', description);
+    updateMetaTag('twitter:image', image);
+    updateMetaTag('description', description);
+}
+
+// Helper function to update or create meta tags
+function updateMetaTag(property, content) {
+    // Handle both og: and twitter: properties
+    let selector = '';
+    if (property.startsWith('og:')) {
+        selector = `meta[property="${property}"]`;
+    } else if (property.startsWith('twitter:')) {
+        selector = `meta[name="${property}"]`;
+    } else {
+        selector = `meta[name="${property}"]`;
+    }
+    
+    let meta = document.querySelector(selector);
+    if (!meta) {
+        meta = document.createElement('meta');
+        if (property.startsWith('og:')) {
+            meta.setAttribute('property', property);
+        } else {
+            meta.setAttribute('name', property);
+        }
+        document.head.appendChild(meta);
+    }
+    meta.setAttribute('content', content);
 }
 
 // Go back to library from episodes
@@ -924,6 +1009,10 @@ function showCategory(categoryName) {
 
 function showCategoryPage(categoryName) {
     currentCategory = categoryName;
+    
+    // Update page title for this category
+    updatePageTitle('category');
+    
     const loadingEl = document.getElementById('category-loading');
     const gridEl = document.getElementById('category-grid');
     const titleEl = document.getElementById('category-page-title');
@@ -1073,6 +1162,10 @@ function showAuthor(authorName) {
 // Show author page (podcasts by author)
 async function showAuthorPage(authorName) {
     currentAuthor = authorName;
+    
+    // Update page title for this author
+    updatePageTitle('author');
+    
     const loadingEl = document.getElementById('author-loading');
     const contentEl = document.getElementById('author-content');
     const descriptionEl = document.getElementById('author-description');
@@ -1275,6 +1368,8 @@ function openEpisodeDetail(episodeId, podcastId) {
     window.history.pushState({ episodeId: episodeId, podcastId: podcastId, page: 'episode' }, '', `/podcast/${slug}`);
     
     navigateTo('episode');
+    // Update title after navigation
+    setTimeout(() => updatePageTitle('episode'), 100);
 }
 
 // Handle URL parameters from SEO pages (e.g., ?episode=123&podcast=456)
@@ -1362,6 +1457,9 @@ function handleURLParams() {
 // Load episode detail page
 function loadEpisodeDetailPage() {
     if (!displayedEpisode || !currentPodcast) return;
+    
+    // Update page title for this episode
+    updatePageTitle('episode');
     
     const contentEl = document.getElementById('episode-detail-content');
     const titleEl = document.getElementById('episode-page-title');
@@ -2066,6 +2164,9 @@ function applyPodcastEpisodesDurationFilter() {
 // Load episodes page
 async function loadEpisodesPage() {
     if (!currentPodcast) return;
+    
+    // Update page title for this podcast
+    updatePageTitle('episodes');
     
     const loadingEl = document.getElementById('episodes-loading');
     const listEl = document.getElementById('episodes-list');

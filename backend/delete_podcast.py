@@ -28,7 +28,7 @@ def delete_by_feed_url(feed_url: str):
     return result
 
 
-def delete_by_title(title_search: str):
+def delete_by_title(title_search: str, confirm_yes: bool = False):
     """Delete podcasts matching a title search (partial match, case-insensitive)."""
     # First, find what we're about to delete
     podcasts = sb.table("podcasts").select("id,title,feed_url").ilike("title", f"%{title_search}%").execute()
@@ -41,10 +41,11 @@ def delete_by_title(title_search: str):
     for p in podcasts.data:
         print(f"  - {p.get('title')} ({p.get('feed_url')})")
     
-    confirm = input(f"\nDelete {len(podcasts.data)} podcast(s)? (yes/no): ")
-    if confirm.lower() != "yes":
-        print("Cancelled.")
-        return
+    if not confirm_yes:
+        confirm = input(f"\nDelete {len(podcasts.data)} podcast(s)? (yes/no): ")
+        if confirm.lower() != "yes":
+            print("Cancelled.")
+            return
     
     for p in podcasts.data:
         result = sb.table("podcasts").delete().eq("id", p["id"]).execute()
@@ -96,17 +97,24 @@ if __name__ == "__main__":
         print("  --list                List all podcasts")
         print("  --feed-url URL        Delete by feed URL")
         print("  --title SEARCH        Delete by title (partial match)")
+        print("  --title SEARCH --yes  Delete by title without confirmation")
         print("  --all                 Delete everything (requires confirmation)")
         sys.exit(1)
     
     arg = sys.argv[1]
+    confirm_yes = "--yes" in sys.argv
     
     if arg == "--list":
         list_podcasts()
     elif arg == "--feed-url" and len(sys.argv) > 2:
         delete_by_feed_url(sys.argv[2])
     elif arg == "--title" and len(sys.argv) > 2:
-        delete_by_title(sys.argv[2])
+        title_arg = sys.argv[2] if sys.argv[2] != "--yes" else (sys.argv[3] if len(sys.argv) > 3 else "")
+        if title_arg:
+            delete_by_title(title_arg, confirm_yes)
+        else:
+            print("Error: --title requires a search term")
+            sys.exit(1)
     elif arg == "--all":
         delete_all()
     else:
