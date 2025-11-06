@@ -746,6 +746,42 @@ body {
     color: var(--text-tertiary);
 }
 
+.podcast-author-link {
+    color: var(--text-tertiary);
+    text-decoration: none;
+    transition: color 0.2s;
+    cursor: pointer;
+}
+
+.podcast-author-link:hover {
+    color: var(--accent);
+    text-decoration: underline;
+}
+
+.podcast-list-author-link {
+    color: var(--text-tertiary);
+    text-decoration: none;
+    transition: color 0.2s;
+    cursor: pointer;
+}
+
+.podcast-list-author-link:hover {
+    color: var(--accent);
+    text-decoration: underline;
+}
+
+.episodes-author-link {
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: color 0.2s;
+    cursor: pointer;
+}
+
+.episodes-author-link:hover {
+    color: var(--accent);
+    text-decoration: underline;
+}
+
 .podcast-episode-count {
     font-size: 12px;
     color: var(--accent);
@@ -1190,17 +1226,23 @@ body {
 
 .description-full {
     margin-top: 8px;
+    overflow: visible !important;
+    max-height: none !important;
+    white-space: normal !important;
+    word-wrap: break-word;
 }
 
 .description-full.hidden {
     /* Keep in DOM for SEO but visually hidden */
     /* SEO-friendly hidden: text is still readable by search engines */
-    display: none;
+    display: none !important;
 }
 
 .description-full:not(.hidden) {
-    display: block;
+    display: block !important;
     margin-top: 8px;
+    overflow: visible !important;
+    max-height: none !important;
 }
 
 .btn-description-toggle {

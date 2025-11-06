@@ -1803,7 +1803,11 @@ function renderPodcasts(podcastsToRender = podcasts, containerEl = null) {
                     <div class="podcast-title">${escapeHtml(podcast.title || 'Untitled Podcast')}</div>
                     ${(() => {
                         const cleanedAuthor = podcast.author ? cleanAuthorText(podcast.author) : '';
-                        return cleanedAuthor && !shouldHideAuthor(cleanedAuthor) ? `<div class="podcast-author">${escapeHtml(cleanedAuthor)}</div>` : '';
+                        if (cleanedAuthor && !shouldHideAuthor(cleanedAuthor)) {
+                            const authorSlug = generateSlug(cleanedAuthor);
+                            return `<div class="podcast-author" onclick="event.stopPropagation(); showAuthor('${escapeHtml(cleanedAuthor)}');"><a href="/author/${authorSlug}" class="podcast-author-link">${escapeHtml(cleanedAuthor)}</a></div>`;
+                        }
+                        return '';
                     })()}
                 </div>
             </div>
@@ -1836,7 +1840,11 @@ function renderPodcasts(podcastsToRender = podcasts, containerEl = null) {
                         <div class="podcast-list-title">${escapeHtml(podcast.title || 'Untitled Podcast')}</div>
                         ${(() => {
                             const cleanedAuthor = podcast.author ? cleanAuthorText(podcast.author) : '';
-                            return cleanedAuthor && !shouldHideAuthor(cleanedAuthor) ? `<div class="podcast-list-meta"><span>${escapeHtml(cleanedAuthor)}</span></div>` : '';
+                            if (cleanedAuthor && !shouldHideAuthor(cleanedAuthor)) {
+                                const authorSlug = generateSlug(cleanedAuthor);
+                                return `<div class="podcast-list-meta" onclick="event.stopPropagation(); showAuthor('${escapeHtml(cleanedAuthor)}');"><span><a href="/author/${authorSlug}" class="podcast-list-author-link">${escapeHtml(cleanedAuthor)}</a></span></div>`;
+                            }
+                            return '';
                         })()}
                     </div>
                 </div>
@@ -2264,7 +2272,10 @@ async function loadEpisodesPage() {
                              onerror="this.src='${getPlaceholderImage()}'">
                         <div class="episodes-header-info">
                             <h1 class="episodes-podcast-title-compact">${escapeHtml(latestPodcast.title || '')}</h1>
-                            ${latestPodcast.author ? `<p class="episodes-podcast-author-compact">${escapeHtml(latestPodcast.author)}</p>` : ''}
+                            ${latestPodcast.author ? (() => {
+                                const authorSlug = generateSlug(latestPodcast.author);
+                                return `<p class="episodes-podcast-author-compact"><a href="/author/${authorSlug}" class="episodes-author-link" onclick="event.preventDefault(); showAuthor('${escapeHtml(latestPodcast.author)}'); return false;">${escapeHtml(latestPodcast.author)}</a></p>`;
+                            })() : ''}
                         </div>
                     </div>
                     <div class="episodes-header-right">
@@ -2782,12 +2793,16 @@ window.toggleDescription = function(button) {
         // Collapse
         full.classList.add('hidden');
         preview.style.display = 'block';
+        preview.style.visibility = 'visible';
         toggleText.textContent = 'See more';
         toggleIcon.textContent = '▼';
     } else {
         // Expand
         full.classList.remove('hidden');
+        full.style.display = 'block';
+        full.style.visibility = 'visible';
         preview.style.display = 'none';
+        preview.style.visibility = 'hidden';
         toggleText.textContent = 'See less';
         toggleIcon.textContent = '▲';
     }
