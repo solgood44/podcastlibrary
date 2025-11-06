@@ -3603,12 +3603,16 @@ function setupAuth() {
     });
 
     // Listen for auth state changes
-    authService.onAuthStateChange((event, session) => {
+    authService.onAuthStateChange(async (event, session) => {
         if (event === 'SIGNED_IN' && session) {
             updateAuthUI(session.user);
             syncEnabled = true;
-            // Sync local data to server on sign in
-            syncToServer();
+            // Sync strategy on sign in:
+            // 1. Upload local data to server (merges with existing server data)
+            // 2. Download server data to local (merges with local, server is source of truth)
+            // This ensures both local and server have the complete merged dataset
+            await syncToServer(); // Upload local data (merges with server)
+            await syncFromServer(); // Download merged data back (updates local)
         } else if (event === 'SIGNED_OUT') {
             updateAuthUI(null);
             syncEnabled = false;
@@ -3627,7 +3631,26 @@ async function handleEmailConfirmation() {
     const accessToken = hashParams.get('access_token');
     const type = hashParams.get('type');
     
-    if (type === 'recovery' || type === 'signup') {
+    if (type === 'recovery') {
+        // User clicked password reset link
+        if (accessToken) {
+            // Clear the hash from URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+            // Wait a moment for session to be established
+            setTimeout(async () => {
+                const session = await authService.getSession();
+                if (session) {
+                    // Show password reset form
+                    const modal = document.getElementById('auth-modal');
+                    if (modal) {
+                        modal.classList.remove('hidden');
+                        switchAuthMode('reset');
+                        showAuthSuccess('Please enter your new password.');
+                    }
+                }
+            }, 500);
+        }
+    } else if (type === 'signup') {
         // User clicked email confirmation link
         // Supabase client should handle this automatically, but we can show a message
         if (accessToken) {
@@ -3663,7 +3686,7 @@ function updateAuthUI(user) {
         authButton.textContent = user.email ? user.email.split('@')[0] : 'Account';
         authButton.classList.add('signed-in');
     } else {
-        authButton.textContent = 'Sign In';
+        authButton.textContent = 'Sign Up';
         authButton.classList.remove('signed-in');
     }
 }
@@ -3677,8 +3700,8 @@ window.toggleAuthModal = async function() {
         // If signed in, show account info
         showSignedInView(user);
     } else {
-        // Show sign in form
-        switchAuthMode('signin');
+        // Show sign up form by default
+        switchAuthMode('signup');
     }
     
     modal.classList.toggle('hidden');
@@ -3695,21 +3718,33 @@ window.closeAuthModal = function() {
 window.switchAuthMode = function(mode) {
     const signinForm = document.getElementById('auth-signin-form');
     const signupForm = document.getElementById('auth-signup-form');
+    const forgotForm = document.getElementById('auth-forgot-form');
+    const resetForm = document.getElementById('auth-reset-form');
     const signedinView = document.getElementById('auth-signedin');
     const modalTitle = document.getElementById('auth-modal-title');
     
     clearAuthMessages();
     
-    if (mode === 'signup') {
-        signinForm.classList.add('hidden');
-        signupForm.classList.remove('hidden');
-        signedinView.classList.add('hidden');
-        modalTitle.textContent = 'Sign Up';
-    } else {
+    // Hide all forms first
+    signinForm.classList.add('hidden');
+    signupForm.classList.add('hidden');
+    forgotForm.classList.add('hidden');
+    resetForm.classList.add('hidden');
+    signedinView.classList.add('hidden');
+    
+    if (mode === 'signin') {
         signinForm.classList.remove('hidden');
-        signupForm.classList.add('hidden');
-        signedinView.classList.add('hidden');
         modalTitle.textContent = 'Sign In';
+    } else if (mode === 'forgot') {
+        forgotForm.classList.remove('hidden');
+        modalTitle.textContent = 'Reset Password';
+    } else if (mode === 'reset') {
+        resetForm.classList.remove('hidden');
+        modalTitle.textContent = 'Set New Password';
+    } else {
+        // Default to signup
+        signupForm.classList.remove('hidden');
+        modalTitle.textContent = 'Sign Up';
     }
 };
 
@@ -3821,6 +3856,61 @@ window.handleSignOut = async function() {
     }
 };
 
+// Handle forgot password
+window.handleForgotPassword = async function() {
+    const email = document.getElementById('forgot-email').value;
+    
+    if (!email) {
+        showAuthError('Please enter your email address');
+        return;
+    }
+    
+    showAuthError('');
+    const result = await authService.resetPassword(email);
+    
+    if (result.success) {
+        showAuthSuccess('Password reset link sent! Please check your email and click the link to reset your password.');
+    } else {
+        showAuthError(result.error || 'Failed to send reset link');
+    }
+};
+
+// Handle reset password (after clicking email link)
+window.handleResetPassword = async function() {
+    const password = document.getElementById('reset-password').value;
+    const passwordConfirm = document.getElementById('reset-password-confirm').value;
+    
+    if (!password || !passwordConfirm) {
+        showAuthError('Please fill in all fields');
+        return;
+    }
+    
+    if (password !== passwordConfirm) {
+        showAuthError('Passwords do not match');
+        return;
+    }
+    
+    if (password.length < 6) {
+        showAuthError('Password must be at least 6 characters');
+        return;
+    }
+    
+    showAuthError('');
+    const result = await authService.updatePassword(password);
+    
+    if (result.success) {
+        showAuthSuccess('Password updated successfully! You can now sign in with your new password.');
+        setTimeout(() => {
+            switchAuthMode('signin');
+            // Clear password fields
+            document.getElementById('reset-password').value = '';
+            document.getElementById('reset-password-confirm').value = '';
+        }, 2000);
+    } else {
+        showAuthError(result.error || 'Failed to update password');
+    }
+};
+
 // Show auth error message
 function showAuthError(message) {
     const errorEl = document.getElementById('auth-error');
@@ -3886,14 +3976,43 @@ async function syncToServer() {
         const existing = await authService.fetchUserData();
         if (existing) {
             // Merge: combine local and server data (arrays get merged, objects get combined)
+            // For history: merge arrays and deduplicate by episodeId, keeping most recent
+            const combinedHistory = [...(existing.history || []), ...userData.history];
+            const uniqueHistory = combinedHistory.reduce((acc, item) => {
+                const existing = acc.find(i => i.episodeId === item.episodeId);
+                if (!existing || item.timestamp > existing.timestamp) {
+                    if (existing) {
+                        const index = acc.indexOf(existing);
+                        acc[index] = item;
+                    } else {
+                        acc.push(item);
+                    }
+                }
+                return acc;
+            }, []);
+            uniqueHistory.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+            
+            // For favorites: merge arrays and deduplicate
+            // Episodes are objects with id property, so we need to deduplicate by id
+            const combinedEpisodes = [...(existing.favorites?.episodes || []), ...userData.favorites.episodes];
+            const uniqueEpisodes = combinedEpisodes.reduce((acc, item) => {
+                const existing = acc.find(e => e.id === item.id);
+                if (!existing) {
+                    acc.push(item);
+                }
+                return acc;
+            }, []);
+            
+            const mergedFavorites = {
+                podcasts: [...new Set([...(existing.favorites?.podcasts || []), ...userData.favorites.podcasts])],
+                episodes: uniqueEpisodes,
+                authors: [...new Set([...(existing.favorites?.authors || []), ...userData.favorites.authors])]
+            };
+            
             const merged = {
                 progress: { ...existing.progress, ...userData.progress },
-                history: [...new Set([...existing.history, ...userData.history])],
-                favorites: {
-                    podcasts: [...new Set([...existing.favorites.podcasts || [], ...userData.favorites.podcasts])],
-                    episodes: [...new Set([...existing.favorites.episodes || [], ...userData.favorites.episodes])],
-                    authors: [...new Set([...(existing.favorites.authors || []), ...userData.favorites.authors])]
-                },
+                history: uniqueHistory,
+                favorites: mergedFavorites,
                 sortPreferences: { ...existing.sort_preferences, ...userData.sortPreferences }
             };
             await authService.syncUserData(merged);
@@ -3958,9 +4077,19 @@ async function syncFromServer() {
             if (serverData.favorites) {
                 const localFavorites = getFavorites();
                 // Merge favorites: combine arrays and deduplicate
+                // Episodes are objects with id property, so we need to deduplicate by id
+                const combinedEpisodes = [...localFavorites.episodes, ...(serverData.favorites.episodes || [])];
+                const uniqueEpisodes = combinedEpisodes.reduce((acc, item) => {
+                    const existing = acc.find(e => e.id === item.id);
+                    if (!existing) {
+                        acc.push(item);
+                    }
+                    return acc;
+                }, []);
+                
                 const merged = {
                     podcasts: [...new Set([...localFavorites.podcasts, ...(serverData.favorites.podcasts || [])])],
-                    episodes: [...new Set([...localFavorites.episodes, ...(serverData.favorites.episodes || [])])],
+                    episodes: uniqueEpisodes,
                     authors: [...new Set([...localFavorites.authors, ...(serverData.favorites.authors || [])])]
                 };
                 saveFavorites(merged);

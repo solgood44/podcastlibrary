@@ -92,7 +92,7 @@
             >
         </div>
         <div id="auth-button-container" class="auth-button-container">
-            <button id="auth-button" class="btn-auth" onclick="toggleAuthModal()">Sign In</button>
+            <button id="auth-button" class="btn-auth" onclick="toggleAuthModal()">Sign Up</button>
         </div>
     </header>
     <!-- Main Content Area -->
@@ -387,14 +387,14 @@
         <div class="auth-modal-overlay" onclick="closeAuthModal()"></div>
         <div class="auth-modal-content">
             <div class="auth-modal-header">
-                <h2 id="auth-modal-title">Sign In</h2>
+                <h2 id="auth-modal-title">Sign Up</h2>
                 <button class="btn-close-modal" onclick="closeAuthModal()">✕</button>
             </div>
             <div class="auth-modal-body">
                 <div id="auth-error" class="auth-error hidden"></div>
                 <div id="auth-success" class="auth-success hidden"></div>
                 
-                <div id="auth-signin-form" class="auth-form">
+                <div id="auth-signin-form" class="auth-form hidden">
                     <div class="auth-form-group">
                         <label for="signin-email">Email</label>
                         <input type="email" id="signin-email" class="auth-input" placeholder="your@email.com">
@@ -403,14 +403,32 @@
                         <label for="signin-password">Password</label>
                         <input type="password" id="signin-password" class="auth-input" placeholder="••••••••">
                     </div>
+                    <p style="text-align: right; margin-top: -0.5rem; margin-bottom: 1rem;">
+                        <a href="#" onclick="switchAuthMode('forgot'); return false;" style="font-size: 0.9rem; color: #0066cc; text-decoration: none;">Forgot password?</a>
+                    </p>
                     <button class="btn-auth-primary" onclick="handleSignIn()">Sign In</button>
                     <p class="auth-switch-text">
                         Don't have an account? 
                         <a href="#" onclick="switchAuthMode('signup'); return false;">Sign up</a>
                     </p>
+                    <p class="auth-legal-links" style="margin-top: 1rem; font-size: 0.85rem; text-align: center; color: #666;">
+                        By signing in, you agree to our 
+                        <a href="/terms" target="_blank" style="color: #0066cc; text-decoration: underline;">Terms of Service</a> 
+                        and 
+                        <a href="/privacy" target="_blank" style="color: #0066cc; text-decoration: underline;">Privacy Policy</a>
+                    </p>
                 </div>
 
-                <div id="auth-signup-form" class="auth-form hidden">
+                <div id="auth-signup-form" class="auth-form">
+                    <div class="auth-benefits" style="background: var(--bg-tertiary); padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
+                        <h3 style="margin: 0 0 0.75rem 0; font-size: 1rem; color: var(--text-primary);">Benefits of signing up:</h3>
+                        <ul style="margin: 0; padding-left: 1.25rem; color: var(--text-secondary); font-size: 0.9rem; line-height: 1.6;">
+                            <li>Sync favorites and history across all your devices</li>
+                            <li>Never lose your listening progress</li>
+                            <li>Access your data from anywhere</li>
+                            <li>Free and secure</li>
+                        </ul>
+                    </div>
                     <div class="auth-form-group">
                         <label for="signup-email">Email</label>
                         <input type="email" id="signup-email" class="auth-input" placeholder="your@email.com">
@@ -427,6 +445,41 @@
                     <p class="auth-switch-text">
                         Already have an account? 
                         <a href="#" onclick="switchAuthMode('signin'); return false;">Sign in</a>
+                    </p>
+                    <p class="auth-legal-links" style="margin-top: 1rem; font-size: 0.85rem; text-align: center; color: #666;">
+                        By signing up, you agree to our 
+                        <a href="/terms" target="_blank" style="color: #0066cc; text-decoration: underline;">Terms of Service</a> 
+                        and 
+                        <a href="/privacy" target="_blank" style="color: #0066cc; text-decoration: underline;">Privacy Policy</a>
+                    </p>
+                </div>
+
+                <div id="auth-forgot-form" class="auth-form hidden">
+                    <p style="margin-bottom: 1rem; color: #666;">Enter your email address and we'll send you a link to reset your password.</p>
+                    <div class="auth-form-group">
+                        <label for="forgot-email">Email</label>
+                        <input type="email" id="forgot-email" class="auth-input" placeholder="your@email.com">
+                    </div>
+                    <button class="btn-auth-primary" onclick="handleForgotPassword()">Send Reset Link</button>
+                    <p class="auth-switch-text">
+                        Remember your password? 
+                        <a href="#" onclick="switchAuthMode('signin'); return false;">Sign in</a>
+                    </p>
+                </div>
+
+                <div id="auth-reset-form" class="auth-form hidden">
+                    <p style="margin-bottom: 1rem; color: #666;">Enter your new password.</p>
+                    <div class="auth-form-group">
+                        <label for="reset-password">New Password</label>
+                        <input type="password" id="reset-password" class="auth-input" placeholder="••••••••">
+                    </div>
+                    <div class="auth-form-group">
+                        <label for="reset-password-confirm">Confirm New Password</label>
+                        <input type="password" id="reset-password-confirm" class="auth-input" placeholder="••••••••">
+                    </div>
+                    <button class="btn-auth-primary" onclick="handleResetPassword()">Update Password</button>
+                    <p class="auth-switch-text">
+                        <a href="#" onclick="switchAuthMode('signin'); return false;">Back to sign in</a>
                     </p>
                 </div>
 

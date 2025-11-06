@@ -91,6 +91,45 @@ class AuthService {
     }
   }
 
+  // Reset password (send reset email)
+  async resetPassword(email) {
+    try {
+      const client = this.getSupabaseClient();
+      if (!client) throw new Error('Supabase client not available');
+      
+      // Use current page URL as redirect URL for password reset
+      const redirectUrl = window.location.origin + window.location.pathname;
+      
+      const { data, error } = await client.auth.resetPasswordForEmail(email, {
+        redirectTo: redirectUrl
+      });
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error) {
+      console.error('Reset password error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Update password (after clicking reset link)
+  async updatePassword(newPassword) {
+    try {
+      const client = this.getSupabaseClient();
+      if (!client) throw new Error('Supabase client not available');
+      
+      const { data, error } = await client.auth.updateUser({
+        password: newPassword
+      });
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error) {
+      console.error('Update password error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
   // Get current user
   async getCurrentUser() {
     try {
