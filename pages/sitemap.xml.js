@@ -1,7 +1,7 @@
 // Dynamic sitemap generation for SEO
-import { fetchAllPodcasts, generateSlug } from '../lib/supabase';
+import { fetchAllPodcasts, fetchAllAuthors, generateSlug } from '../lib/supabase';
 
-function generateSiteMap(podcasts) {
+function generateSiteMap(podcasts, authors) {
   const baseUrl = 'https://podcastlibrary.org';
   
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -24,6 +24,18 @@ function generateSiteMap(podcasts) {
      `;
        })
        .join('')}
+     ${authors
+       .map(author => {
+         const slug = generateSlug(author || '');
+         return `
+       <url>
+           <loc>${baseUrl}/author/${slug}</loc>
+           <changefreq>weekly</changefreq>
+           <priority>0.7</priority>
+       </url>
+     `;
+       })
+       .join('')}
    </urlset>
  `;
 }
@@ -33,11 +45,12 @@ function SiteMap() {
 }
 
 export async function getServerSideProps({ res }) {
-  // Fetch podcasts
+  // Fetch podcasts and authors
   const podcasts = await fetchAllPodcasts();
+  const authors = await fetchAllAuthors();
 
-  // Generate the XML sitemap with the podcast data
-  const sitemap = generateSiteMap(podcasts);
+  // Generate the XML sitemap with the podcast and author data
+  const sitemap = generateSiteMap(podcasts, authors);
 
   res.setHeader('Content-Type', 'text/xml');
   // Cache sitemap for 24 hours

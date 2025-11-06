@@ -1,10 +1,36 @@
 import { fetchAuthorBySlug, fetchPodcastsByAuthor, fetchAuthorDescription, generateSlug } from '../../lib/supabase';
 import Head from 'next/head';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 
 export default function AuthorPage({ authorName, podcasts, description, error }) {
   const router = useRouter();
+  const [sortMode, setSortMode] = useState('title-asc');
+  const [sortedPodcasts, setSortedPodcasts] = useState(podcasts || []);
+
+  // Sort podcasts when sortMode or podcasts change
+  useEffect(() => {
+    if (!podcasts || podcasts.length === 0) {
+      setSortedPodcasts([]);
+      return;
+    }
+
+    const sorted = [...podcasts];
+    if (sortMode === 'title-asc') {
+      sorted.sort((a, b) => {
+        const titleA = (a.title || '').toLowerCase();
+        const titleB = (b.title || '').toLowerCase();
+        return titleA.localeCompare(titleB);
+      });
+    } else if (sortMode === 'title-desc') {
+      sorted.sort((a, b) => {
+        const titleA = (a.title || '').toLowerCase();
+        const titleB = (b.title || '').toLowerCase();
+        return titleB.localeCompare(titleA);
+      });
+    }
+    setSortedPodcasts(sorted);
+  }, [sortMode, podcasts]);
 
   useEffect(() => {
     // Redirect real users to SPA (keep SEO page for bots)
@@ -132,12 +158,33 @@ export default function AuthorPage({ authorName, podcasts, description, error })
         {/* Podcasts List */}
         {podcasts.length > 0 ? (
           <div className="podcast-seo-episodes-section">
-            <h2 className="podcast-seo-episodes-title">
-              Podcasts by {authorName}
-            </h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h2 className="podcast-seo-episodes-title">
+                Podcasts by {authorName}
+              </h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <label htmlFor="author-podcasts-sort" style={{ fontSize: '0.9rem', color: '#666' }}>Sort:</label>
+                <select 
+                  id="author-podcasts-sort"
+                  value={sortMode}
+                  onChange={(e) => setSortMode(e.target.value)}
+                  style={{
+                    padding: '0.5rem',
+                    fontSize: '0.9rem',
+                    border: '1px solid #ddd',
+                    borderRadius: '4px',
+                    backgroundColor: 'white',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <option value="title-asc">A-Z</option>
+                  <option value="title-desc">Z-A</option>
+                </select>
+              </div>
+            </div>
             
             <div className="podcast-seo-episodes-list">
-              {podcasts.map((podcast) => (
+              {sortedPodcasts.map((podcast) => (
                 <div key={podcast.id} className="podcast-seo-episode-card">
                   {podcast.image_url && (
                     <img 

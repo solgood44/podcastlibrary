@@ -271,7 +271,16 @@
                     <p class="author-description-placeholder">No description available yet.</p>
                 </div>
                 <div id="author-podcasts-section">
-                    <h2 class="author-section-title">Podcasts</h2>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h2 class="author-section-title">Podcasts</h2>
+                        <div class="sort-controls">
+                            <label for="author-podcasts-sort-select" class="sort-label">Sort:</label>
+                            <select id="author-podcasts-sort-select" class="sort-select" onchange="applyAuthorPodcastsSorting()">
+                                <option value="title-asc">A-Z</option>
+                                <option value="title-desc">Z-A</option>
+                            </select>
+                        </div>
+                    </div>
                     <div id="author-podcasts-grid" class="podcast-grid"></div>
                 </div>
             </div>

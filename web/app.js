@@ -1254,6 +1254,12 @@ async function showAuthorPage(authorName) {
             descriptionEl.innerHTML = '<p class="author-description-placeholder">No description available yet.</p>';
         }
         
+        // Update sort select to match current sort mode
+        const sortSelect = document.getElementById('author-podcasts-sort-select');
+        if (sortSelect) {
+            sortSelect.value = sortMode;
+        }
+        
         // Render podcasts
         if (filteredPodcasts.length === 0) {
             podcastsGridEl.innerHTML = '<div class="empty"><p>No podcasts by this author</p></div>';
@@ -1772,6 +1778,28 @@ function applySorting() {
         : podcasts;
     
     renderPodcasts(currentPodcasts);
+}
+
+// Apply sorting for author podcasts page
+function applyAuthorPodcastsSorting() {
+    const sortSelect = document.getElementById('author-podcasts-sort-select');
+    if (sortSelect) {
+        sortMode = sortSelect.value;
+        
+        // Re-render author podcasts
+        if (currentAuthor) {
+            const filteredPodcasts = podcasts.filter(p => {
+                if (p.author && typeof p.author === 'string') {
+                    return p.author.trim() === currentAuthor;
+                }
+                return false;
+            });
+            const podcastsGridEl = document.getElementById('author-podcasts-grid');
+            if (podcastsGridEl) {
+                renderPodcasts(filteredPodcasts, podcastsGridEl);
+            }
+        }
+    }
 }
 
 // Update podcast count display (removed - showing inaccurate count due to 1000 limit)
