@@ -14,7 +14,6 @@ let currentCategory = null; // Currently viewed category
 let authors = []; // All unique authors
 let currentAuthor = null; // Currently viewed author
 let authorsSortMode = 'count-desc'; // 'count-desc' or 'name-asc' for authors page
-let authorsViewMode = 'grid'; // 'grid' or 'list' for authors page
 let authorDescriptions = {}; // Cache for author descriptions (will be loaded from API later)
 let searchMode = 'episodes'; // 'episodes' or 'podcasts'
 let viewMode = 'grid'; // 'grid' or 'list'
@@ -886,24 +885,30 @@ function loadFavoritesPage() {
         
         // Render favorite authors
         if (favorites.authors.length > 0) {
-            html += '<div class="favorites-section"><h2 class="favorites-section-title">Favorite Authors</h2><div class="podcast-grid">';
+            html += '<div class="favorites-section"><h2 class="favorites-section-title">Favorite Authors</h2><div class="podcast-list">';
             const favoriteAuthors = authors.filter(a => favorites.authors.includes(String(a)));
             favoriteAuthors.forEach(author => {
                 const podcastCount = getAuthorPodcastCount(author);
                 html += `
-                    <div class="podcast-card">
-                        <div class="podcast-card-content" onclick="showAuthor('${escapeHtml(author)}')">
-                            <div class="podcast-image" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; font-size: 3rem;">
-                                ✍️
+                    <div class="podcast-list-item author-list-item">
+                        <div class="podcast-list-item-content" onclick="showAuthor('${escapeHtml(author)}')">
+                            <div class="podcast-list-item-image">
+                                <div class="podcast-list-item-image-placeholder">✍️</div>
                             </div>
-                            <div class="podcast-info">
-                                <div class="podcast-title">${escapeHtml(author)}</div>
-                                <div class="podcast-author">${podcastCount} ${podcastCount === 1 ? 'podcast' : 'podcasts'}</div>
+                            <div class="podcast-list-item-info">
+                                <h3 class="podcast-list-item-title">${escapeHtml(author)}</h3>
+                                <p class="podcast-list-item-meta">${podcastCount} ${podcastCount === 1 ? 'podcast' : 'podcasts'}</p>
                             </div>
                         </div>
-                        <button class="btn-podcast-favorite favorited" onclick="event.stopPropagation(); toggleAuthorFavorite('${escapeHtml(author)}');" title="Remove from favorites">
-                            ❤️
-                        </button>
+                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                            <button class="btn-podcast-favorite-list favorited" onclick="event.stopPropagation(); toggleAuthorFavorite('${escapeHtml(author)}');" title="Remove from favorites">
+                                ❤️
+                            </button>
+                            <button class="btn-view-author-pods" onclick="event.stopPropagation(); showAuthor('${escapeHtml(author)}');" title="View podcasts by ${escapeHtml(author)}">
+                                <span>View Pods</span>
+                                <span class="btn-icon">→</span>
+                            </button>
+                        </div>
                     </div>
                 `;
             });
@@ -1160,25 +1165,18 @@ function loadAuthorsPage() {
         if (sortSelect) {
             sortSelect.value = authorsSortMode;
         }
-        // Update view mode buttons
-        const gridBtn = document.getElementById('authors-view-grid-btn');
-        const listBtn = document.getElementById('authors-view-list-btn');
-        if (gridBtn && listBtn) {
-            if (authorsViewMode === 'grid') {
-                gridBtn.classList.add('active');
-                listBtn.classList.remove('active');
-            } else {
-                listBtn.classList.add('active');
-                gridBtn.classList.remove('active');
-            }
-        }
         renderAuthors();
         updateAuthorsCount();
     }, 300);
 }
 
-// Render authors in grid or list view (sorted)
+// Render authors in list view (sorted)
 function renderAuthors() {
+    const listEl = document.getElementById('authors-list');
+    
+    // Clear existing content
+    listEl.innerHTML = '';
+    
     // Sort authors based on current sort mode
     let sortedAuthors = [...authors];
     if (authorsSortMode === 'count-desc') {
@@ -1193,59 +1191,36 @@ function renderAuthors() {
         sortedAuthors.sort((a, b) => a.localeCompare(b));
     }
     
-    // Render grid view
-    const gridEl = document.getElementById('authors-grid');
-    if (gridEl) {
-        gridEl.innerHTML = sortedAuthors.map(author => {
-            const podcastCount = getAuthorPodcastCount(author);
-            const authorSlug = generateSlug(author);
-            const isFavorite = isAuthorFavorited(author);
-            
-            return `
-                <div class="podcast-card">
-                    <div class="podcast-card-content" onclick="showAuthor('${escapeHtml(author)}')">
-                        <div class="podcast-image" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; font-size: 3rem;">
-                            ✍️
-                        </div>
-                        <div class="podcast-info">
-                            <div class="podcast-title">${escapeHtml(author)}</div>
-                            <div class="podcast-author">${podcastCount} ${podcastCount === 1 ? 'podcast' : 'podcasts'}</div>
-                        </div>
-                    </div>
-                    <button class="btn-podcast-favorite ${isFavorite ? 'favorited' : ''}" onclick="event.stopPropagation(); toggleAuthorFavorite('${escapeHtml(author)}');" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
-                        ${isFavorite ? '❤️' : '🤍'}
-                    </button>
+    sortedAuthors.forEach(author => {
+        const podcastCount = getAuthorPodcastCount(author);
+        const authorSlug = generateSlug(author);
+        const isFavorite = isAuthorFavorited(author);
+        
+        // List view item with clear call-to-action button
+        const listItem = document.createElement('div');
+        listItem.className = 'podcast-list-item author-list-item';
+        listItem.innerHTML = `
+            <div class="podcast-list-item-content">
+                <div class="podcast-list-item-image">
+                    <div class="podcast-list-item-image-placeholder">✍️</div>
                 </div>
-            `;
-        }).join('');
-    }
-    
-    // Render list view
-    const listEl = document.getElementById('authors-list');
-    if (listEl) {
-        listEl.innerHTML = sortedAuthors.map(author => {
-            const podcastCount = getAuthorPodcastCount(author);
-            const authorSlug = generateSlug(author);
-            const isFavorite = isAuthorFavorited(author);
-            
-            return `
-                <div class="podcast-list-item author-list-item">
-                    <div class="podcast-list-item-content" onclick="showAuthor('${escapeHtml(author)}')">
-                        <div class="podcast-list-item-image">
-                            <div class="podcast-list-item-image-placeholder">✍️</div>
-                        </div>
-                        <div class="podcast-list-item-info">
-                            <h3 class="podcast-list-item-title">${escapeHtml(author)}</h3>
-                            <p class="podcast-list-item-meta">${podcastCount} ${podcastCount === 1 ? 'podcast' : 'podcasts'}</p>
-                        </div>
-                    </div>
-                    <button class="btn-podcast-favorite-list ${isFavorite ? 'favorited' : ''}" onclick="event.stopPropagation(); toggleAuthorFavorite('${escapeHtml(author)}');" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
-                        ${isFavorite ? '❤️' : '🤍'}
-                    </button>
+                <div class="podcast-list-item-info">
+                    <h3 class="podcast-list-item-title">${escapeHtml(author)}</h3>
+                    <p class="podcast-list-item-meta">${podcastCount} ${podcastCount === 1 ? 'podcast' : 'podcasts'}</p>
                 </div>
-            `;
-        }).join('');
-    }
+            </div>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <button class="btn-podcast-favorite-list ${isFavorite ? 'favorited' : ''}" onclick="event.stopPropagation(); toggleAuthorFavorite('${escapeHtml(author)}');" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+                    ${isFavorite ? '❤️' : '🤍'}
+                </button>
+                <button class="btn-view-author-pods" onclick="showAuthor('${escapeHtml(author)}')" title="View podcasts by ${escapeHtml(author)}">
+                    <span>View Pods</span>
+                    <span class="btn-icon">→</span>
+                </button>
+            </div>
+        `;
+        listEl.appendChild(listItem);
+    });
 }
 
 // Get count of podcasts by author
@@ -1256,30 +1231,6 @@ function getAuthorPodcastCount(author) {
         }
         return false;
     }).length;
-}
-
-// Set authors view mode (grid or list)
-function setAuthorsViewMode(mode) {
-    authorsViewMode = mode;
-    const gridBtn = document.getElementById('authors-view-grid-btn');
-    const listBtn = document.getElementById('authors-view-list-btn');
-    const gridEl = document.getElementById('authors-grid');
-    const listEl = document.getElementById('authors-list');
-    
-    if (mode === 'grid') {
-        gridBtn.classList.add('active');
-        listBtn.classList.remove('active');
-        gridEl.classList.remove('hidden');
-        listEl.classList.add('hidden');
-    } else {
-        listBtn.classList.add('active');
-        gridBtn.classList.remove('active');
-        gridEl.classList.add('hidden');
-        listEl.classList.remove('hidden');
-    }
-    
-    // Re-render authors with current view mode
-    renderAuthors();
 }
 
 // Apply authors sorting
