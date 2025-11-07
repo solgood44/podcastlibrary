@@ -360,6 +360,23 @@ function setupRouting() {
 function navigateTo(page, param = null) {
     showPage(page);
     
+    // Track page view
+    if (window.analytics) {
+        const pageName = page === 'grid' ? 'Library' : 
+                        page === 'episodes' ? 'Podcast Episodes' :
+                        page === 'player' ? 'Player' :
+                        page === 'search' ? 'Search' :
+                        page === 'category' ? `Category: ${param || ''}` :
+                        page === 'authors' ? 'Authors' :
+                        page === 'author' ? `Author: ${param || ''}` :
+                        page === 'history' ? 'History' :
+                        page === 'favorites' ? 'Favorites' :
+                        page === 'episode' ? 'Episode Detail' :
+                        page === 'all-episodes' ? 'All Episodes' :
+                        page;
+        window.analytics.trackPageView(pageName, `/${page}${param ? '/' + param : ''}`);
+    }
+    
     // Close sidebar only on mobile
     if (isMobileScreen()) {
         const sidebar = document.getElementById('sidebar');
@@ -816,12 +833,20 @@ function togglePodcastFavorite(podcastId) {
         const id = String(podcastId);
         const index = favorites.podcasts.indexOf(id);
         
+        const podcast = podcasts.find(p => String(p.id) === id);
+        const isFavorite = index === -1; // Will be favorite after toggle
+        
         if (index > -1) {
             // Remove from favorites
             favorites.podcasts.splice(index, 1);
         } else {
             // Add to favorites
             favorites.podcasts.push(id);
+        }
+        
+        // Track favorite action
+        if (window.analytics && podcast) {
+            window.analytics.trackFavoritePodcast(podcast, isFavorite);
         }
         
         saveFavorites(favorites);
@@ -852,6 +877,11 @@ function toggleEpisodeFavorite(episodeId, podcastId) {
     const id = String(episodeId);
     const existingIndex = favorites.episodes.findIndex(e => e.id === id);
     
+    const episode = allEpisodes.find(e => String(e.id) === id) || 
+                   (currentPodcast && episodesCache[currentPodcast.id]?.find(e => String(e.id) === id));
+    const podcast = podcasts.find(p => String(p.id) === String(podcastId));
+    const isFavorite = existingIndex === -1; // Will be favorite after toggle
+    
     if (existingIndex > -1) {
         favorites.episodes.splice(existingIndex, 1);
     } else {
@@ -860,6 +890,11 @@ function toggleEpisodeFavorite(episodeId, podcastId) {
             podcastId: String(podcastId),
             timestamp: Date.now()
         });
+    }
+    
+    // Track favorite action
+    if (window.analytics && episode && podcast) {
+        window.analytics.trackFavoriteEpisode(episode, podcast, isFavorite);
     }
     
     saveFavorites(favorites);
@@ -1272,6 +1307,13 @@ function showAuthor(authorName) {
     const authorSlug = generateSlug(authorName);
     // Update URL to use slug
     window.history.pushState({ author: authorName, page: 'author' }, '', `/author/${authorSlug}`);
+    
+    // Track author view
+    if (window.analytics) {
+        const podcastCount = getAuthorPodcastCount(authorName);
+        window.analytics.trackAuthorView(authorName, podcastCount);
+    }
+    
     navigateTo('author', authorName);
 }
 
@@ -2170,6 +2212,11 @@ function loadAllEpisodesPage() {
 async function openEpisodes(podcastId) {
     currentPodcast = podcasts.find(p => p.id === podcastId);
     
+    // Track podcast view
+    if (window.analytics && currentPodcast) {
+        window.analytics.trackPodcastView(currentPodcast);
+    }
+    
     // Update URL with podcast slug
     if (currentPodcast) {
         const slug = generateSlug(currentPodcast.title || '');
@@ -2720,6 +2767,11 @@ function handleSearch(query) {
             (ep.description || '').toLowerCase().includes(searchTerm)
         );
         
+        // Track search
+        if (window.analytics) {
+            window.analytics.trackSearch(query, searchMode, matches.length);
+        }
+        
         if (matches.length === 0) {
             resultsEl.innerHTML = '<div class="empty"><p>No episodes found</p></div>';
             return;
@@ -2815,6 +2867,10 @@ function playEpisode(episode) {
     // Save previous progress if switching episodes
     if (currentEpisode && currentEpisode.id !== episode.id) {
         saveProgress();
+        // Reset progress tracking for new episode
+        if (window.analytics) {
+            window.analytics.resetEpisodeProgress(episode.id);
+        }
     }
     
     currentEpisode = episode;
@@ -2822,6 +2878,11 @@ function playEpisode(episode) {
     // Find podcast if not set
     if (!currentPodcast || currentPodcast.id !== episode.podcast_id) {
         currentPodcast = podcasts.find(p => p.id === episode.podcast_id);
+    }
+    
+    // Track episode play
+    if (window.analytics && currentPodcast) {
+        window.analytics.trackEpisodePlay(episode, currentPodcast);
     }
     
     // Add to history
@@ -3016,6 +3077,15 @@ function togglePlayPause() {
     if (isPlaying) {
         audioPlayer.pause();
         isPlaying = false;
+        // Track pause
+        if (window.analytics && currentPodcast) {
+            window.analytics.trackEpisodePause(
+                currentEpisode, 
+                currentPodcast, 
+                audioPlayer.currentTime, 
+                audioPlayer.duration
+            );
+        }
     } else {
         audioPlayer.play();
         isPlaying = true;
@@ -3247,7 +3317,18 @@ function seekToPosition(event) {
     const newTime = percent * audioPlayer.duration;
     
     if (!isNaN(newTime) && isFinite(newTime)) {
+        const oldTime = audioPlayer.currentTime;
         audioPlayer.currentTime = Math.max(0, Math.min(newTime, audioPlayer.duration));
+        
+        // Track seek
+        if (window.analytics && currentPodcast) {
+            window.analytics.trackEpisodeSeek(
+                currentEpisode,
+                oldTime,
+                audioPlayer.currentTime,
+                audioPlayer.duration
+            );
+        }
     }
 }
 
@@ -3283,6 +3364,15 @@ function setupAudioPlayer() {
             const progressFill = document.getElementById('player-bar-progress-fill');
             if (progressFill) {
                 progressFill.style.width = `${progress}%`;
+            }
+            
+            // Track episode progress milestones
+            if (window.analytics && currentEpisode) {
+                window.analytics.trackEpisodeProgress(
+                    currentEpisode, 
+                    audioPlayer.currentTime, 
+                    audioPlayer.duration
+                );
             }
         }
         
@@ -3342,6 +3432,14 @@ function setupAudioPlayer() {
         // Mark as completed
         if (currentEpisode) {
             saveEpisodeProgress(currentEpisode.id, 100);
+            // Track episode completion
+            if (window.analytics && currentPodcast) {
+                window.analytics.trackEpisodeEnd(
+                    currentEpisode, 
+                    currentPodcast, 
+                    audioPlayer.duration
+                );
+            }
         }
     });
     

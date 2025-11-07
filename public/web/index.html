@@ -28,6 +28,20 @@
     <!-- Additional Meta -->
     <meta name="description" content="Discover and listen to thousands of podcasts, audiobooks, and audio content. Browse by author, category, or search for your favorite shows.">
     
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9CDHCMHT8J"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-9CDHCMHT8J', {
+            anonymize_ip: true,
+            allow_google_signals: false,
+            allow_ad_personalization_signals: false,
+            transport_type: 'beacon',
+        });
+    </script>
+    
     <link rel="stylesheet" href="/web/styles.css">
 </head>
 <body class="dark-mode">
@@ -498,7 +512,25 @@
     <script src="/web/config.js"></script>
     <script src="/web/api.js"></script>
     <script src="/web/auth.js"></script>
+    <script src="/web/analytics.js"></script>
     <script src="/web/app.js"></script>
+    
+    <!-- GA Debug Helper (remove in production) -->
+    <script>
+        // Debug helper - check if GA loaded
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                if (typeof window.gtag === 'function') {
+                    console.log('✅ Google Analytics loaded successfully');
+                    console.log('Measurement ID: G-9CDHCMHT8J');
+                    console.log('DataLayer length:', window.dataLayer ? window.dataLayer.length : 0);
+                } else {
+                    console.error('❌ Google Analytics NOT loaded');
+                    console.log('Check for ad blockers or network errors');
+                }
+            }, 1000);
+        });
+    </script>
     <!-- Vercel Analytics -->
     <script type="module">
         import { inject } from 'https://esm.sh/@vercel/analytics@1';
