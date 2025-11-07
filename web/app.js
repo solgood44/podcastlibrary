@@ -130,7 +130,16 @@ function prefetchEpisodeAudio(episode) {
 function setupAudioPrefetching() {
     // Use event delegation for hover events on episode items
     document.addEventListener('mouseenter', (e) => {
-        const episodeItem = e.target.closest('.episode-item');
+        // e.target might be a text node, so we need to check if it's an Element
+        let target = e.target;
+        if (!(target instanceof Element)) {
+            target = target?.parentElement;
+        }
+        if (!target || !(target instanceof Element) || typeof target.closest !== 'function') {
+            return;
+        }
+        
+        const episodeItem = target.closest('.episode-item');
         if (episodeItem) {
             // Find the episode data from the onclick handler or data attribute
             const playBtn = episodeItem.querySelector('.btn-episode-play');
@@ -3010,6 +3019,7 @@ function skipForward() {
 
 // Toggle description expand/collapse (make globally available for onclick)
 window.toggleDescription = function(button) {
+    if (!button || !(button instanceof Element) || typeof button.closest !== 'function') return;
     const container = button.closest('.episodes-page-description-compact');
     if (!container) return;
     
@@ -3043,6 +3053,7 @@ window.toggleDescription = function(button) {
 
 // Toggle author description expand/collapse (make globally available for onclick)
 window.toggleAuthorDescription = function(button) {
+    if (!button || !(button instanceof Element) || typeof button.closest !== 'function') return;
     const container = button.closest('.author-description-content');
     if (!container) return;
     

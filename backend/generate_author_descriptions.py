@@ -187,7 +187,9 @@ def fetch_all_authors() -> List[str]:
             author = podcast.get('author')
             if author and isinstance(author, str):
                 author = author.strip()
-                if author and author.lower() not in excluded_lower:
+                author_lower = author.lower()
+                # Exclude authors containing ".com"
+                if author and '.com' not in author_lower and author_lower not in excluded_lower:
                     authors_set.add(author)
         
         return sorted(list(authors_set))

@@ -524,12 +524,39 @@
                     console.log('✅ Google Analytics loaded successfully');
                     console.log('Measurement ID: G-9CDHCMHT8J');
                     console.log('DataLayer length:', window.dataLayer ? window.dataLayer.length : 0);
+                    console.log('');
+                    console.log('📊 To verify events are being sent:');
+                    console.log('1. Open Network tab (F12 → Network)');
+                    console.log('2. Filter by "collect" or "google-analytics"');
+                    console.log('3. Interact with the site (play episode, search, etc.)');
+                    console.log('4. Look for requests to google-analytics.com/g/collect');
+                    console.log('');
+                    console.log('🧪 Test manually: Run window.testGA4() in console');
                 } else {
                     console.error('❌ Google Analytics NOT loaded');
                     console.log('Check for ad blockers or network errors');
+                    console.log('Make sure you are on the live site (not localhost)');
                 }
             }, 1000);
         });
+        
+        // Manual test function for Step 1 verification
+        window.testGA4 = function() {
+            if (typeof window.gtag !== 'function') {
+                console.error('❌ GA4 not loaded. Check for ad blockers or network errors.');
+                return;
+            }
+            console.log('🧪 Sending test event...');
+            window.gtag('event', 'test_manual_event', {
+                event_category: 'test',
+                event_label: 'console_test',
+                test_timestamp: new Date().toISOString()
+            });
+            console.log('✅ Test event sent!');
+            console.log('📊 Now check:');
+            console.log('   1. Network tab → Filter by "collect" → Look for google-analytics.com/g/collect');
+            console.log('   2. GA4 Real-time reports → Should appear within 30 seconds');
+        };
     </script>
     <!-- Vercel Analytics -->
     <script type="module">

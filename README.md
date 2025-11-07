@@ -1,37 +1,55 @@
-# Podcast Player MVP — Supabase + Python Ingestor + SwiftUI App
+# Podcast Website — Full-Stack Podcast Platform
 
-This starter pack gives you a clean, lightweight foundation for building a podcast player:
+A complete podcast platform with web app, iOS app, and backend infrastructure:
 
-- **No login (MVP)** — local-only library on device
-- **Your feeds only** — ingested from CSV
-- **No audio storage** — stream from original host; optional on-device downloads later
-- **Compact Overcast-style grid** for podcasts
-- **Vertical list** for episodes (recommended for readability)
+- **Web App** — Next.js website with SEO-optimized podcast pages and SPA player
+- **iOS App** — Native SwiftUI podcast player
+- **Backend** — Python RSS feed ingestor with Supabase database
+- **Analytics** — Google Analytics 4 integration
+- **Deployment** — Ready for Vercel/Netlify deployment
+
+## 📚 Documentation
+
+**All documentation is organized in the [`docs/`](docs/) folder.** Start with:
+- **[Documentation Index](docs/README.md)** — Complete guide to all docs
+- **[Setup Guides](docs/setup/)** — Initial setup and configuration
+- **[Deployment Guides](docs/deployment/)** — How to deploy your site
+
+## 🚀 Quick Start
+
+1. **Set up Supabase** (see Setup Instructions below)
+2. **Configure backend** — Run the Python feed ingestor
+3. **Deploy web app** — See [Deployment Guide](docs/deployment/DEPLOYMENT_GUIDE.md)
+4. **Set up analytics** — See [GA4 Setup](docs/setup/GA4_SETUP.md)
 
 ## Project Structure
 
 ```
 project/
-  backend/
+  docs/                 # 📚 All documentation (organized by topic)
+    setup/              # Setup and configuration guides
+    deployment/         # Deployment guides
+    testing/            # Testing guides
+    backend/            # Backend-specific docs
+    security/           # Security documentation
+    reports/            # Audit reports
+  backend/              # Backend scripts and database
     schema.sql          # Supabase database schema
     policies.sql        # Row-level security policies
     feed_ingestor.py    # Python RSS feed ingestor
     requirements.txt    # Python dependencies
-    feeds.csv.example   # Example CSV template
-  ios/
+    feeds.csv           # RSS feed list
+  pages/                # Next.js pages (SEO-optimized)
+  web/                  # Web SPA (main podcast player)
+  lib/                  # Shared utilities (analytics, Supabase)
+  ios/                  # iOS SwiftUI app
     PodcastMVP/
-      PodcastMVPApp.swift      # Main app entry point
-      Models/
-        Podcast.swift          # Podcast model
-        Episode.swift          # Episode model
-      Services/
-        APIService.swift       # Supabase API client
-        ImageLoader.swift      # Remote image loader
-      Views/
-        LibraryGridView.swift  # Main grid view
-        PodcastDetailView.swift # Podcast detail wrapper
-        EpisodeListView.swift   # Episode list with player
+      Models/           # Data models
+      Services/         # API services
+      Views/            # UI views
 ```
+
+**For detailed documentation, see [docs/README.md](docs/README.md)**
 
 ## Setup Instructions
 
@@ -141,17 +159,32 @@ When ready to add paid features:
 4. Update RLS policies to gate premium feeds
 5. RSS parsing remains unchanged; only gate API endpoints
 
+## 📖 More Documentation
+
+- **[Setup Guides](docs/setup/)** — Google Analytics, SEO, DNS, Authentication
+- **[Deployment Guides](docs/deployment/)** — Vercel, Netlify, rollback plans
+- **[Testing Guides](docs/testing/)** — Pre-deployment testing
+- **[Backend Guides](docs/backend/)** — Adding podcasts, enhancing descriptions
+- **[Security](docs/security/)** — Security assessment and best practices
+
 ## Troubleshooting
 
 **Python ingestor errors:**
 - Make sure `.env` file has correct Supabase credentials
 - Check that `feeds.csv` exists and has valid RSS URLs
 - Verify network connectivity
+- See [Backend Guides](docs/backend/) for more help
+
+**Web app issues:**
+- Check [Testing Guide](docs/testing/TESTING_GUIDE.md)
+- Review [Deployment Guide](docs/deployment/DEPLOYMENT_GUIDE.md)
+- See [Manual Steps](docs/other/MANUAL_STEPS.md)
 
 **iOS app not loading podcasts:**
 - Verify Supabase URL and anon key in `APIService.swift`
 - Check that policies.sql was run (RLS should allow anonymous reads)
 - Ensure backend ingestor has populated some data
+- See `ios/GETTING_STARTED.md`
 
 **Audio not playing:**
 - Check that episodes have valid `audio_url` values

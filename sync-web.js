@@ -19,6 +19,7 @@ const filesToSync = [
   'api.js',
   'auth.js',
   'config.js',
+  'analytics.js',
 ];
 
 // Ensure target directory exists
