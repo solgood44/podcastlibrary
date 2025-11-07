@@ -2,6 +2,31 @@
 
 This guide will help you verify that events are being tracked and show you where to find them in GA4.
 
+## ⚡ Quick Start: Events Not Showing?
+
+**If you're seeing active users but no events in GA4 Real-time, start here:**
+
+1. **Open your live website** (not localhost)
+2. **Press F12** → **Console** tab
+3. **Copy and paste this diagnostic script:**
+   ```javascript
+   console.log('=== GA4 Diagnostic ===');
+   console.log('gtag exists:', typeof window.gtag === 'function');
+   console.log('analytics exists:', typeof window.analytics === 'object');
+   if (typeof window.gtag === 'function') {
+     window.gtag('event', 'test_event', { test: true });
+     console.log('✅ Test event sent! Check Network tab for "collect" requests.');
+   }
+   ```
+4. **Check Network tab:**
+   - Press F12 → **Network** tab
+   - Filter by: `collect`
+   - Interact with your site (play episode, search)
+   - **If you see `collect` requests:** Events ARE being sent! See [Step 3 below](#step-3-events-are-being-sent-but-not-showing-in-ga4)
+   - **If you DON'T see `collect` requests:** See [Step 4 below](#step-4-events-are-not-being-sent)
+
+**For detailed step-by-step debugging, see the [Detailed Debugging section](#-detailed-debugging-events-not-showing-in-real-time) below.**
+
 ## Quick Verification (Do This First)
 
 ### Step 1: Verify Events Are Being Sent (2 minutes)
@@ -62,10 +87,20 @@ Events appear in different places in GA4. Here's where to look:
 
 ## Events That Are Tracked
 
-These events are automatically sent when users interact with your site:
+**✅ No manual setup needed!** These events are automatically created in GA4 when they're sent from your website. You don't need to add them manually.
+
+**How it works:**
+1. User interacts with your site (plays episode, searches, etc.)
+2. Event is automatically sent to GA4
+3. GA4 automatically creates the event (appears within 1-2 minutes)
+4. Event shows up in **Reports → Engagement → Events**
+
+**You only need to manually:**
+- Mark events as conversions (optional - see section below)
+- Create custom reports (optional)
 
 ### Page Navigation
-- `page_view` - Every page view
+- `page_view` - Every page view (automatic)
 
 ### Audio Playback
 - `episode_play` - When user starts playing an episode
@@ -87,31 +122,168 @@ These events are automatically sent when users interact with your site:
 - `change_view_mode` - Grid vs List view
 - `change_filter` - Filter/sort changes
 
+**Note:** These events will automatically appear in GA4 after they've been triggered at least once on your live site. No manual configuration needed!
+
 ---
 
 ## Mark Key Events as Conversions (Optional, 5 minutes)
 
-Once you see events appearing in GA4, you can mark important ones as conversions:
+**This is the ONLY manual step you need to do** - and it's completely optional!
 
-1. **First, trigger the events on your site:**
-   - Play an episode (triggers `episode_play`)
-   - Let an episode finish (triggers `episode_complete`)
-   - Add a favorite podcast (triggers `add_favorite_podcast`)
+Once events start appearing in GA4 (they'll show up automatically after being triggered), you can optionally mark important ones as "conversions" to track them as key actions.
 
-2. **Wait 5-10 minutes** for events to appear in Admin
+### Step 1: Trigger Events First
 
-3. **Go to Admin → Events:**
-   - Click **Admin** (gear icon) → **Events**
-   - Find these events:
-     - `episode_play`
-     - `episode_complete`
-     - `add_favorite_podcast`
-     - `add_favorite_episode`
-   - Toggle the switch next to each one to mark as conversion
+Events must be sent at least once before they appear in GA4. On your live site:
+- Play an episode (triggers `episode_play`)
+- Let an episode finish (triggers `episode_complete`)
+- Add a favorite podcast (triggers `add_favorite_podcast`)
+- Search for something (triggers `search`)
 
-**Note:** If events don't appear in Admin → Events, you can also mark them from **Reports → Engagement → Events** by clicking on the event name.
+### Step 2: Wait for Events to Appear
+
+- **Reports → Engagement → Events:** Appears within 1-2 minutes ✅ (fastest)
+- **Admin → Events:** May take 5-10 minutes
+
+### Step 3: Mark as Conversions (Optional)
+
+1. Go to **Admin** (gear icon) → **Events**
+2. Find these events (they'll appear automatically after being sent):
+   - `episode_play`
+   - `episode_complete`
+   - `add_favorite_podcast`
+   - `add_favorite_episode`
+3. Toggle the switch next to each one to mark as conversion
+
+**Alternative:** If events don't appear in Admin → Events yet, you can mark them from **Reports → Engagement → Events** by clicking on the event name.
+
+**Remember:** Marking events as conversions is optional. Your events are already being tracked - this just helps you identify your most important user actions.
 
 ---
+
+## 🔍 Detailed Debugging: Events Not Showing in Real-Time
+
+If you're seeing active users but no events in GA4 Real-time, follow these steps in order:
+
+### Step 1: Run Complete Diagnostic (Copy & Paste This)
+
+Open your **live website**, press **F12** → **Console** tab, then copy and paste this entire block:
+
+```javascript
+console.log('=== GA4 Complete Diagnostic ===');
+console.log('1. gtag exists:', typeof window.gtag === 'function');
+console.log('2. dataLayer exists:', Array.isArray(window.dataLayer));
+console.log('3. dataLayer length:', window.dataLayer?.length || 0);
+console.log('4. analytics object:', typeof window.analytics === 'object');
+console.log('5. Measurement ID:', window.dataLayer?.find(item => item[0] === 'config')?.[2] || 'NOT FOUND');
+console.log('6. Last 5 dataLayer items:', window.dataLayer?.slice(-5) || []);
+console.log('7. Test event sending...');
+if (typeof window.gtag === 'function') {
+  window.gtag('event', 'diagnostic_test', { test: true });
+  console.log('✅ Test event sent! Check Network tab for collect request.');
+} else {
+  console.error('❌ gtag is NOT available - GA script may not be loaded');
+}
+```
+
+**What to look for:**
+- ✅ `gtag exists: true` - GA script is loaded
+- ✅ `analytics object: object` - Analytics functions are available
+- ✅ `Measurement ID: G-9CDHCMHT8J` - Correct ID (or your ID)
+- ❌ If any are `false` or `undefined`, GA isn't loading properly
+
+### Step 2: Check Network Tab (Most Important)
+
+1. **Press F12** → **Network** tab
+2. **Clear the network log** (click the 🚫 icon)
+3. **Filter by:** `collect` (type in the filter box)
+4. **Interact with your site:**
+   - Play an episode
+   - Search for something
+   - Navigate to a podcast page
+5. **Look for requests** like: `https://www.google-analytics.com/g/collect?...`
+
+**✅ If you see `collect` requests:** Events ARE being sent! The issue is GA4 not showing them (see Step 3).  
+**❌ If you DON'T see `collect` requests:** Events aren't being sent (see Step 4).
+
+### Step 3: Events Are Being Sent But Not Showing in GA4
+
+If you see `collect` requests in Network tab but not in GA4:
+
+1. **Check you're on the right property:**
+   - In GA4, go to **Admin** → **Data Streams**
+   - Click your web stream
+   - Verify the **Measurement ID** matches `G-9CDHCMHT8J` (or your ID)
+
+2. **Check Real-time location:**
+   - Go to **Reports** → **Realtime** (left sidebar)
+   - Scroll down to **"Event count by event name"** section
+   - Make sure you're looking at the right section (not just "Active users")
+
+3. **Try the manual test event:**
+   ```javascript
+   window.gtag('event', 'manual_test_event', { test: 'console' });
+   ```
+   - Wait 30 seconds
+   - Check Real-time → "Event count by event name"
+   - You should see `manual_test_event`
+
+4. **Check Engagement → Events:**
+   - Go to **Reports** → **Engagement** → **Events**
+   - This shows ALL events (more reliable than Real-time)
+   - Events appear here within 1-2 minutes
+
+### Step 4: Events Are NOT Being Sent
+
+If you DON'T see `collect` requests in Network tab:
+
+1. **Check if GA script is loading:**
+   - Network tab → Filter by: `gtag` or `googletagmanager`
+   - You should see: `gtag/js?id=G-9CDHCMHT8J` (status 200)
+   - ❌ If you don't see this: Script isn't loading (check ad blockers)
+
+2. **Check browser console for errors:**
+   - F12 → Console tab
+   - Look for red errors about `gtag`, `googletagmanager`, or `analytics`
+   - Fix any errors you see
+
+3. **Disable ad blockers:**
+   - Ad blockers often block Google Analytics
+   - Try incognito/private mode
+   - Or disable extensions temporarily
+
+4. **Verify analytics.js is loading:**
+   - Network tab → Filter by: `analytics.js`
+   - Click on the request to see details
+   - **Status should be 200** (success)
+   - **Response should be JavaScript** (not HTML)
+   - ❌ If you see **"Unexpected token '<'" error**: The server is returning HTML (404 page) instead of JavaScript
+     - **Fix:** Run `npm run sync-web` to sync files
+     - **Or:** Check that `public/web/analytics.js` exists
+     - **Or:** Redeploy your site
+
+5. **Check if events are actually being triggered:**
+   - The code checks `if (window.analytics && currentPodcast)` before sending events
+   - Make sure you're actually playing episodes (not just viewing pages)
+   - Try manually calling: `window.analytics.trackEpisodePlay({id: 'test'}, {id: 'test', title: 'Test'})`
+
+### Step 5: Verify Event Names Match
+
+Run this in console to see what events are being sent:
+
+```javascript
+// Monitor dataLayer for new events
+const originalPush = window.dataLayer.push;
+window.dataLayer.push = function(...args) {
+  if (args[0] === 'event') {
+    console.log('📊 Event sent:', args[1], args[2]);
+  }
+  return originalPush.apply(window.dataLayer, args);
+};
+console.log('✅ Event monitor active. Interact with your site to see events.');
+```
+
+Then interact with your site - you should see events logged in console.
 
 ## Troubleshooting
 
@@ -123,9 +295,10 @@ Once you see events appearing in GA4, you can mark important ones as conversions
 3. Events are being sent but GA4 hasn't processed them yet (wait 5-10 minutes)
 
 **To fix:**
-1. **Verify events are being sent:** Use Step 1 (Network tab) above
-2. **Trigger events:** Actually play an episode, search, add favorites on your live site
-3. **Check the right place:** Go to **Reports → Engagement → Events** (not just Real-time)
+1. **Run the diagnostic script above** (Step 1)
+2. **Check Network tab** (Step 2) - this is the most reliable test
+3. **Trigger events:** Actually play an episode, search, add favorites on your live site
+4. **Check the right place:** Go to **Reports → Engagement → Events** (not just Real-time)
 
 ### "No events in Network tab"
 
@@ -196,4 +369,32 @@ If events don't show in the Network tab:
 - Check for JavaScript errors in console
 - Disable ad blockers
 - Verify GA script is loading (Network tab → `gtag/js`)
+
+### "analytics.js:1 Uncaught SyntaxError: Unexpected token '<'"
+
+**This error means:** The browser is getting HTML (probably a 404 page) instead of JavaScript.
+
+**To fix:**
+1. **Check Network tab:**
+   - F12 → Network tab → Filter by: `analytics.js`
+   - Click on the request
+   - If status is **404** or response is HTML: File isn't being served correctly
+
+2. **Sync files:**
+   ```bash
+   npm run sync-web
+   ```
+   This copies `web/analytics.js` to `public/web/analytics.js`
+
+3. **Verify file exists:**
+   - Check that `public/web/analytics.js` exists
+   - Check that `web/analytics.js` exists (source file)
+
+4. **Redeploy:**
+   - Commit and push changes
+   - Wait for Vercel to rebuild (2-5 minutes)
+
+5. **Clear browser cache:**
+   - Hard refresh: Ctrl+Shift+R (Windows) or Cmd+Shift+R (Mac)
+   - Or try incognito mode
 

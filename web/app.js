@@ -130,11 +130,15 @@ function prefetchEpisodeAudio(episode) {
 function setupAudioPrefetching() {
     // Use event delegation for hover events on episode items
     document.addEventListener('mouseenter', (e) => {
-        // e.target might be a text node, so we need to check if it's an Element
+        // e.target might be a text node or other non-Element, so we need to get the Element
         let target = e.target;
-        if (!(target instanceof Element)) {
-            target = target?.parentElement;
+        
+        // If target is not an Element, try to get the parent Element
+        if (!target || !(target instanceof Element)) {
+            target = target?.parentElement || target?.parentNode;
         }
+        
+        // Final check - ensure we have a valid Element with closest method
         if (!target || !(target instanceof Element) || typeof target.closest !== 'function') {
             return;
         }
