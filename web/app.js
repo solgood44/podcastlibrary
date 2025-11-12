@@ -384,8 +384,8 @@ function navigateTo(page, param = null) {
                         page === 'author' ? `Author: ${param || ''}` :
                         page === 'history' ? 'History' :
                         page === 'favorites' ? 'Favorites' :
-                        page === 'episode' ? 'Episode Detail' :
-                        page === 'all-episodes' ? 'All Episodes' :
+                        page === 'episode' ? 'Story Detail' :
+                        page === 'all-episodes' ? 'All Stories' :
                         page;
         window.analytics.trackPageView(pageName, `/${page}${param ? '/' + param : ''}`);
     }
@@ -1037,7 +1037,7 @@ function loadFavoritesPage() {
                             <span class="episode-play-icon" data-episode-id="${episode.id}">${isEpisodePlaying ? '⏸' : '▶'}</span>
                         </button>
                         <div class="episode-item-main" onclick="openEpisodeDetail('${episode.id}', '${podcast.id}')">
-                            <div class="episode-title">${escapeHtml(episode.title || 'Untitled Episode')}</div>
+                            <div class="episode-title">${escapeHtml(episode.title || 'Untitled Story')}</div>
                             <div class="episode-meta">
                                 <span onclick="event.stopPropagation(); openEpisodes('${podcast.id}')" style="cursor: pointer; text-decoration: underline;">${escapeHtml(podcast.title || 'Unknown Podcast')}</span>
                                 ${episode.pub_date ? `<span>• ${formatDate(episode.pub_date)}</span>` : ''}
@@ -1507,7 +1507,7 @@ function loadHistoryPage() {
                         <span class="episode-play-icon" data-episode-id="${episode.id}">${isEpisodePlaying ? '⏸' : '▶'}</span>
                     </button>
                     <div class="episode-item-main" onclick="openEpisodeDetail('${episode.id}', '${podcast.id}')">
-                        <div class="episode-title">${escapeHtml(episode.title || 'Untitled Episode')}</div>
+                        <div class="episode-title">${escapeHtml(episode.title || 'Untitled Story')}</div>
                         <div class="episode-meta">
                             <span onclick="event.stopPropagation(); openEpisodes('${podcast.id}')" style="cursor: pointer; text-decoration: underline;">${escapeHtml(podcast.title || 'Unknown Podcast')}</span>
                             ${episode.pub_date ? `<span>• ${formatDate(episode.pub_date)}</span>` : ''}
@@ -1661,7 +1661,7 @@ function loadEpisodeDetailPage() {
             <div class="episode-detail-header">
                 <img src="${currentPodcast.image_url || getPlaceholderImage()}" alt="${escapeHtml(currentPodcast.title || '')}" class="episode-detail-artwork" onerror="this.src='${getPlaceholderImage()}'">
                 <div class="episode-detail-info">
-                    <h2>${escapeHtml(displayedEpisode.title || 'Untitled Episode')}</h2>
+                    <h2>${escapeHtml(displayedEpisode.title || 'Untitled Story')}</h2>
                     <p class="episode-detail-podcast" onclick="openEpisodes('${currentPodcast.id}')">${escapeHtml(currentPodcast.title || 'Unknown Podcast')}</p>
                     <div class="episode-detail-meta">
                         ${displayedEpisode.pub_date ? `<span>${formatDate(displayedEpisode.pub_date)}</span>` : ''}
@@ -1875,6 +1875,13 @@ function sortPodcasts(podcastsToSort) {
                 const titleB = (b.title || '').toLowerCase();
                 return titleB.localeCompare(titleA);
             });
+            break;
+        case 'random':
+            // Fisher-Yates shuffle algorithm
+            for (let i = sorted.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [sorted[i], sorted[j]] = [sorted[j], sorted[i]];
+            }
             break;
     }
     
@@ -2162,7 +2169,7 @@ function loadAllEpisodesPage() {
     
     setTimeout(() => {
         if (allEpisodes.length === 0) {
-            listEl.innerHTML = '<div class="empty"><p>No episodes available</p></div>';
+            listEl.innerHTML = '<div class="empty"><p>No stories available</p></div>';
             return;
         }
         
@@ -2201,7 +2208,7 @@ function loadAllEpisodesPage() {
                         <span class="episode-play-icon" data-episode-id="${episode.id}">${isEpisodePlaying ? '⏸' : '▶'}</span>
                     </button>
                     <div class="episode-item-main" onclick="openEpisodeDetail('${episode.id}', '${podcast.id}')">
-                        <div class="episode-title">${escapeHtml(episode.title || 'Untitled Episode')}</div>
+                        <div class="episode-title">${escapeHtml(episode.title || 'Untitled Story')}</div>
                         <div class="episode-meta">
                             <span onclick="event.stopPropagation(); openEpisodes('${podcast.id}')" style="cursor: pointer; text-decoration: underline;">${escapeHtml(podcast.title || 'Unknown Podcast')}</span>
                             ${episode.pub_date ? `<span>• ${formatDate(episode.pub_date)}</span>` : ''}
@@ -2315,9 +2322,39 @@ function filterPodcastEpisodesByDuration(episodesToFilter) {
     });
 }
 
+// Check if an episode title suggests it's part of a sequence
+function isSequentialEpisode(episode) {
+    if (!episode || !episode.title) return false;
+    
+    const title = episode.title.toLowerCase().trim();
+    
+    // Patterns that indicate sequential content:
+    // - Starts with numbers like "01", "001", "1."
+    // - Contains "chapter 1", "chapter 01", "part 1", "act 1", etc.
+    // - Contains "episode 01", "episode 1" (but not episode 10, 11, etc. - those are standalone)
+    const sequentialPatterns = [
+        /^0*\d+[\.\s]/,  // Starts with zero-padded number like "01", "001."
+        /^0*1[\.\s]/,    // Starts with "1" or "01"
+        /\bchapter\s+0*1\b/i,  // "chapter 1" or "chapter 01"
+        /\bpart\s+0*1\b/i,     // "part 1" or "part 01"
+        /\bact\s+0*1\b/i,      // "act 1" or "act 01"
+        /\bepisode\s+0*1[^\d]/i, // "episode 1" or "episode 01" (but not episode 10, 11)
+        /\bep\s+0*1[^\d]/i,    // "ep 1" or "ep 01"
+        /^0*1\s*[-:]\s*/,      // "1 -" or "01:"
+    ];
+    
+    return sequentialPatterns.some(pattern => pattern.test(title));
+}
+
 // Sort podcast episodes
 function sortPodcastEpisodes(episodesToSort) {
-    const sorted = [...episodesToSort];
+    let sorted = [...episodesToSort];
+    
+    // When sorting by stories (title-asc, title-desc, random), filter out sequential episodes
+    const isStorySort = ['title-asc', 'title-desc', 'random'].includes(podcastEpisodesSortMode);
+    if (isStorySort) {
+        sorted = sorted.filter(episode => !isSequentialEpisode(episode));
+    }
     
     switch (podcastEpisodesSortMode) {
         case 'title-asc':
@@ -2347,6 +2384,13 @@ function sortPodcastEpisodes(episodesToSort) {
                 const dateB = b.pub_date ? new Date(b.pub_date).getTime() : 0;
                 return dateA - dateB;
             });
+            break;
+        case 'random':
+            // Fisher-Yates shuffle algorithm
+            for (let i = sorted.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [sorted[i], sorted[j]] = [sorted[j], sorted[i]];
+            }
             break;
     }
     
@@ -2447,7 +2491,7 @@ async function loadEpisodesPage() {
         
         if (episodes.length === 0) {
             if (controlsEl) controlsEl.classList.add('hidden');
-            listEl.innerHTML = '<div class="empty"><p>No episodes available</p></div>';
+            listEl.innerHTML = '<div class="empty"><p>No stories available</p></div>';
         } else {
             // Set default sort order based on podcast characteristics (only if user hasn't set a preference)
             const podcastId = currentPodcast.id;
@@ -2508,6 +2552,7 @@ async function loadEpisodesPage() {
                                     <option value="title-desc" ${podcastEpisodesSortMode === 'title-desc' ? 'selected' : ''}>Z-A</option>
                                     <option value="date-desc" ${podcastEpisodesSortMode === 'date-desc' ? 'selected' : ''}>Newest</option>
                                     <option value="date-asc" ${podcastEpisodesSortMode === 'date-asc' ? 'selected' : ''}>Oldest</option>
+                                    <option value="random" ${podcastEpisodesSortMode === 'random' ? 'selected' : ''}>Random</option>
                                 </select>
                             </div>
                         </div>
@@ -2575,7 +2620,7 @@ async function loadEpisodesPage() {
                             <span class="episode-play-icon" data-episode-id="${episode.id}">${isEpisodePlaying ? '⏸' : '▶'}</span>
                         </button>
                         <div class="episode-item-main" onclick="openEpisodeDetail('${episode.id}', '${currentPodcast.id}')">
-                            <div class="episode-title">${escapeHtml(episode.title || 'Untitled Episode')}</div>
+                            <div class="episode-title">${escapeHtml(episode.title || 'Untitled Story')}</div>
                             <div class="episode-meta">
                                 ${episode.pub_date ? `<span>${formatDate(episode.pub_date)}</span>` : ''}
                                 ${episode.duration_seconds ? `<span>${formatDuration(episode.duration_seconds)}</span>` : ''}
@@ -2609,7 +2654,7 @@ async function loadEpisodesPage() {
         console.error('Error loading episodes:', error);
         loadingEl.classList.add('hidden');
         if (controlsEl) controlsEl.classList.add('hidden');
-        listEl.innerHTML = `<div class="error"><p>Error loading episodes: ${escapeHtml(error.message)}</p></div>`;
+        listEl.innerHTML = `<div class="error"><p>Error loading stories: ${escapeHtml(error.message)}</p></div>`;
     }
 }
 
@@ -2620,8 +2665,8 @@ function loadPlayerPage() {
     if (!currentEpisode) {
         contentEl.innerHTML = `
             <div class="player-page-empty">
-                <p>No episode selected</p>
-                <p class="subtitle">Start playing an episode to see it here</p>
+                <p>No story selected</p>
+                <p class="subtitle">Start playing a story to see it here</p>
             </div>
         `;
         return;
@@ -2641,7 +2686,7 @@ function loadPlayerPage() {
                     ${currentPodcast?.image_url ? `<img src="${artworkUrl}" alt="${escapeHtml(podcastTitle)}" class="player-page-artwork" onerror="this.src='${getPlaceholderImage()}'">` : ''}
                 </div>
                 <div class="player-page-info">
-                    <h2>${escapeHtml(currentEpisode.title || 'Untitled Episode')}</h2>
+                    <h2>${escapeHtml(currentEpisode.title || 'Untitled Story')}</h2>
                     <p class="player-page-podcast" onclick="openEpisodes('${currentPodcast?.id || ''}')" style="cursor: pointer; text-decoration: underline;">${escapeHtml(podcastTitle)}</p>
                     ${currentEpisode.description ? `<div class="player-page-description">${sanitizeHtml(currentEpisode.description)}</div>` : ''}
                     <div class="player-page-controls-large">
@@ -2786,7 +2831,7 @@ function handleSearch(query) {
         }
         
         if (matches.length === 0) {
-            resultsEl.innerHTML = '<div class="empty"><p>No episodes found</p></div>';
+            resultsEl.innerHTML = '<div class="empty"><p>No stories found</p></div>';
             return;
         }
         
@@ -2800,7 +2845,7 @@ function handleSearch(query) {
                             ${podcast?.image_url ? `<img src="${podcast.image_url}" alt="${escapeHtml(podcast.title || '')}" onerror="this.src='${getPlaceholderImage()}'">` : '<div class="placeholder-image"></div>'}
                         </div>
                         <div class="search-result-info">
-                            <div class="search-result-title">${escapeHtml(episode.title || 'Untitled Episode')}</div>
+                            <div class="search-result-title">${escapeHtml(episode.title || 'Untitled Story')}</div>
                             <div class="search-result-meta">
                                 <span onclick="event.stopPropagation(); openEpisodes('${podcast?.id || ''}')" style="cursor: pointer; text-decoration: underline;">${escapeHtml(podcast?.title || 'Unknown Podcast')}</span>
                                 ${episode.pub_date ? `<span>• ${formatDate(episode.pub_date)}</span>` : ''}
