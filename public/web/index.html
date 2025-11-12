@@ -90,11 +90,11 @@
         <button class="btn-menu" onclick="toggleSidebar()">☰</button>
         <div class="top-bar-search-container">
             <div class="search-mode-toggle">
-                <button id="search-mode-episodes" class="search-mode-btn active" onclick="setSearchMode('episodes')">Stories</button>
+                <button id="search-mode-episodes" class="search-mode-btn active" onclick="setSearchMode('episodes')">Episodes</button>
                 <button id="search-mode-podcasts" class="search-mode-btn" onclick="setSearchMode('podcasts')">Podcasts</button>
             </div>
             <select id="search-mode-dropdown" class="search-mode-dropdown" onchange="setSearchMode(this.value)">
-                <option value="episodes" selected>Stories</option>
+                <option value="episodes" selected>Episodes</option>
                 <option value="podcasts">Podcasts</option>
             </select>
             <input 
@@ -145,7 +145,7 @@
                         </select>
                     </div>
                     <div class="filter-controls">
-                        <label for="duration-filter" class="filter-label">Story Duration:</label>
+                        <label for="duration-filter" class="filter-label">Episode Duration:</label>
                         <select id="duration-filter" class="filter-select" onchange="applyDurationFilter()">
                             <option value="all">All Durations</option>
                             <option value="under10">Under 10 min</option>
@@ -169,11 +169,11 @@
         <div id="page-episodes" class="page hidden">
             <div class="page-header">
                 <button class="btn-back" onclick="goBackToLibrary()">← Back</button>
-                <h1 id="episodes-page-title">Stories</h1>
+                <h1 id="episodes-page-title">Episodes</h1>
             </div>
             <div id="episodes-loading" class="loading hidden">
                 <div class="spinner"></div>
-                <p>Loading stories...</p>
+                <p>Loading episodes...</p>
             </div>
             <div id="podcast-episodes-controls" class="podcast-controls hidden">
                 <div class="controls-left">
@@ -203,8 +203,8 @@
             </div>
             <div id="player-page-content" class="player-page-content">
                 <div class="player-page-empty">
-                    <p>No story selected</p>
-                    <p class="subtitle">Start playing a story to see it here</p>
+                    <p>No episode selected</p>
+                    <p class="subtitle">Start playing an episode to see it here</p>
                 </div>
             </div>
         </div>
@@ -237,7 +237,7 @@
         <!-- History Page -->
         <div id="page-history" class="page hidden">
             <div class="page-header">
-                <h1>Recent Stories</h1>
+                <h1>Recent Episodes</h1>
                 <button class="btn-clear-history-header" onclick="clearHistory(); navigateTo('history')" title="Clear history">Clear History</button>
             </div>
             <div id="history-loading" class="loading hidden">
@@ -310,7 +310,7 @@
         <div id="page-episode" class="page hidden">
             <div class="page-header">
                 <button class="btn-back" onclick="goBackFromEpisode()">← Back</button>
-                <h1 id="episode-page-title">Story</h1>
+                <h1 id="episode-page-title">Episode</h1>
             </div>
             <div id="episode-detail-content" class="episode-detail-content"></div>
         </div>
@@ -330,7 +330,7 @@
         <!-- All Episodes Page -->
         <div id="page-all-episodes" class="page hidden">
             <div class="page-header">
-                <h1>All Stories</h1>
+                <h1>All Episodes</h1>
             </div>
             <div id="episodes-controls" class="podcast-controls">
                 <div class="controls-left">
@@ -345,7 +345,7 @@
                         </select>
                     </div>
                     <div class="filter-controls">
-                        <label for="episodes-duration-filter" class="filter-label">Story Duration:</label>
+                        <label for="episodes-duration-filter" class="filter-label">Episode Duration:</label>
                         <select id="episodes-duration-filter" class="filter-select" onchange="applyEpisodesDurationFilter()">
                             <option value="all">All Durations</option>
                             <option value="under10">Under 10 min</option>
@@ -372,7 +372,7 @@
                 </div>
                 <div class="player-bar-text">
                     <h3 id="player-bar-title">Now Playing</h3>
-                    <p id="player-bar-episode">Select a story</p>
+                    <p id="player-bar-episode">Select an episode</p>
                 </div>
             </div>
             <div class="player-bar-center">
