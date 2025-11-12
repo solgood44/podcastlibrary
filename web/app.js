@@ -2111,6 +2111,18 @@ function sortEpisodes(episodesToSort) {
     const isStorySort = ['title-asc', 'title-desc', 'random'].includes(episodesSortMode);
     if (isStorySort) {
         sorted = sorted.filter(episode => !isSequentialEpisode(episode));
+        
+        // Remove duplicates based on normalized title (case-insensitive)
+        // Keep the first occurrence of each unique title
+        const seenTitles = new Set();
+        sorted = sorted.filter(episode => {
+            const normalizedTitle = (episode.title || '').toLowerCase().trim();
+            if (seenTitles.has(normalizedTitle)) {
+                return false; // Duplicate, filter it out
+            }
+            seenTitles.add(normalizedTitle);
+            return true; // First occurrence, keep it
+        });
     }
     
     switch (episodesSortMode) {
@@ -2387,6 +2399,18 @@ function sortPodcastEpisodes(episodesToSort) {
     const isStorySort = ['title-asc', 'title-desc', 'random'].includes(podcastEpisodesSortMode);
     if (isStorySort) {
         sorted = sorted.filter(episode => !isSequentialEpisode(episode));
+        
+        // Remove duplicates based on normalized title (case-insensitive)
+        // Keep the first occurrence of each unique title
+        const seenTitles = new Set();
+        sorted = sorted.filter(episode => {
+            const normalizedTitle = (episode.title || '').toLowerCase().trim();
+            if (seenTitles.has(normalizedTitle)) {
+                return false; // Duplicate, filter it out
+            }
+            seenTitles.add(normalizedTitle);
+            return true; // First occurrence, keep it
+        });
     }
     
     switch (podcastEpisodesSortMode) {
