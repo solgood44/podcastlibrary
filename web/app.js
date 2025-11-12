@@ -2326,21 +2326,38 @@ function filterPodcastEpisodesByDuration(episodesToFilter) {
 function isSequentialEpisode(episode) {
     if (!episode || !episode.title) return false;
     
-    const title = episode.title.toLowerCase().trim();
+    const title = episode.title.trim();
+    const titleLower = title.toLowerCase();
     
-    // Patterns that indicate sequential content:
-    // - Starts with numbers like "01", "001", "1."
-    // - Contains "chapter 1", "chapter 01", "part 1", "act 1", etc.
-    // - Contains "episode 01", "episode 1" (but not episode 10, 11, etc. - those are standalone)
+    // Patterns that indicate sequential content - we want to filter these out when showing stories
+    // Examples to filter: "00 Introduction", "01 - Title", "02 - Title", "Chapter 1", etc.
+    // Examples to keep: "And All the Earth a Grave - C C MacApp" (standalone story)
+    
+    // Check if title starts with numbered sequence (most common case)
+    // Matches: "00 ", "01 ", "02 -", "1 -", "2 -", "001.", etc.
+    // This catches zero-padded numbers and single digits followed by space/dash/period
+    if (/^0*\d+\s*[-.\s]/.test(title)) {
+        // Additional check: if it's a year (4 digits starting with 19 or 20), don't filter it
+        // This prevents filtering titles like "1984" or "2001: A Space Odyssey"
+        const startsWithYear = /^(19|20)\d{2}/.test(title);
+        if (!startsWithYear) {
+            return true; // It's a sequential episode
+        }
+    }
+    
+    // Check for common sequential words at the start
+    if (/^(introduction|prologue|preface|chapter|part|act)\s+/i.test(title)) {
+        return true;
+    }
+    
+    // Check for chapter/part/act patterns anywhere in title
     const sequentialPatterns = [
-        /^0*\d+[\.\s]/,  // Starts with zero-padded number like "01", "001."
-        /^0*1[\.\s]/,    // Starts with "1" or "01"
-        /\bchapter\s+0*1\b/i,  // "chapter 1" or "chapter 01"
-        /\bpart\s+0*1\b/i,     // "part 1" or "part 01"
-        /\bact\s+0*1\b/i,      // "act 1" or "act 01"
-        /\bepisode\s+0*1[^\d]/i, // "episode 1" or "episode 01" (but not episode 10, 11)
-        /\bep\s+0*1[^\d]/i,    // "ep 1" or "ep 01"
-        /^0*1\s*[-:]\s*/,      // "1 -" or "01:"
+        /\bchapter\s+0*\d+\b/i,  // "chapter 1", "chapter 01", "chapter 2", etc.
+        /\bpart\s+0*\d+\b/i,     // "part 1", "part 01", "part 2", etc.
+        /\bact\s+0*\d+\b/i,      // "act 1", "act 01", "act 2", etc.
+        // Episode patterns (only for low numbers 1-9 to avoid filtering standalone episodes)
+        /\bepisode\s+0*[1-9][^\d]/i, // "episode 1", "episode 01" (but not episode 10, 11, etc.)
+        /\bep\s+0*[1-9][^\d]/i,    // "ep 1", "ep 01" (but not ep 10, 11, etc.)
     ];
     
     return sequentialPatterns.some(pattern => pattern.test(title));
