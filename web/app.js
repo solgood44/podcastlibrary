@@ -2105,7 +2105,13 @@ function filterEpisodesByDuration(episodesToFilter) {
 
 // Sort episodes
 function sortEpisodes(episodesToSort) {
-    const sorted = [...episodesToSort];
+    let sorted = [...episodesToSort];
+    
+    // When sorting by stories (title-asc, title-desc, random), filter out sequential episodes
+    const isStorySort = ['title-asc', 'title-desc', 'random'].includes(episodesSortMode);
+    if (isStorySort) {
+        sorted = sorted.filter(episode => !isSequentialEpisode(episode));
+    }
     
     switch (episodesSortMode) {
         case 'title-asc':
@@ -2135,6 +2141,13 @@ function sortEpisodes(episodesToSort) {
                 const dateB = b.pub_date ? new Date(b.pub_date).getTime() : 0;
                 return dateA - dateB;
             });
+            break;
+        case 'random':
+            // Fisher-Yates shuffle algorithm
+            for (let i = sorted.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [sorted[i], sorted[j]] = [sorted[j], sorted[i]];
+            }
             break;
     }
     
@@ -2335,8 +2348,11 @@ function isSequentialEpisode(episode) {
     
     // Check if title starts with numbered sequence (most common case)
     // Matches: "00 ", "01 ", "02 -", "1 -", "2 -", "001.", etc.
-    // This catches zero-padded numbers and single digits followed by space/dash/period
-    if (/^0*\d+\s*[-.\s]/.test(title)) {
+    // Pattern breakdown:
+    // - ^\d+ matches one or more digits at the start (00, 01, 1, 2, etc.)
+    // - \s* matches optional whitespace
+    // - [-.\s] matches dash, period, or space (the separator)
+    if (/^\d+\s*[-.\s]/.test(title)) {
         // Additional check: if it's a year (4 digits starting with 19 or 20), don't filter it
         // This prevents filtering titles like "1984" or "2001: A Space Odyssey"
         const startsWithYear = /^(19|20)\d{2}/.test(title);
