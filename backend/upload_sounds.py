@@ -264,14 +264,14 @@ def match_by_filename(image_filename: str, sound_titles: List[str]) -> Optional[
     return None
 
 
-def match_images_to_sounds(image_folder: str, sound_titles: List[str], use_ocr: bool = False) -> Dict[str, str]:
-    """Match image files to sound titles using filename matching (or OCR if enabled)."""
+def match_images_to_sounds(image_folder: str, sound_titles: List[str]) -> Dict[str, str]:
+    """Match image files to sound titles using case-insensitive filename matching."""
     image_folder_path = Path(image_folder)
     if not image_folder_path.exists():
         console.print(f"[yellow]Image folder not found: {image_folder}[/yellow]")
         return {}
     
-    # Find all image files
+    # Find all image files (case-insensitive)
     image_extensions = ['.jpg', '.jpeg', '.png', '.JPG', '.JPEG', '.PNG']
     image_files = []
     for ext in image_extensions:
@@ -281,7 +281,7 @@ def match_images_to_sounds(image_folder: str, sound_titles: List[str], use_ocr: 
         console.print(f"[yellow]No image files found in {image_folder}[/yellow]")
         return {}
     
-    console.print(f"[cyan]Found {len(image_files)} image files. Matching by filename...[/cyan]")
+    console.print(f"[cyan]Found {len(image_files)} image files. Matching by filename (case-insensitive)...[/cyan]")
     
     matches = {}
     unmatched_images = []
@@ -296,36 +296,22 @@ def match_images_to_sounds(image_folder: str, sound_titles: List[str], use_ocr: 
         task = progress.add_task("Matching images to sounds...", total=len(image_files))
         
         for image_file in image_files:
-            # First try filename matching
+            # Match by filename (case-insensitive)
             match = match_by_filename(image_file.name, sound_titles)
             
             if match:
                 matches[match] = str(image_file)
                 console.print(f"[green]✓ Matched: {image_file.name} → {match}[/green]")
-            elif use_ocr:
-                # Fall back to OCR if enabled
-                extracted_text = extract_text_from_image(str(image_file))
-                if extracted_text:
-                    match = find_best_match(extracted_text, sound_titles)
-                    if match:
-                        matches[match] = str(image_file)
-                        console.print(f"[green]✓ Matched (OCR): {image_file.name} → {match}[/green]")
-                    else:
-                        unmatched_images.append((image_file.name, extracted_text[:50]))
-                        console.print(f"[yellow]⚠ No match for: {image_file.name} (extracted: {extracted_text[:50]}...)[/yellow]")
-                else:
-                    unmatched_images.append((image_file.name, "No text extracted"))
-                    console.print(f"[yellow]⚠ No match for: {image_file.name} (no text extracted)[/yellow]")
             else:
-                unmatched_images.append((image_file.name, "Filename didn't match"))
+                unmatched_images.append(image_file.name)
                 console.print(f"[yellow]⚠ No match for: {image_file.name}[/yellow]")
             
             progress.update(task, advance=1)
     
     if unmatched_images:
         console.print(f"\n[yellow]Unmatched images ({len(unmatched_images)}):[/yellow]")
-        for img_name, reason in unmatched_images[:10]:  # Show first 10
-            console.print(f"  - {img_name}: {reason}")
+        for img_name in unmatched_images[:10]:  # Show first 10
+            console.print(f"  - {img_name}")
         if len(unmatched_images) > 10:
             console.print(f"  ... and {len(unmatched_images) - 10} more")
     
@@ -448,7 +434,7 @@ def main():
     parser.add_argument(
         '--match-images',
         action='store_true',
-        help='Match images to sounds and upload them (uses filename matching, OCR as fallback)'
+        help='Match images to sounds and upload them (case-insensitive filename matching)'
     )
     parser.add_argument(
         '--ensure-all-images',
@@ -554,8 +540,8 @@ def main():
             sound_titles = []
         
         if sound_titles:
-            # Match images to sounds (try filename first, OCR as fallback if --match-images is used)
-            image_matches = match_images_to_sounds(args.images, sound_titles, use_ocr=args.match_images)
+            # Match images to sounds by filename (case-insensitive)
+            image_matches = match_images_to_sounds(args.images, sound_titles)
             
             if image_matches:
                 console.print(f"\n[cyan]Uploading {len(image_matches)} matched images...[/cyan]")
@@ -594,8 +580,8 @@ def main():
                 # Get all sound titles that need images
                 sound_titles_needing_images = [s['title'] for s in sounds_without_images]
                 
-                # Match images to sounds (try filename first, OCR as fallback)
-                image_matches = match_images_to_sounds(args.images, sound_titles_needing_images, use_ocr=True)
+                # Match images to sounds by filename (case-insensitive)
+                image_matches = match_images_to_sounds(args.images, sound_titles_needing_images)
                 
                 if image_matches:
                     console.print(f"\n[cyan]Uploading {len(image_matches)} matched images...[/cyan]")
