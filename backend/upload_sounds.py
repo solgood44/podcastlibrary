@@ -450,6 +450,11 @@ def main():
         action='store_true',
         help='Match images to sounds and upload them (uses filename matching, OCR as fallback)'
     )
+    parser.add_argument(
+        '--ensure-all-images',
+        action='store_true',
+        help='Ensure all sounds have images by matching unmatched sounds with available images'
+    )
     
     args = parser.parse_args()
     
@@ -571,6 +576,53 @@ def main():
                 console.print(f"\n[green]✓ Uploaded {uploaded_count} images[/green]")
             else:
                 console.print(f"[yellow]No images matched to sounds[/yellow]")
+    
+    # Ensure all sounds have images
+    if args.ensure_all_images and not args.dry_run:
+        console.print(f"\n[cyan]Ensuring all sounds have images...[/cyan]")
+        
+        try:
+            # Get all sounds without images
+            sounds_result = sb.table('sounds').select('id,title,image_url').execute()
+            sounds_without_images = [s for s in sounds_result.data if not s.get('image_url')]
+            
+            if not sounds_without_images:
+                console.print(f"[green]✓ All sounds already have images![/green]")
+            else:
+                console.print(f"[yellow]Found {len(sounds_without_images)} sounds without images[/yellow]")
+                
+                # Get all sound titles that need images
+                sound_titles_needing_images = [s['title'] for s in sounds_without_images]
+                
+                # Match images to sounds (try filename first, OCR as fallback)
+                image_matches = match_images_to_sounds(args.images, sound_titles_needing_images, use_ocr=True)
+                
+                if image_matches:
+                    console.print(f"\n[cyan]Uploading {len(image_matches)} matched images...[/cyan]")
+                    
+                    # Upload images and update database
+                    uploaded_count = 0
+                    for sound_title, image_path in image_matches.items():
+                        image_url = upload_image_to_storage(image_path, sound_title)
+                        if image_url:
+                            if update_sound_image(sound_title, image_url):
+                                console.print(f"[green]✓ Uploaded image for: {sound_title}[/green]")
+                                uploaded_count += 1
+                            else:
+                                console.print(f"[yellow]⚠ Image uploaded but failed to update database for: {sound_title}[/yellow]")
+                        else:
+                            console.print(f"[red]✗ Failed to upload image for: {sound_title}[/red]")
+                    
+                    console.print(f"\n[green]✓ Uploaded {uploaded_count} images for sounds that were missing them[/green]")
+                    
+                    # Report any sounds that still don't have images
+                    remaining = len(sounds_without_images) - uploaded_count
+                    if remaining > 0:
+                        console.print(f"[yellow]⚠ {remaining} sounds still don't have images. Check image filenames match sound titles.[/yellow]")
+                else:
+                    console.print(f"[yellow]No images could be matched to the sounds without images[/yellow]")
+        except Exception as e:
+            console.print(f"[red]Error ensuring all sounds have images: {e}[/red]")
     
     if args.dry_run:
         console.print("\n[yellow]This was a dry run. Run without --dry-run to actually upload files.[/yellow]")

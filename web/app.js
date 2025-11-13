@@ -28,7 +28,7 @@ let podcastSortPreferences = {}; // Store sort preferences per podcast ID
 let isSyncing = false; // Track if sync is in progress
 let syncEnabled = false; // Track if user has enabled sync
 let sounds = []; // All nature sounds
-let soundsSortMode = 'title-asc'; // 'title-asc', 'title-desc', 'category-asc'
+let soundsSortMode = 'title-asc'; // 'title-asc', 'title-desc'
 let currentSound = null; // The sound that is currently playing (if any)
 let soundAudioPlayer = null; // Separate audio player for sounds (for seamless looping)
 
@@ -1035,16 +1035,6 @@ function sortSounds(soundsToSort) {
         case 'title-desc':
             sorted.sort((a, b) => (b.title || '').localeCompare(a.title || ''));
             break;
-        case 'category-asc':
-            sorted.sort((a, b) => {
-                const catA = (a.category || 'nature').toLowerCase();
-                const catB = (b.category || 'nature').toLowerCase();
-                if (catA !== catB) {
-                    return catA.localeCompare(catB);
-                }
-                return (a.title || '').localeCompare(b.title || '');
-            });
-            break;
         default:
             break;
     }
@@ -1207,16 +1197,21 @@ function updateSoundPlayerUI() {
     
     // Update sound detail page if open
     if (currentPage === 'sound') {
-        const playIconEl = document.getElementById('sound-detail-play-icon');
-        if (playIconEl) {
-            playIconEl.textContent = isPlaying ? '⏸' : '▶';
-        }
+        updateSoundDetailPlayButton();
     }
 }
 
 // Toggle sound play/pause
 function toggleSoundPlayPause() {
-    if (!soundAudioPlayer || !currentSound) return;
+    if (!currentSound) return;
+    
+    // If sound player doesn't exist or different sound, initialize it
+    if (!soundAudioPlayer || !soundAudioPlayer.src || 
+        (!soundAudioPlayer.src.includes(currentSound.audio_url) && 
+         !soundAudioPlayer.src.endsWith(currentSound.audio_url.split('/').pop()))) {
+        playSound(currentSound.id);
+        return;
+    }
     
     if (soundAudioPlayer.paused) {
         soundAudioPlayer.play().catch(err => {
@@ -1227,6 +1222,7 @@ function toggleSoundPlayPause() {
     }
     
     updateSoundPlayerUI();
+    updateSoundDetailPlayButton();
 }
 
 // Open sound detail page
@@ -1274,21 +1270,34 @@ function loadSoundDetailPage() {
         }
     }
     
-    // Update play button
-    const isPlaying = soundAudioPlayer && !soundAudioPlayer.paused && currentSound && soundAudioPlayer.src.includes(currentSound.audio_url);
-    if (playIconEl) {
-        playIconEl.textContent = isPlaying ? '⏸' : '▶';
-    }
-    
     // Set animated background based on category
     if (backgroundEl) {
         const category = currentSound.category || 'nature';
         backgroundEl.className = `sound-detail-background sound-category-${category}`;
     }
     
-    // Auto-play if not already playing this sound
-    if (!soundAudioPlayer || soundAudioPlayer.paused || !currentSound || !soundAudioPlayer.src.includes(currentSound.audio_url)) {
+    // Check if this sound is already loaded and playing
+    const isCurrentSoundPlaying = soundAudioPlayer && 
+                                  currentSound && 
+                                  soundAudioPlayer.src && 
+                                  (soundAudioPlayer.src === currentSound.audio_url || soundAudioPlayer.src.endsWith(currentSound.audio_url.split('/').pop()));
+    
+    // If sound player doesn't exist or different sound is loaded, initialize it
+    if (!soundAudioPlayer || !isCurrentSoundPlaying) {
+        // Initialize and play the sound
         playSound(currentSound.id);
+    } else {
+        // Just update the UI to reflect current play state
+        updateSoundDetailPlayButton();
+    }
+}
+
+// Update play button on sound detail page
+function updateSoundDetailPlayButton() {
+    const playIconEl = document.getElementById('sound-detail-play-icon');
+    if (playIconEl && soundAudioPlayer && currentSound) {
+        const isPlaying = !soundAudioPlayer.paused;
+        playIconEl.textContent = isPlaying ? '⏸' : '▶';
     }
 }
 
