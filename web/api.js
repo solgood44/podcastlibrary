@@ -78,6 +78,11 @@ class APIService {
     const results = await this.request(`/authors${query}`);
     return results.length > 0 ? results[0] : null;
   }
+
+  async fetchSounds() {
+    const query = '?select=id,title,description,audio_url,image_url,duration_seconds,category,is_premium&order=title.asc';
+    return await this.request(`/sounds${query}`);
+  }
 }
 
 // Create singleton instance

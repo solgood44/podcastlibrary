@@ -772,6 +772,217 @@ body {
     color: var(--text-tertiary);
 }
 
+/* Sound card specific styles */
+.sound-card {
+    position: relative;
+}
+
+.sound-card .podcast-card-content {
+    position: relative;
+}
+
+.sound-play-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 60px;
+    height: 60px;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    opacity: 0;
+    transition: opacity 0.2s, transform 0.2s;
+    pointer-events: none;
+    z-index: 5;
+}
+
+.sound-card:hover .sound-play-overlay {
+    opacity: 1;
+}
+
+.sound-play-overlay.playing {
+    opacity: 1;
+    background: rgba(0, 150, 255, 0.8);
+}
+
+.sound-category {
+    display: inline-block;
+    padding: 2px 8px;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+    font-size: 11px;
+    text-transform: capitalize;
+    margin-right: 6px;
+}
+
+.sound-duration {
+    font-size: 11px;
+    color: var(--text-tertiary);
+}
+
+/* Sound Player Bar (simpler than episode player) */
+.sound-player-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border);
+    z-index: 88; /* Below episode player bar */
+    padding: 12px 24px;
+    backdrop-filter: blur(10px);
+    transition: left 0.3s ease;
+}
+
+/* On desktop, sound player bar starts after sidebar */
+@media (min-width: 769px) {
+    .sound-player-bar {
+        left: var(--sidebar-width);
+        transition: left 0.3s ease;
+    }
+    
+    /* When sidebar is closed, sound player bar should fill the screen */
+    body:has(.sidebar:not(.open)) .sound-player-bar,
+    body.sidebar-closed .sound-player-bar {
+        left: 0;
+    }
+    
+    /* When episode player is visible, sound player should be above it */
+    body.player-bar-visible .sound-player-bar {
+        bottom: 80px; /* Height of episode player bar */
+    }
+}
+
+/* On mobile, sound player bar is full width */
+@media (max-width: 768px) {
+    .sound-player-bar {
+        left: 0;
+    }
+    
+    /* When episode player is visible, sound player should be above it */
+    body.player-bar-visible .sound-player-bar {
+        bottom: 80px; /* Height of episode player bar */
+    }
+}
+
+.sound-player-bar.hidden {
+    display: none;
+}
+
+.sound-player-content {
+    max-width: 1400px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+}
+
+.sound-player-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 0 0 auto;
+    min-width: 200px;
+}
+
+.sound-player-artwork {
+    width: 56px;
+    height: 56px;
+    border-radius: 6px;
+    overflow: hidden;
+    flex-shrink: 0;
+    background: var(--bg-tertiary);
+}
+
+.sound-player-artwork img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.sound-player-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.sound-player-text h3 {
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text-primary);
+}
+
+.sound-player-text p {
+    font-size: 13px;
+    color: var(--text-tertiary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sound-player-center {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    justify-content: center;
+}
+
+.btn-sound-play-pause {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: none;
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.btn-sound-play-pause:hover {
+    background: var(--accent-hover);
+    transform: scale(1.05);
+}
+
+.btn-sound-stop {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.btn-sound-stop:hover {
+    background: var(--bg-hover);
+    transform: scale(1.05);
+}
+
+.sound-player-right {
+    flex: 0 0 auto;
+    min-width: 200px;
+}
+
 .podcast-author-link {
     color: var(--accent);
     text-decoration: underline;

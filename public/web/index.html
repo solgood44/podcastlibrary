@@ -67,6 +67,10 @@
                 <span class="sidebar-item-title">Favorites</span>
                 <span id="sidebar-favorites-count" class="sidebar-item-count">0</span>
             </div>
+            <div class="sidebar-item" onclick="navigateTo('sounds')">
+                <span class="sidebar-item-icon">🎵</span>
+                <span class="sidebar-item-title">Sounds</span>
+            </div>
             <div class="sidebar-item" onclick="navigateTo('authors')">
                 <span class="sidebar-item-icon">✍️</span>
                 <span class="sidebar-item-title">Authors</span>
@@ -234,6 +238,35 @@
             <div id="favorites-content"></div>
         </div>
 
+        <!-- Sounds Page -->
+        <div id="page-sounds" class="page hidden">
+            <div class="page-header">
+                <h1>Nature Sounds</h1>
+            </div>
+            <div id="sounds-loading" class="loading hidden">
+                <div class="spinner"></div>
+                <p>Loading sounds...</p>
+            </div>
+            <div id="sounds-controls" class="podcast-controls hidden">
+                <div class="controls-left">
+                    <div class="sort-controls">
+                        <label for="sounds-sort-select" class="sort-label">Sort:</label>
+                        <select id="sounds-sort-select" class="sort-select" onchange="applySoundsSorting()">
+                            <option value="title-asc">A-Z</option>
+                            <option value="title-desc">Z-A</option>
+                            <option value="category-asc">Category</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="controls-right">
+                    <div id="sounds-count" class="podcast-count"></div>
+                </div>
+            </div>
+            <div id="sounds-container">
+                <div id="sounds-grid" class="podcast-grid"></div>
+            </div>
+        </div>
+
         <!-- History Page -->
         <div id="page-history" class="page hidden">
             <div class="page-header">
@@ -368,7 +401,7 @@
         </div>
     </main>
 
-    <!-- Persistent Audio Player (always visible when playing) -->
+    <!-- Persistent Audio Player (always visible when playing episodes) -->
     <div id="player-bar" class="player-bar hidden">
         <div class="player-bar-content">
             <div class="player-bar-left" onclick="navigateTo('episode')">
@@ -403,6 +436,30 @@
             <div class="player-bar-right"></div>
         </div>
         <audio id="audio-player" preload="none"></audio>
+    </div>
+
+    <!-- Simple Sound Player (for looping nature sounds) -->
+    <div id="sound-player-bar" class="sound-player-bar hidden">
+        <div class="sound-player-content">
+            <div class="sound-player-left">
+                <div class="sound-player-artwork">
+                    <img id="sound-player-image" src="" alt="" onerror="this.style.display='none'">
+                </div>
+                <div class="sound-player-text">
+                    <h3 id="sound-player-title">Nature Sound</h3>
+                    <p id="sound-player-status">Looping</p>
+                </div>
+            </div>
+            <div class="sound-player-center">
+                <button id="sound-play-pause-btn" class="btn-sound-play-pause" onclick="toggleSoundPlayPause()">
+                    <span id="sound-play-icon">⏸</span>
+                </button>
+                <button class="btn-sound-stop" onclick="stopSound()" title="Stop">
+                    <span>⏹</span>
+                </button>
+            </div>
+            <div class="sound-player-right"></div>
+        </div>
     </div>
 
     <!-- Auth Modal -->
