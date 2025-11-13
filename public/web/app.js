@@ -954,13 +954,13 @@ function loadFavoritesPage() {
             const favoriteAuthors = authors.filter(a => favorites.authors.includes(String(a)));
             favoriteAuthors.forEach(author => {
                 const podcastCount = getAuthorPodcastCount(author);
-                // Use API endpoint that handles stored images with fallback
-                const authorImageUrl = `/api/author-image?name=${encodeURIComponent(author)}`;
+                // Use generated author image
+                const authorImageUrl = `/api/og-author?name=${encodeURIComponent(author)}&size=profile`;
                 html += `
                     <div class="podcast-list-item author-list-item">
                         <div class="podcast-list-item-content" onclick="showAuthor('${escapeHtml(author)}')">
                             <div class="podcast-list-item-image">
-                                <img src="${authorImageUrl}" alt="${escapeHtml(author)}" class="podcast-list-item-image-img" onerror="this.onerror=null; this.src='/api/og-author?name=${encodeURIComponent(author)}&size=profile';">
+                                <img src="${authorImageUrl}" alt="${escapeHtml(author)}" class="podcast-list-item-image-img" onerror="this.src='${authorImageUrl}';">
                             </div>
                             <div class="podcast-list-item-info">
                                 <h3 class="podcast-list-item-title">${escapeHtml(author)}</h3>
@@ -1283,7 +1283,7 @@ function renderAuthors() {
     }
 }
 
-// Render authors in grid view
+// Render authors in grid view (matches podcast grid style)
 function renderAuthorsGrid(sortedAuthors) {
     const gridEl = document.getElementById('authors-grid');
     gridEl.innerHTML = '';
@@ -1291,21 +1291,27 @@ function renderAuthorsGrid(sortedAuthors) {
     sortedAuthors.forEach(author => {
         const podcastCount = getAuthorPodcastCount(author);
         const isFavorite = isAuthorFavorited(author);
-        const authorImageUrl = `/api/author-image?name=${encodeURIComponent(author)}`;
+        const authorImageUrl = `/api/og-author?name=${encodeURIComponent(author)}&size=profile`;
         
         const gridItem = document.createElement('div');
         gridItem.className = 'podcast-grid-item';
         gridItem.onclick = () => showAuthor(author);
         gridItem.innerHTML = `
             <div class="podcast-grid-artwork-container">
-                <img src="${authorImageUrl}" alt="${escapeHtml(author)}" class="podcast-grid-artwork" onerror="this.onerror=null; this.src='/api/og-author?name=${encodeURIComponent(author)}&size=profile';">
+                <img src="${authorImageUrl}" alt="${escapeHtml(author)}" class="podcast-grid-artwork" onerror="this.src='${authorImageUrl}';">
                 <button class="btn-podcast-favorite ${isFavorite ? 'favorited' : ''}" onclick="event.stopPropagation(); toggleAuthorFavorite('${escapeHtml(author)}');" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
                     ${isFavorite ? '❤️' : '🤍'}
                 </button>
             </div>
             <div class="podcast-grid-info">
                 <div class="podcast-grid-title">${escapeHtml(author)}</div>
-                <div class="podcast-author">${podcastCount} ${podcastCount === 1 ? 'podcast' : 'podcasts'}</div>
+                ${(() => {
+                    const cleanedAuthor = author ? cleanAuthorText(author) : '';
+                    if (cleanedAuthor && !shouldHideAuthor(cleanedAuthor)) {
+                        return `<div class="podcast-author">${podcastCount} ${podcastCount === 1 ? 'podcast' : 'podcasts'}</div>`;
+                    }
+                    return '';
+                })()}
             </div>
         `;
         gridEl.appendChild(gridItem);
@@ -1321,8 +1327,8 @@ function renderAuthorsList(sortedAuthors) {
         const podcastCount = getAuthorPodcastCount(author);
         const authorSlug = generateSlug(author);
         const isFavorite = isAuthorFavorited(author);
-        // Use API endpoint that handles stored images with fallback
-        const authorImageUrl = `/api/author-image?name=${encodeURIComponent(author)}`;
+        // Use generated author image
+        const authorImageUrl = `/api/og-author?name=${encodeURIComponent(author)}&size=profile`;
         
         // List view item with clear call-to-action button
         const listItem = document.createElement('div');
@@ -1330,7 +1336,7 @@ function renderAuthorsList(sortedAuthors) {
         listItem.innerHTML = `
             <div class="podcast-list-item-content">
                 <div class="podcast-list-item-image">
-                    <img src="${authorImageUrl}" alt="${escapeHtml(author)}" class="podcast-list-item-image-img" onerror="this.onerror=null; this.src='/api/og-author?name=${encodeURIComponent(author)}&size=profile';">
+                    <img src="${authorImageUrl}" alt="${escapeHtml(author)}" class="podcast-list-item-image-img" onerror="this.src='${authorImageUrl}';">
                 </div>
                 <div class="podcast-list-item-info">
                     <h3 class="podcast-list-item-title">${escapeHtml(author)}</h3>
@@ -1434,9 +1440,6 @@ async function showAuthorPage(authorName) {
     const descriptionEl = document.getElementById('author-description');
     const podcastsGridEl = document.getElementById('author-podcasts-grid');
     const titleEl = document.getElementById('author-page-title');
-    const headerImageEl = document.getElementById('author-header-image');
-    const headerTitleEl = document.getElementById('author-header-title');
-    const headerMetaEl = document.getElementById('author-header-meta');
     
     titleEl.textContent = authorName;
     loadingEl.classList.remove('hidden');
@@ -1467,28 +1470,9 @@ async function showAuthorPage(authorName) {
         }
     }
     
-    setTimeout(async () => {
+    setTimeout(() => {
         loadingEl.classList.add('hidden');
         contentEl.classList.remove('hidden');
-        
-        // Load and display author image
-        try {
-            const imageResponse = await fetch(`/api/author-image?name=${encodeURIComponent(authorName)}&format=json`);
-            if (imageResponse.ok) {
-                const imageData = await imageResponse.json();
-                if (imageData.imageUrl) {
-                    headerImageEl.src = imageData.imageUrl;
-                    headerImageEl.alt = authorName;
-                    headerImageEl.style.display = 'block';
-                }
-            }
-        } catch (error) {
-            console.warn('Could not fetch author image:', error);
-        }
-        
-        // Update header
-        headerTitleEl.textContent = authorName;
-        headerMetaEl.textContent = `${filteredPodcasts.length} ${filteredPodcasts.length === 1 ? 'podcast' : 'podcasts'}`;
         
         // Display description with "see more" functionality
         if (description) {

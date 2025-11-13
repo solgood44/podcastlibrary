@@ -1,9 +1,9 @@
-import { fetchAuthorBySlug, fetchPodcastsByAuthor, fetchAuthorDescription, fetchAuthorImageUrl, generateSlug } from '../../lib/supabase';
+import { fetchAuthorBySlug, fetchPodcastsByAuthor, fetchAuthorDescription, generateSlug } from '../../lib/supabase';
 import Head from 'next/head';
 import { useEffect } from 'react';
 import { useRouter } from 'next/router';
 
-export default function AuthorPage({ authorName, podcasts, description, authorImageUrl, error }) {
+export default function AuthorPage({ authorName, podcasts, description, error }) {
   const router = useRouter();
 
   useEffect(() => {
@@ -47,10 +47,8 @@ export default function AuthorPage({ authorName, podcasts, description, authorIm
     ? description.replace(/<[^>]*>/g, '').substring(0, 300) 
     : `Explore podcasts by ${authorName} on Podcast Library.`;
 
-  // Use author image for OG if available, otherwise use generated image
-  const ogImage = authorImageUrl 
-    ? authorImageUrl 
-    : `https://podcastlibrary.org/api/og-author?name=${encodeURIComponent(authorName)}`;
+  // Use generated OG image
+  const ogImage = `https://podcastlibrary.org/api/og-author?name=${encodeURIComponent(authorName)}`;
 
   return (
     <>
@@ -108,19 +106,6 @@ export default function AuthorPage({ authorName, podcasts, description, authorIm
 
         {/* Author Header */}
         <div className="podcast-seo-header">
-          <img 
-            src={authorImageUrl || `/api/og-author?name=${encodeURIComponent(authorName)}&size=profile`}
-            alt={authorName}
-            className="podcast-seo-author-image"
-            onError={(e) => {
-              // Fallback to generated image if stored image fails
-              if (authorImageUrl && e.target.src !== `/api/og-author?name=${encodeURIComponent(authorName)}&size=profile`) {
-                e.target.src = `/api/og-author?name=${encodeURIComponent(authorName)}&size=profile`;
-              } else {
-                e.target.style.display = 'none';
-              }
-            }}
-          />
           <div className="podcast-seo-info">
             <h1 className="podcast-seo-title">{authorName}</h1>
             
@@ -277,16 +262,12 @@ export async function getStaticProps({ params }) {
     
     // Fetch author description
     const description = await fetchAuthorDescription(authorName);
-    
-    // Fetch author image URL
-    const authorImageUrl = await fetchAuthorImageUrl(authorName);
 
     return {
       props: {
         authorName,
         podcasts: podcasts || [],
-        description: description || null,
-        authorImageUrl: authorImageUrl || null
+        description: description || null
       },
       // Revalidate every hour (3600 seconds)
       revalidate: 3600
@@ -298,8 +279,7 @@ export async function getStaticProps({ params }) {
         error: 'Failed to load author',
         authorName: null,
         podcasts: [],
-        description: null,
-        authorImageUrl: null
+        description: null
       }
     };
   }
