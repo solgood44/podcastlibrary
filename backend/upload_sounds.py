@@ -484,6 +484,11 @@ def main():
         action='store_true',
         help='List all sound titles in the database (useful for checking what to rename images to)'
     )
+    parser.add_argument(
+        '--set-placeholder',
+        type=str,
+        help='Set a placeholder image URL for all sounds without images (provide the URL)'
+    )
     
     args = parser.parse_args()
     
@@ -701,6 +706,35 @@ def main():
                     console.print(f"[yellow]No images could be matched to the sounds without images[/yellow]")
         except Exception as e:
             console.print(f"[red]Error ensuring all sounds have images: {e}[/red]")
+    
+    # Set placeholder image for sounds without images
+    if args.set_placeholder and not args.dry_run:
+        console.print(f"\n[cyan]Setting placeholder image for sounds without images...[/cyan]")
+        try:
+            # Get all sounds without images
+            sounds_result = sb.table('sounds').select('id,title,image_url').execute()
+            sounds_without_images = [s for s in sounds_result.data if not s.get('image_url')]
+            
+            if not sounds_without_images:
+                console.print(f"[green]✓ All sounds already have images![/green]")
+            else:
+                console.print(f"[yellow]Found {len(sounds_without_images)} sounds without images[/yellow]")
+                
+                updated_count = 0
+                for sound in sounds_without_images:
+                    result = sb.table('sounds').update({
+                        'image_url': args.set_placeholder
+                    }).eq('id', sound['id']).execute()
+                    
+                    if result.data:
+                        console.print(f"[green]✓ Set placeholder for: {sound['title']}[/green]")
+                        updated_count += 1
+                    else:
+                        console.print(f"[yellow]⚠ Failed to update: {sound['title']}[/yellow]")
+                
+                console.print(f"\n[green]✓ Set placeholder image for {updated_count} sounds[/green]")
+        except Exception as e:
+            console.print(f"[red]Error setting placeholder: {e}[/red]")
     
     if args.dry_run:
         console.print("\n[yellow]This was a dry run. Run without --dry-run to actually upload files.[/yellow]")
