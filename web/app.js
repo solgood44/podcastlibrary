@@ -390,6 +390,7 @@ function navigateTo(page, param = null) {
                         page === 'history' ? 'History' :
                         page === 'favorites' ? 'Favorites' :
                         page === 'sounds' ? 'Sounds' :
+                        page === 'sound' ? 'Sound Detail' :
                         page === 'episode' ? 'Episode Detail' :
                         page === 'all-episodes' ? 'All Episodes' :
                         page;
@@ -476,6 +477,8 @@ function navigateTo(page, param = null) {
         loadFavoritesPage();
     } else if (page === 'sounds') {
         loadSoundsPage();
+    } else if (page === 'sound') {
+        loadSoundDetailPage();
     } else if (page === 'episode') {
         // If navigating to episode page and we have a playing episode, show it
         // Otherwise, displayedEpisode should already be set by openEpisodeDetail()
@@ -542,6 +545,9 @@ function updatePageTitle(page) {
     } else if (page === 'sounds') {
         title = `Nature Sounds - ${baseTitle}`;
         description = 'Listen to seamless nature sound loops for relaxation and focus';
+    } else if (page === 'sound' && currentSound) {
+        title = `${currentSound.title || 'Nature Sound'} - ${baseTitle}`;
+        description = currentSound.description || `Listen to ${currentSound.title || 'this nature sound'}`;
     } else if (page === 'history') {
         title = `History - ${baseTitle}`;
         description = 'Your recently played episodes';
@@ -995,13 +1001,11 @@ function renderSounds() {
     }
     
     gridEl.innerHTML = sortedSounds.map(sound => {
-        const duration = sound.duration_seconds ? formatDuration(sound.duration_seconds) : '';
-        const category = sound.category || 'nature';
         const soundIsPlaying = currentSound && currentSound.id === sound.id && soundAudioPlayer && !soundAudioPlayer.paused;
         
         return `
         <div class="podcast-card sound-card">
-            <div class="podcast-card-content" onclick="playSound('${sound.id}')">
+            <div class="podcast-card-content" onclick="openSoundDetail('${sound.id}')">
                 <img 
                     src="${sound.image_url || getPlaceholderImage()}" 
                     alt="${escapeHtml(sound.title || 'Sound')}"
@@ -1010,10 +1014,6 @@ function renderSounds() {
                 >
                 <div class="podcast-info">
                     <div class="podcast-title">${escapeHtml(sound.title || 'Untitled Sound')}</div>
-                    <div class="podcast-author">
-                        ${category ? `<span class="sound-category">${escapeHtml(category)}</span>` : ''}
-                        ${duration ? `<span class="sound-duration">${duration}</span>` : ''}
-                    </div>
                 </div>
                 <div class="sound-play-overlay ${soundIsPlaying ? 'playing' : ''}">
                     ${soundIsPlaying ? '⏸' : '▶'}
@@ -1129,15 +1129,22 @@ function playSound(soundId) {
     soundAudioPlayer.src = sound.audio_url;
     soundAudioPlayer.load();
     
-    // Show sound player bar
-    const soundPlayerBar = document.getElementById('sound-player-bar');
-    if (soundPlayerBar) {
-        soundPlayerBar.classList.remove('hidden');
-        document.body.classList.add('sound-player-visible');
+    // Show sound player bar (unless on sound detail page)
+    if (currentPage !== 'sound') {
+        const soundPlayerBar = document.getElementById('sound-player-bar');
+        if (soundPlayerBar) {
+            soundPlayerBar.classList.remove('hidden');
+            document.body.classList.add('sound-player-visible');
+        }
     }
     
     // Update sound player UI
     updateSoundPlayerUI();
+    
+    // If on sound detail page, update it
+    if (currentPage === 'sound') {
+        loadSoundDetailPage();
+    }
     
     // Try to play
     const playPromise = soundAudioPlayer.play();
@@ -1190,12 +1197,20 @@ function updateSoundPlayerUI() {
         playIconEl.textContent = isPlaying ? '⏸' : '▶';
     }
     if (statusEl) {
-        statusEl.textContent = isPlaying ? 'Looping' : 'Paused';
+        statusEl.textContent = isPlaying ? 'Playing' : 'Paused';
     }
     
     // Update sound cards on sounds page
     if (currentPage === 'sounds') {
         renderSounds();
+    }
+    
+    // Update sound detail page if open
+    if (currentPage === 'sound') {
+        const playIconEl = document.getElementById('sound-detail-play-icon');
+        if (playIconEl) {
+            playIconEl.textContent = isPlaying ? '⏸' : '▶';
+        }
     }
 }
 
@@ -1212,6 +1227,74 @@ function toggleSoundPlayPause() {
     }
     
     updateSoundPlayerUI();
+}
+
+// Open sound detail page
+function openSoundDetail(soundId) {
+    const sound = sounds.find(s => s.id === soundId);
+    if (!sound) {
+        console.error('Sound not found:', soundId);
+        return;
+    }
+    
+    currentSound = sound;
+    navigateTo('sound');
+}
+
+// Load sound detail page
+function loadSoundDetailPage() {
+    if (!currentSound) {
+        navigateTo('sounds');
+        return;
+    }
+    
+    const titleEl = document.getElementById('sound-detail-title');
+    const imageEl = document.getElementById('sound-detail-image');
+    const descriptionEl = document.getElementById('sound-detail-description');
+    const playIconEl = document.getElementById('sound-detail-play-icon');
+    const backgroundEl = document.getElementById('sound-detail-background');
+    
+    if (titleEl) titleEl.textContent = currentSound.title || 'Nature Sound';
+    
+    if (imageEl) {
+        if (currentSound.image_url) {
+            imageEl.src = currentSound.image_url;
+            imageEl.style.display = '';
+        } else {
+            imageEl.style.display = 'none';
+        }
+    }
+    
+    if (descriptionEl) {
+        if (currentSound.description) {
+            descriptionEl.textContent = currentSound.description;
+            descriptionEl.style.display = '';
+        } else {
+            descriptionEl.style.display = 'none';
+        }
+    }
+    
+    // Update play button
+    const isPlaying = soundAudioPlayer && !soundAudioPlayer.paused && currentSound && soundAudioPlayer.src.includes(currentSound.audio_url);
+    if (playIconEl) {
+        playIconEl.textContent = isPlaying ? '⏸' : '▶';
+    }
+    
+    // Set animated background based on category
+    if (backgroundEl) {
+        const category = currentSound.category || 'nature';
+        backgroundEl.className = `sound-detail-background sound-category-${category}`;
+    }
+    
+    // Auto-play if not already playing this sound
+    if (!soundAudioPlayer || soundAudioPlayer.paused || !currentSound || !soundAudioPlayer.src.includes(currentSound.audio_url)) {
+        playSound(currentSound.id);
+    }
+}
+
+// Go back from sound detail
+function goBackFromSound() {
+    navigateTo('sounds');
 }
 
 // Stop sound
@@ -1232,6 +1315,8 @@ function stopSound() {
     // Update UI
     if (currentPage === 'sounds') {
         renderSounds();
+    } else if (currentPage === 'sound') {
+        navigateTo('sounds');
     }
 }
 

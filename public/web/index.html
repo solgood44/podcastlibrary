@@ -353,6 +353,33 @@
             <div id="episode-detail-content" class="episode-detail-content"></div>
         </div>
 
+        <!-- Sound Detail Page -->
+        <div id="page-sound" class="page hidden">
+            <div id="sound-detail-background" class="sound-detail-background"></div>
+            <div class="sound-detail-content">
+                <div class="sound-detail-header">
+                    <button class="btn-back" onclick="goBackFromSound()">← Back</button>
+                </div>
+                <div id="sound-detail-main" class="sound-detail-main">
+                    <div class="sound-detail-image-container">
+                        <img id="sound-detail-image" src="" alt="" class="sound-detail-image">
+                    </div>
+                    <div class="sound-detail-info">
+                        <h1 id="sound-detail-title" class="sound-detail-title">Nature Sound</h1>
+                        <div class="sound-detail-controls">
+                            <button id="sound-detail-play-btn" class="btn-sound-detail-play" onclick="toggleSoundPlayPause()">
+                                <span id="sound-detail-play-icon">▶</span>
+                            </button>
+                            <button class="btn-sound-detail-stop" onclick="stopSound()" title="Stop">
+                                <span>⏹</span>
+                            </button>
+                        </div>
+                        <div id="sound-detail-description" class="sound-detail-description"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Search Page / All Episodes Page -->
         <div id="page-search" class="page hidden">
             <div class="page-header">
@@ -447,7 +474,7 @@
                 </div>
                 <div class="sound-player-text">
                     <h3 id="sound-player-title">Nature Sound</h3>
-                    <p id="sound-player-status">Looping</p>
+                    <p id="sound-player-status">Playing</p>
                 </div>
             </div>
             <div class="sound-player-center">
