@@ -1283,39 +1283,34 @@ function renderAuthors() {
     }
 }
 
-// Render authors in grid view (matches podcast grid style)
+// Render authors in grid view (matches podcast grid style exactly)
 function renderAuthorsGrid(sortedAuthors) {
     const gridEl = document.getElementById('authors-grid');
-    gridEl.innerHTML = '';
-    
-    sortedAuthors.forEach(author => {
+    gridEl.innerHTML = sortedAuthors.map(author => {
         const podcastCount = getAuthorPodcastCount(author);
         const isFavorite = isAuthorFavorited(author);
         const authorImageUrl = `/api/og-author?name=${encodeURIComponent(author)}&size=profile`;
         
-        const gridItem = document.createElement('div');
-        gridItem.className = 'podcast-grid-item';
-        gridItem.onclick = () => showAuthor(author);
-        gridItem.innerHTML = `
-            <div class="podcast-grid-artwork-container">
-                <img src="${authorImageUrl}" alt="${escapeHtml(author)}" class="podcast-grid-artwork" onerror="this.src='${authorImageUrl}';">
-                <button class="btn-podcast-favorite ${isFavorite ? 'favorited' : ''}" onclick="event.stopPropagation(); toggleAuthorFavorite('${escapeHtml(author)}');" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
-                    ${isFavorite ? '❤️' : '🤍'}
-                </button>
+        return `
+        <div class="podcast-card">
+            <div class="podcast-card-content" onclick="showAuthor('${escapeHtml(author)}')">
+                <img 
+                    src="${authorImageUrl}" 
+                    alt="${escapeHtml(author)}"
+                    class="podcast-image"
+                    onerror="this.src='${authorImageUrl}'"
+                >
+                <div class="podcast-info">
+                    <div class="podcast-title">${escapeHtml(author)}</div>
+                    <div class="podcast-author">${podcastCount} ${podcastCount === 1 ? 'podcast' : 'podcasts'}</div>
+                </div>
             </div>
-            <div class="podcast-grid-info">
-                <div class="podcast-grid-title">${escapeHtml(author)}</div>
-                ${(() => {
-                    const cleanedAuthor = author ? cleanAuthorText(author) : '';
-                    if (cleanedAuthor && !shouldHideAuthor(cleanedAuthor)) {
-                        return `<div class="podcast-author">${podcastCount} ${podcastCount === 1 ? 'podcast' : 'podcasts'}</div>`;
-                    }
-                    return '';
-                })()}
-            </div>
-        `;
-        gridEl.appendChild(gridItem);
-    });
+            <button class="btn-podcast-favorite ${isFavorite ? 'favorited' : ''}" onclick="event.stopPropagation(); toggleAuthorFavorite('${escapeHtml(author)}');" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+                ${isFavorite ? '❤️' : '🤍'}
+            </button>
+        </div>
+    `;
+    }).join('');
 }
 
 // Render authors in list view
