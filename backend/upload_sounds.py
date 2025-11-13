@@ -246,20 +246,51 @@ def normalize_title(title: str) -> str:
     return normalized
 
 
-def match_by_filename(image_filename: str, sound_titles: List[str]) -> Optional[str]:
+def match_by_filename(image_filename: str, sound_titles: List[str], debug: bool = False) -> Optional[str]:
     """Try to match image filename to sound title."""
     image_title = normalize_title(image_filename)
     
+    if debug:
+        console.print(f"[dim]Matching image: '{image_filename}' (normalized: '{image_title}')[/dim]")
+    
     # Try exact match first
     for sound_title in sound_titles:
-        if normalize_title(sound_title) == image_title:
+        sound_normalized = normalize_title(sound_title)
+        if sound_normalized == image_title:
+            if debug:
+                console.print(f"[dim]  → Exact match: '{sound_title}'[/dim]")
             return sound_title
     
     # Try partial match (image title contains sound title or vice versa)
     for sound_title in sound_titles:
         sound_normalized = normalize_title(sound_title)
         if image_title in sound_normalized or sound_normalized in image_title:
+            if debug:
+                console.print(f"[dim]  → Partial match: '{sound_title}'[/dim]")
             return sound_title
+    
+    # Try fuzzy match - check if most words match
+    image_words = set(image_title.split())
+    if len(image_words) > 0:
+        best_match = None
+        best_score = 0
+        for sound_title in sound_titles:
+            sound_normalized = normalize_title(sound_title)
+            sound_words = set(sound_normalized.split())
+            if len(sound_words) > 0:
+                # Calculate word overlap
+                common_words = image_words.intersection(sound_words)
+                if len(common_words) > 0:
+                    # Score based on how many words match relative to the shorter title
+                    score = len(common_words) / min(len(image_words), len(sound_words))
+                    if score > best_score and score >= 0.5:  # At least 50% of words match
+                        best_score = score
+                        best_match = sound_title
+        
+        if best_match:
+            if debug:
+                console.print(f"[dim]  → Fuzzy match ({best_score:.0%}): '{best_match}'[/dim]")
+            return best_match
     
     return None
 
@@ -297,7 +328,7 @@ def match_images_to_sounds(image_folder: str, sound_titles: List[str]) -> Dict[s
         
         for image_file in image_files:
             # Match by filename (case-insensitive)
-            match = match_by_filename(image_file.name, sound_titles)
+            match = match_by_filename(image_file.name, sound_titles, debug=False)
             
             if match:
                 matches[match] = str(image_file)
@@ -576,6 +607,11 @@ def main():
                 console.print(f"[green]✓ All sounds already have images![/green]")
             else:
                 console.print(f"[yellow]Found {len(sounds_without_images)} sounds without images[/yellow]")
+                console.print(f"[dim]Sound titles needing images:[/dim]")
+                for s in sounds_without_images[:10]:  # Show first 10
+                    console.print(f"[dim]  - {s['title']}[/dim]")
+                if len(sounds_without_images) > 10:
+                    console.print(f"[dim]  ... and {len(sounds_without_images) - 10} more[/dim]")
                 
                 # Get all sound titles that need images
                 sound_titles_needing_images = [s['title'] for s in sounds_without_images]
