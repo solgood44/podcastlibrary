@@ -1,8 +1,9 @@
 // API route to generate Open Graph images for authors
 // Returns an SVG image with the author's name
+// Supports 'size' parameter: 'og' (1200x630) or 'profile' (400x400 square)
 
 export default function handler(req, res) {
-  const { name } = req.query;
+  const { name, size = 'og' } = req.query;
 
   if (!name) {
     return res.status(400).json({ error: 'Author name is required' });
@@ -24,8 +25,27 @@ export default function handler(req, res) {
   const bgColor = `hsl(${hue}, 70%, 45%)`;
   const bgColorLight = `hsl(${hue}, 70%, 55%)`;
 
-  // Create SVG image (1200x630 for OG image standard)
-  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+  let svg;
+  
+  if (size === 'profile') {
+    // Profile image: square format (400x400)
+    svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg width="400" height="400" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:${bgColor};stop-opacity:1" />
+      <stop offset="100%" style="stop-color:${bgColorLight};stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="400" height="400" fill="url(#grad)"/>
+  
+  <!-- Circle with first letter -->
+  <circle cx="200" cy="200" r="100" fill="rgba(255, 255, 255, 0.2)"/>
+  <text x="200" y="220" font-family="Arial, sans-serif" font-size="120" font-weight="bold" fill="white" text-anchor="middle" dominant-baseline="middle">${firstLetter}</text>
+</svg>`;
+  } else {
+    // OG image: standard format (1200x630)
+    svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg width="1200" height="630" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -48,6 +68,7 @@ export default function handler(req, res) {
   <!-- Podcast Library branding -->
   <text x="600" y="580" font-family="Arial, sans-serif" font-size="28" fill="rgba(255, 255, 255, 0.8)" text-anchor="middle">podcastlibrary.org</text>
 </svg>`;
+  }
 
   res.setHeader('Content-Type', 'image/svg+xml');
   res.setHeader('Cache-Control', 'public, s-maxage=86400, stale-while-revalidate');

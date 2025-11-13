@@ -1,7 +1,7 @@
 // Dynamic sitemap generation for SEO
 import { fetchAllPodcasts, fetchAllAuthors, generateSlug } from '../lib/supabase';
 
-function generateSiteMap(podcasts, authors) {
+function generateSiteMap(validPodcasts, validAuthors) {
   const baseUrl = 'https://podcastlibrary.org';
   
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -11,9 +11,10 @@ function generateSiteMap(podcasts, authors) {
        <changefreq>daily</changefreq>
        <priority>1.0</priority>
      </url>
-     ${podcasts
+     ${validPodcasts
        .map(podcast => {
          const slug = generateSlug(podcast.title || '');
+         if (!slug) return ''; // Skip if no valid slug
          return `
        <url>
            <loc>${baseUrl}/podcast/${slug}</loc>
@@ -23,10 +24,12 @@ function generateSiteMap(podcasts, authors) {
        </url>
      `;
        })
+       .filter(Boolean)
        .join('')}
-     ${authors
+     ${validAuthors
        .map(author => {
          const slug = generateSlug(author || '');
+         if (!slug) return ''; // Skip if no valid slug
          return `
        <url>
            <loc>${baseUrl}/author/${slug}</loc>
@@ -35,6 +38,7 @@ function generateSiteMap(podcasts, authors) {
        </url>
      `;
        })
+       .filter(Boolean)
        .join('')}
    </urlset>
  `;
@@ -45,22 +49,86 @@ function SiteMap() {
 }
 
 export async function getServerSideProps({ res }) {
-  // Fetch podcasts and authors
-  const podcasts = await fetchAllPodcasts();
-  const authors = await fetchAllAuthors();
+  try {
+    // Fetch podcasts and authors
+    const podcasts = await fetchAllPodcasts();
+    const authors = await fetchAllAuthors();
 
-  // Generate the XML sitemap with the podcast and author data
-  const sitemap = generateSiteMap(podcasts, authors);
+    // Validate podcasts: filter out invalid ones
+    // Create a map of slug -> podcast for quick validation
+    const podcastSlugMap = new Map();
+    podcasts.forEach(podcast => {
+      if (podcast.title) {
+        const slug = generateSlug(podcast.title);
+        if (slug) {
+          // Store by slug, keeping only the first if duplicates exist
+          if (!podcastSlugMap.has(slug)) {
+            podcastSlugMap.set(slug, podcast);
+          }
+        }
+      }
+    });
 
-  res.setHeader('Content-Type', 'text/xml');
-  // Cache sitemap for 24 hours
-  res.setHeader('Cache-Control', 'public, s-maxage=86400, stale-while-revalidate');
-  res.write(sitemap);
-  res.end();
+    // Only include podcasts that have valid slugs and can be found
+    const validPodcasts = Array.from(podcastSlugMap.values());
 
-  return {
-    props: {},
-  };
+    // Validate authors: ensure they exist and have podcasts
+    // Since we already have all podcasts, we can validate authors more efficiently
+    const validAuthors = [];
+    const authorPodcastCount = new Map();
+    
+    // Count podcasts per author
+    podcasts.forEach(podcast => {
+      if (podcast.author) {
+        authorPodcastCount.set(podcast.author, (authorPodcastCount.get(podcast.author) || 0) + 1);
+      }
+    });
+
+    // Validate each author
+    for (const author of authors) {
+      if (!author) continue; // Skip empty authors
+      
+      const slug = generateSlug(author);
+      if (!slug) continue; // Skip if slug generation fails
+      
+      // Verify the author has podcasts (author pages should have content)
+      const podcastCount = authorPodcastCount.get(author) || 0;
+      if (podcastCount > 0) {
+        validAuthors.push(author);
+      }
+    }
+
+    // Generate the XML sitemap with only validated podcasts and authors
+    const sitemap = generateSiteMap(validPodcasts, validAuthors);
+
+    res.setHeader('Content-Type', 'text/xml');
+    // Cache sitemap for 24 hours
+    res.setHeader('Cache-Control', 'public, s-maxage=86400, stale-while-revalidate');
+    res.write(sitemap);
+    res.end();
+
+    return {
+      props: {},
+    };
+  } catch (error) {
+    console.error('Error generating sitemap:', error);
+    // Return a minimal valid sitemap on error
+    const minimalSitemap = `<?xml version="1.0" encoding="UTF-8"?>
+   <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+     <url>
+       <loc>https://podcastlibrary.org</loc>
+       <changefreq>daily</changefreq>
+       <priority>1.0</priority>
+     </url>
+   </urlset>
+ `;
+    res.setHeader('Content-Type', 'text/xml');
+    res.write(minimalSitemap);
+    res.end();
+    return {
+      props: {},
+    };
+  }
 }
 
 export default SiteMap;

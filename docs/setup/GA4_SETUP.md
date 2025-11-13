@@ -130,7 +130,7 @@ Events appear in different places in GA4. Here's where to look:
 
 **This is the ONLY manual step you need to do** - and it's completely optional!
 
-Once events start appearing in GA4 (they'll show up automatically after being triggered), you can optionally mark important ones as "conversions" to track them as key actions.
+Once events start appearing in GA4 (they'll show up automatically after being triggered), you can optionally mark important ones as "key events" (GA4's term for conversions) to track them as important actions.
 
 ### Step 1: Trigger Events First
 
@@ -145,19 +145,32 @@ Events must be sent at least once before they appear in GA4. On your live site:
 - **Reports → Engagement → Events:** Appears within 1-2 minutes ✅ (fastest)
 - **Admin → Events:** May take 5-10 minutes
 
-### Step 3: Mark as Conversions (Optional)
+### Step 3: Mark as Key Events (Optional)
 
 1. Go to **Admin** (gear icon) → **Events**
-2. Find these events (they'll appear automatically after being sent):
+2. Click on the **"Recent events"** tab (not "Key events")
+3. Find your custom events in the list (they'll appear automatically after being triggered):
    - `episode_play`
    - `episode_complete`
    - `add_favorite_podcast`
    - `add_favorite_episode`
-3. Toggle the switch next to each one to mark as conversion
+   - `search`
+   - `view_podcast`
+   - etc.
 
-**Alternative:** If events don't appear in Admin → Events yet, you can mark them from **Reports → Engagement → Events** by clicking on the event name.
+4. **To mark an event as a key event:**
+   - Click the **three dots (⋮)** on the right side of the event row
+   - Select **"Mark as key event"** from the dropdown menu
+   - The event will move to the "Key events" tab
 
-**Remember:** Marking events as conversions is optional. Your events are already being tracked - this just helps you identify your most important user actions.
+**Important:** 
+- Custom events only appear after they've been triggered at least once on your live site
+- If you don't see your custom events, trigger them first (play an episode, search, etc.)
+- Wait 5-10 minutes after triggering for events to appear in the list
+
+**Alternative:** You can also mark events from **Reports → Engagement → Events** by clicking on the event name and using the same dropdown menu.
+
+**Remember:** Marking events as key events is optional. Your events are already being tracked - this just helps you identify your most important user actions.
 
 ---
 
@@ -188,23 +201,38 @@ if (typeof window.gtag === 'function') {
 
 **What to look for:**
 - ✅ `gtag exists: true` - GA script is loaded
-- ✅ `analytics object: object` - Analytics functions are available
-- ✅ `Measurement ID: G-9CDHCMHT8J` - Correct ID (or your ID)
+- ✅ `analytics object: true` or `object` - Analytics functions are available
+- ✅ `dataLayer length: 5+` - Events are being tracked (higher number = more events sent)
+- ✅ `Measurement ID: G-9CDHCMHT8J` - Correct ID (or your ID, or config object is fine)
 - ❌ If any are `false` or `undefined`, GA isn't loading properly
 
-### Step 2: Check Network Tab (Most Important)
+**If you see all ✅:**
+- Events ARE being sent! ✅
+- Now check Step 2 (Network tab) to confirm
+- Then check Step 3 to find them in GA4
+
+### Step 2: Check Network Tab (Most Important) - DO THIS NOW!
+
+Since your diagnostic shows events are being sent, let's confirm in the Network tab:
 
 1. **Press F12** → **Network** tab
-2. **Clear the network log** (click the 🚫 icon)
+2. **Clear the network log** (click the 🚫 icon or press Ctrl+L / Cmd+K)
 3. **Filter by:** `collect` (type in the filter box)
 4. **Interact with your site:**
    - Play an episode
    - Search for something
    - Navigate to a podcast page
+   - Or just wait - you should see requests from the diagnostic test
 5. **Look for requests** like: `https://www.google-analytics.com/g/collect?...`
 
-**✅ If you see `collect` requests:** Events ARE being sent! The issue is GA4 not showing them (see Step 3).  
-**❌ If you DON'T see `collect` requests:** Events aren't being sent (see Step 4).
+**✅ If you see `collect` requests:** 
+- Events ARE being sent! ✅✅✅
+- The issue is just finding them in GA4 (see Step 3 below)
+- You should see requests with status 200 (success)
+
+**❌ If you DON'T see `collect` requests:** 
+- Even though diagnostic passed, events aren't reaching Google
+- See Step 4 for troubleshooting
 
 ### Step 3: Events Are Being Sent But Not Showing in GA4
 

@@ -14,6 +14,7 @@ let currentCategory = null; // Currently viewed category
 let authors = []; // All unique authors
 let currentAuthor = null; // Currently viewed author
 let authorsSortMode = 'count-desc'; // 'count-desc' or 'name-asc' for authors page
+let authorsViewMode = 'list'; // 'grid' or 'list' for authors page
 let authorDescriptions = {}; // Cache for author descriptions (will be loaded from API later)
 let searchMode = 'episodes'; // 'episodes' or 'podcasts'
 let viewMode = 'grid'; // 'grid' or 'list'
@@ -953,11 +954,13 @@ function loadFavoritesPage() {
             const favoriteAuthors = authors.filter(a => favorites.authors.includes(String(a)));
             favoriteAuthors.forEach(author => {
                 const podcastCount = getAuthorPodcastCount(author);
+                // Use API endpoint that handles stored images with fallback
+                const authorImageUrl = `/api/author-image?name=${encodeURIComponent(author)}`;
                 html += `
                     <div class="podcast-list-item author-list-item">
                         <div class="podcast-list-item-content" onclick="showAuthor('${escapeHtml(author)}')">
                             <div class="podcast-list-item-image">
-                                <div class="podcast-list-item-image-placeholder"></div>
+                                <img src="${authorImageUrl}" alt="${escapeHtml(author)}" class="podcast-list-item-image-img" onerror="this.onerror=null; this.src='/api/og-author?name=${encodeURIComponent(author)}&size=profile';">
                             </div>
                             <div class="podcast-list-item-info">
                                 <h3 class="podcast-list-item-title">${escapeHtml(author)}</h3>
@@ -1234,13 +1237,31 @@ function loadAuthorsPage() {
     }, 300);
 }
 
-// Render authors in list view (sorted)
-function renderAuthors() {
+// Set authors view mode (grid or list)
+function setAuthorsViewMode(mode) {
+    authorsViewMode = mode;
+    const gridBtn = document.getElementById('authors-view-grid');
+    const listBtn = document.getElementById('authors-view-list');
+    const gridEl = document.getElementById('authors-grid');
     const listEl = document.getElementById('authors-list');
     
-    // Clear existing content
-    listEl.innerHTML = '';
+    if (mode === 'grid') {
+        gridBtn.classList.add('active');
+        listBtn.classList.remove('active');
+        gridEl.classList.remove('hidden');
+        listEl.classList.add('hidden');
+    } else {
+        listBtn.classList.add('active');
+        gridBtn.classList.remove('active');
+        listEl.classList.remove('hidden');
+        gridEl.classList.add('hidden');
+    }
     
+    renderAuthors();
+}
+
+// Render authors in list view (sorted)
+function renderAuthors() {
     // Sort authors based on current sort mode
     let sortedAuthors = [...authors];
     if (authorsSortMode === 'count-desc') {
@@ -1255,10 +1276,53 @@ function renderAuthors() {
         sortedAuthors.sort((a, b) => a.localeCompare(b));
     }
     
+    if (authorsViewMode === 'grid') {
+        renderAuthorsGrid(sortedAuthors);
+    } else {
+        renderAuthorsList(sortedAuthors);
+    }
+}
+
+// Render authors in grid view
+function renderAuthorsGrid(sortedAuthors) {
+    const gridEl = document.getElementById('authors-grid');
+    gridEl.innerHTML = '';
+    
+    sortedAuthors.forEach(author => {
+        const podcastCount = getAuthorPodcastCount(author);
+        const isFavorite = isAuthorFavorited(author);
+        const authorImageUrl = `/api/author-image?name=${encodeURIComponent(author)}`;
+        
+        const gridItem = document.createElement('div');
+        gridItem.className = 'podcast-grid-item';
+        gridItem.onclick = () => showAuthor(author);
+        gridItem.innerHTML = `
+            <div class="podcast-grid-artwork-container">
+                <img src="${authorImageUrl}" alt="${escapeHtml(author)}" class="podcast-grid-artwork" onerror="this.onerror=null; this.src='/api/og-author?name=${encodeURIComponent(author)}&size=profile';">
+                <button class="btn-podcast-favorite ${isFavorite ? 'favorited' : ''}" onclick="event.stopPropagation(); toggleAuthorFavorite('${escapeHtml(author)}');" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+                    ${isFavorite ? '❤️' : '🤍'}
+                </button>
+            </div>
+            <div class="podcast-grid-info">
+                <div class="podcast-grid-title">${escapeHtml(author)}</div>
+                <div class="podcast-author">${podcastCount} ${podcastCount === 1 ? 'podcast' : 'podcasts'}</div>
+            </div>
+        `;
+        gridEl.appendChild(gridItem);
+    });
+}
+
+// Render authors in list view
+function renderAuthorsList(sortedAuthors) {
+    const listEl = document.getElementById('authors-list');
+    listEl.innerHTML = '';
+    
     sortedAuthors.forEach(author => {
         const podcastCount = getAuthorPodcastCount(author);
         const authorSlug = generateSlug(author);
         const isFavorite = isAuthorFavorited(author);
+        // Use API endpoint that handles stored images with fallback
+        const authorImageUrl = `/api/author-image?name=${encodeURIComponent(author)}`;
         
         // List view item with clear call-to-action button
         const listItem = document.createElement('div');
@@ -1266,7 +1330,7 @@ function renderAuthors() {
         listItem.innerHTML = `
             <div class="podcast-list-item-content">
                 <div class="podcast-list-item-image">
-                    <div class="podcast-list-item-image-placeholder"></div>
+                    <img src="${authorImageUrl}" alt="${escapeHtml(author)}" class="podcast-list-item-image-img" onerror="this.onerror=null; this.src='/api/og-author?name=${encodeURIComponent(author)}&size=profile';">
                 </div>
                 <div class="podcast-list-item-info">
                     <h3 class="podcast-list-item-title">${escapeHtml(author)}</h3>
@@ -1285,6 +1349,34 @@ function renderAuthors() {
         `;
         listEl.appendChild(listItem);
     });
+}
+
+// Get author image URL (with caching)
+const authorImageCache = {};
+async function getAuthorImageUrl(author) {
+    if (!author) return `/api/og-author?name=${encodeURIComponent('')}&size=profile`;
+    
+    // Check cache first
+    if (authorImageCache[author]) {
+        return authorImageCache[author];
+    }
+    
+    try {
+        const response = await fetch(`/api/author-image?name=${encodeURIComponent(author)}`);
+        if (response.ok) {
+            const data = await response.json();
+            const imageUrl = data.imageUrl || `/api/og-author?name=${encodeURIComponent(author)}&size=profile`;
+            authorImageCache[author] = imageUrl;
+            return imageUrl;
+        }
+    } catch (error) {
+        console.error('Error fetching author image:', error);
+    }
+    
+    // Fallback to generated image
+    const fallbackUrl = `/api/og-author?name=${encodeURIComponent(author)}&size=profile`;
+    authorImageCache[author] = fallbackUrl;
+    return fallbackUrl;
 }
 
 // Get count of podcasts by author
@@ -1342,6 +1434,9 @@ async function showAuthorPage(authorName) {
     const descriptionEl = document.getElementById('author-description');
     const podcastsGridEl = document.getElementById('author-podcasts-grid');
     const titleEl = document.getElementById('author-page-title');
+    const headerImageEl = document.getElementById('author-header-image');
+    const headerTitleEl = document.getElementById('author-header-title');
+    const headerMetaEl = document.getElementById('author-header-meta');
     
     titleEl.textContent = authorName;
     loadingEl.classList.remove('hidden');
@@ -1372,9 +1467,28 @@ async function showAuthorPage(authorName) {
         }
     }
     
-    setTimeout(() => {
+    setTimeout(async () => {
         loadingEl.classList.add('hidden');
         contentEl.classList.remove('hidden');
+        
+        // Load and display author image
+        try {
+            const imageResponse = await fetch(`/api/author-image?name=${encodeURIComponent(authorName)}&format=json`);
+            if (imageResponse.ok) {
+                const imageData = await imageResponse.json();
+                if (imageData.imageUrl) {
+                    headerImageEl.src = imageData.imageUrl;
+                    headerImageEl.alt = authorName;
+                    headerImageEl.style.display = 'block';
+                }
+            }
+        } catch (error) {
+            console.warn('Could not fetch author image:', error);
+        }
+        
+        // Update header
+        headerTitleEl.textContent = authorName;
+        headerMetaEl.textContent = `${filteredPodcasts.length} ${filteredPodcasts.length === 1 ? 'podcast' : 'podcasts'}`;
         
         // Display description with "see more" functionality
         if (description) {

@@ -268,10 +268,15 @@
                     </div>
                 </div>
                 <div class="controls-right">
+                    <div class="view-toggle">
+                        <button id="authors-view-grid" class="view-toggle-btn active" onclick="setAuthorsViewMode('grid')" title="Grid view">⊞</button>
+                        <button id="authors-view-list" class="view-toggle-btn" onclick="setAuthorsViewMode('list')" title="List view">☰</button>
+                    </div>
                     <div id="authors-count" class="podcast-count"></div>
                 </div>
             </div>
             <div id="authors-container">
+                <div id="authors-grid" class="podcast-grid hidden"></div>
                 <div id="authors-list" class="podcast-list"></div>
             </div>
         </div>
@@ -287,6 +292,13 @@
                 <p>Loading author...</p>
             </div>
             <div id="author-content" class="author-detail-content hidden">
+                <div id="author-header" class="author-header">
+                    <img id="author-header-image" src="" alt="" class="author-header-image" onerror="this.style.display='none';">
+                    <div class="author-header-info">
+                        <h1 id="author-header-title" class="author-header-title"></h1>
+                        <div id="author-header-meta" class="author-header-meta"></div>
+                    </div>
+                </div>
                 <div id="author-description" class="author-description">
                     <p class="author-description-placeholder">No description available yet.</p>
                 </div>
