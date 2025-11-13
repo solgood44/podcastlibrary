@@ -335,7 +335,9 @@ def match_images_to_sounds(image_folder: str, sound_titles: List[str]) -> Dict[s
                 console.print(f"[green]✓ Matched: {image_file.name} → {match}[/green]")
             else:
                 unmatched_images.append(image_file.name)
-                console.print(f"[yellow]⚠ No match for: {image_file.name}[/yellow]")
+                # Show what it normalized to for debugging
+                normalized = normalize_title(image_file.name)
+                console.print(f"[yellow]⚠ No match for: {image_file.name} (normalized: '{normalized}')[/yellow]")
             
             progress.update(task, advance=1)
     
@@ -637,13 +639,24 @@ def main():
             else:
                 console.print(f"[yellow]Found {len(sounds_without_images)} sounds without images[/yellow]")
                 console.print(f"[dim]Sound titles needing images:[/dim]")
-                for s in sounds_without_images[:10]:  # Show first 10
+                for s in sounds_without_images:
                     console.print(f"[dim]  - {s['title']}[/dim]")
-                if len(sounds_without_images) > 10:
-                    console.print(f"[dim]  ... and {len(sounds_without_images) - 10} more[/dim]")
                 
                 # Get all sound titles that need images
                 sound_titles_needing_images = [s['title'] for s in sounds_without_images]
+                
+                # Show available images for debugging
+                image_folder_path = Path(args.images)
+                if image_folder_path.exists():
+                    image_extensions = ['.jpg', '.jpeg', '.png', '.JPG', '.JPEG', '.PNG']
+                    available_images = []
+                    for ext in image_extensions:
+                        available_images.extend(image_folder_path.glob(f'*{ext}'))
+                    
+                    if available_images:
+                        console.print(f"\n[dim]Available images ({len(available_images)}):[/dim]")
+                        for img in sorted(available_images):
+                            console.print(f"[dim]  - {img.name}[/dim]")
                 
                 # Match images to sounds by filename (case-insensitive)
                 image_matches = match_images_to_sounds(args.images, sound_titles_needing_images)
@@ -669,7 +682,14 @@ def main():
                     # Report any sounds that still don't have images
                     remaining = len(sounds_without_images) - uploaded_count
                     if remaining > 0:
-                        console.print(f"[yellow]⚠ {remaining} sounds still don't have images. Check image filenames match sound titles.[/yellow]")
+                        console.print(f"\n[yellow]⚠ {remaining} sounds still don't have images:[/yellow]")
+                        # Show which sounds still need images
+                        matched_titles = set(image_matches.keys())
+                        for s in sounds_without_images:
+                            if s['title'] not in matched_titles:
+                                normalized_title = normalize_title(s['title'])
+                                console.print(f"[yellow]  - {s['title']} (normalized: '{normalized_title}')[/yellow]")
+                        console.print(f"\n[yellow]Tip: Rename image files to match these exact titles (case-insensitive)[/yellow]")
                 else:
                     console.print(f"[yellow]No images could be matched to the sounds without images[/yellow]")
         except Exception as e:
