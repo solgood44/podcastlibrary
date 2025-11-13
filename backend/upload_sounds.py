@@ -303,10 +303,15 @@ def match_images_to_sounds(image_folder: str, sound_titles: List[str]) -> Dict[s
         return {}
     
     # Find all image files (case-insensitive)
-    image_extensions = ['.jpg', '.jpeg', '.png', '.JPG', '.JPEG', '.PNG']
+    # Use case-insensitive glob pattern to find all image files
     image_files = []
-    for ext in image_extensions:
-        image_files.extend(image_folder_path.glob(f'*{ext}'))
+    # Try common extensions in both cases
+    extensions = ['jpg', 'jpeg', 'png', 'JPG', 'JPEG', 'PNG', 'Jpg', 'Jpeg', 'Png']
+    for ext in extensions:
+        image_files.extend(image_folder_path.glob(f'*.{ext}'))
+    
+    # Remove duplicates (in case we found the same file with different case)
+    image_files = list(set(image_files))
     
     if not image_files:
         console.print(f"[yellow]No image files found in {image_folder}[/yellow]")
@@ -648,10 +653,12 @@ def main():
                 # Show available images for debugging
                 image_folder_path = Path(args.images)
                 if image_folder_path.exists():
-                    image_extensions = ['.jpg', '.jpeg', '.png', '.JPG', '.JPEG', '.PNG']
+                    extensions = ['jpg', 'jpeg', 'png', 'JPG', 'JPEG', 'PNG', 'Jpg', 'Jpeg', 'Png']
                     available_images = []
-                    for ext in image_extensions:
-                        available_images.extend(image_folder_path.glob(f'*{ext}'))
+                    for ext in extensions:
+                        available_images.extend(image_folder_path.glob(f'*.{ext}'))
+                    # Remove duplicates
+                    available_images = list(set(available_images))
                     
                     if available_images:
                         console.print(f"\n[dim]Available images ({len(available_images)}):[/dim]")
