@@ -33,14 +33,30 @@ Or copy the contents of `backend/sounds_schema.sql` into the Supabase SQL Editor
 
 ### 3. Install Python Dependencies
 
-The upload script requires `mutagen` for reading MP3 metadata:
+The upload script requires `mutagen` for reading MP3 metadata and `pytesseract` for OCR (if matching images):
 
 ```bash
 cd backend
 pip install -r requirements.txt
 ```
 
-This will install `mutagen==1.47.0` along with other dependencies.
+This will install:
+- `mutagen==1.47.0` - for MP3 metadata
+- `pytesseract==0.3.10` - for OCR (text extraction from images)
+- Other required packages
+
+**Note**: If you plan to match images using OCR, you also need to install Tesseract OCR:
+
+```bash
+# macOS
+brew install tesseract
+
+# Linux (Ubuntu/Debian)
+sudo apt-get install tesseract-ocr
+
+# Windows
+# Download from: https://github.com/UB-Mannheim/tesseract/wiki
+```
 
 ### 4. Configure Environment
 
@@ -77,9 +93,34 @@ python3 backend/upload_sounds.py --dry-run
 
 # Skip sounds that already exist
 python3 backend/upload_sounds.py --skip-existing
+
+# Match and upload images using OCR
+python3 backend/upload_sounds.py --match-images
+
+# Use custom image folder
+python3 backend/upload_sounds.py --match-images --images /path/to/images
 ```
 
-### 6. Verify Setup
+### 6. Match and Upload Images (Optional)
+
+If you have graphics/images for the sounds, you can use OCR to automatically match them:
+
+```bash
+# Match images to sounds and upload them
+python3 backend/upload_sounds.py --match-images
+```
+
+This will:
+1. Extract text from each image using OCR
+2. Match images to sound titles based on extracted text
+3. Upload matched images to Supabase Storage (`sound-images` bucket)
+4. Update the database with image URLs
+
+**Note**: You'll need to create the `sound-images` bucket in Supabase Storage (make it public).
+
+The script will show you which images matched and which didn't, so you can manually fix any mismatches.
+
+### 7. Verify Setup
 
 1. Visit your website and click "Sounds" in the sidebar menu
 2. You should see all uploaded sounds in a grid layout
