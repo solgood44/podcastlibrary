@@ -472,8 +472,37 @@ def main():
         action='store_true',
         help='Ensure all sounds have images by matching unmatched sounds with available images'
     )
+    parser.add_argument(
+        '--list-sounds',
+        action='store_true',
+        help='List all sound titles in the database (useful for checking what to rename images to)'
+    )
     
     args = parser.parse_args()
+    
+    # List sounds if requested
+    if args.list_sounds:
+        try:
+            console.print(f"\n[cyan]Fetching all sounds from database...[/cyan]")
+            sounds_result = sb.table('sounds').select('id,title,image_url').order('title').execute()
+            sounds_list = sounds_result.data
+            
+            if not sounds_list:
+                console.print(f"[yellow]No sounds found in database[/yellow]")
+            else:
+                console.print(f"\n[green]Found {len(sounds_list)} sounds:[/green]\n")
+                for sound in sounds_list:
+                    has_image = "✓" if sound.get('image_url') else "✗"
+                    console.print(f"  {has_image} {sound['title']}")
+                
+                sounds_without = [s for s in sounds_list if not s.get('image_url')]
+                if sounds_without:
+                    console.print(f"\n[yellow]{len(sounds_without)} sounds without images:[/yellow]")
+                    for sound in sounds_without:
+                        console.print(f"  - {sound['title']}")
+        except Exception as e:
+            console.print(f"[red]Error fetching sounds: {e}[/red]")
+        return
     
     folder_path = Path(args.folder)
     
