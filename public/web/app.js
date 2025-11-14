@@ -1399,49 +1399,32 @@ function playSound(soundId) {
 // Update sound player UI
 function updateSoundPlayerUI() {
     const soundPlayerBar = document.getElementById('sound-player-bar');
-    if (!soundPlayerBar || !currentSound) return;
+    if (!soundPlayerBar) return;
     
-    // Update title and image
-    const titleEl = document.getElementById('sound-player-title');
-    const imageEl = document.getElementById('sound-player-image');
-    const statusEl = document.getElementById('sound-player-status');
-    const playIconEl = document.getElementById('sound-play-icon');
-    const mobilePlayIconEl = document.getElementById('sound-player-mobile-play-icon');
-    
-    if (titleEl) titleEl.textContent = currentSound.title || 'Nature Sound';
-    if (imageEl) {
-        if (currentSound.image_url) {
-            imageEl.src = currentSound.image_url;
-            imageEl.style.display = '';
-        } else {
-            imageEl.style.display = 'none';
-        }
+    if (!currentSound) {
+        soundPlayerBar.classList.add('hidden');
+        document.body.classList.remove('sound-player-visible');
+        return;
     }
     
-    // Update play/pause/stop button - show stop icon when playing, play icon when stopped
+    // Update title
+    const titleEl = document.getElementById('sound-player-title');
+    const playIconEl = document.getElementById('sound-player-play-icon');
+    
+    if (titleEl) titleEl.textContent = currentSound.title || 'Nature Sound';
+    
+    // Update play/pause button - show pause icon when playing, play icon when paused
     // Check both Web Audio API and HTML5 audio
     const isPlaying = (soundAudioSource && soundAudioContext && soundAudioContext.state === 'running') || 
                       (soundAudioPlayer && !soundAudioPlayer.paused);
     if (playIconEl) {
-        // Show stop icon (⏹) when playing, play icon (▶) when stopped
-        playIconEl.textContent = isPlaying ? '⏹' : '▶';
-    }
-    if (mobilePlayIconEl) {
-        mobilePlayIconEl.textContent = isPlaying ? '⏹' : '▶';
-    }
-    
-    if (statusEl) {
-        statusEl.textContent = isPlaying ? 'Playing' : 'Stopped';
+        // Show pause icon (⏸) when playing, play icon (▶) when paused
+        playIconEl.textContent = isPlaying ? '⏸' : '▶';
     }
     
     // Update sound cards if on sounds page
     if (currentPage === 'sounds') {
         renderSounds();
-    }
-    
-    // Update sound detail page if open
-    if (currentPage === 'sound') {
-        updateSoundDetailPlayButton();
     }
 }
 
