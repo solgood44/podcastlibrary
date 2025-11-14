@@ -1253,6 +1253,8 @@ function playSound(soundId) {
         }
         // Enable cross-origin for CORS if needed
         soundAudioPlayer.crossOrigin = 'anonymous';
+        // Set loop attribute for seamless looping (works better on iOS)
+        soundAudioPlayer.loop = true;
         document.body.appendChild(soundAudioPlayer);
         
         // Handle audio interruptions (phone calls, lock screen, etc.)
@@ -1647,6 +1649,12 @@ async function loadSoundAudioBuffer(audioUrl) {
     }
 }
 
+// Detect iOS device
+function isIOSDevice() {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+           (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
 // Start seamless looping using Web Audio API
 async function startSeamlessLoop() {
     if (!currentSound || !soundAudioPlayer) return Promise.resolve();
@@ -1654,7 +1662,37 @@ async function startSeamlessLoop() {
     // Stop any existing Web Audio source
     stopSeamlessLoop();
     
-    // Try to use Web Audio API for seamless looping
+    // On iOS, prefer HTML5 audio for better background playback support
+    // Web Audio API has issues with background playback on iOS
+    if (isIOSDevice()) {
+        // Use HTML5 audio with loop attribute for iOS
+        if (soundAudioPlayer && soundAudioPlayer.paused) {
+            try {
+                // Set loop attribute for seamless looping
+                soundAudioPlayer.loop = true;
+                await soundAudioPlayer.play();
+                
+                // Set up loop check as backup (though loop=true should handle it)
+                soundLoopCheckFunction = () => {
+                    if (!soundAudioPlayer || !currentSound || soundAudioPlayer.paused) {
+                        return;
+                    }
+                    if (soundAudioPlayer.duration && 
+                        soundAudioPlayer.currentTime >= soundAudioPlayer.duration - 0.1) {
+                        soundAudioPlayer.currentTime = 0;
+                    }
+                };
+                soundAudioPlayer.addEventListener('timeupdate', soundLoopCheckFunction);
+                
+                return Promise.resolve();
+            } catch (err) {
+                console.log('Error playing HTML5 audio on iOS:', err);
+                // Fall through to Web Audio API attempt
+            }
+        }
+    }
+    
+    // Try to use Web Audio API for seamless looping (better for non-iOS)
     if (initSoundAudioContext()) {
         try {
             // Resume audio context if suspended (required on mobile)
@@ -1754,10 +1792,12 @@ async function startSeamlessLoop() {
         }
     }
     
-    // Fallback to HTML5 audio with timeupdate loop check
+    // Fallback to HTML5 audio with loop attribute
     // Start playing HTML5 audio if not already playing
     if (soundAudioPlayer && soundAudioPlayer.paused) {
         try {
+            // Ensure loop is set for seamless looping
+            soundAudioPlayer.loop = true;
             await soundAudioPlayer.play();
         } catch (err) {
             console.log('Error playing HTML5 audio fallback:', err);
@@ -1765,13 +1805,14 @@ async function startSeamlessLoop() {
         }
     }
     
-    // Set up loop check for HTML5 audio
+    // Set up loop check as backup (though loop=true should handle it)
     soundLoopCheckFunction = () => {
         if (!soundAudioPlayer || !currentSound || soundAudioPlayer.paused) {
             return;
         }
         
         // Check if we're very close to the end (within 0.1 seconds)
+        // This is a backup in case loop attribute doesn't work perfectly
         if (soundAudioPlayer.duration && 
             soundAudioPlayer.currentTime >= soundAudioPlayer.duration - 0.1) {
             soundAudioPlayer.currentTime = 0;
@@ -1828,12 +1869,17 @@ function updateMediaSessionMetadata() {
             ] : []
         });
         
+        // Set playback state for better background support
+        const isPlaying = (soundAudioSource && soundAudioContext && soundAudioContext.state === 'running') || 
+                          (soundAudioPlayer && !soundAudioPlayer.paused);
+        navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+        
         // Set action handlers
         navigator.mediaSession.setActionHandler('play', () => {
             if (currentSound) {
-                const isPlaying = (soundAudioSource && soundAudioContext && soundAudioContext.state === 'running') || 
-                                  (soundAudioPlayer && !soundAudioPlayer.paused);
-                if (!isPlaying) {
+                const isCurrentlyPlaying = (soundAudioSource && soundAudioContext && soundAudioContext.state === 'running') || 
+                                          (soundAudioPlayer && !soundAudioPlayer.paused);
+                if (!isCurrentlyPlaying) {
                     toggleSoundPlayPause();
                 }
             }
@@ -1841,9 +1887,9 @@ function updateMediaSessionMetadata() {
         
         navigator.mediaSession.setActionHandler('pause', () => {
             if (currentSound) {
-                const isPlaying = (soundAudioSource && soundAudioContext && soundAudioContext.state === 'running') || 
-                                  (soundAudioPlayer && !soundAudioPlayer.paused);
-                if (isPlaying) {
+                const isCurrentlyPlaying = (soundAudioSource && soundAudioContext && soundAudioContext.state === 'running') || 
+                                          (soundAudioPlayer && !soundAudioPlayer.paused);
+                if (isCurrentlyPlaying) {
                     toggleSoundPlayPause();
                 }
             }
