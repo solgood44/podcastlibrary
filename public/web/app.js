@@ -219,6 +219,8 @@ document.addEventListener('DOMContentLoaded', () => {
     audioPlayer = document.getElementById('audio-player');
     setupAudioPlayer();
     setupRouting();
+    // Initialize sleep timer UI to show sidebar timer
+    updateSleepTimerUI();
     setupAuth(); // Initialize authentication
     setupAudioPrefetching(); // Setup audio prefetching
     // Set initial search mode based on default page (grid = podcasts)
