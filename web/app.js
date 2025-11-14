@@ -32,6 +32,7 @@ let soundsSortMode = 'title-asc'; // 'title-asc', 'title-desc'
 let soundsViewMode = 'grid'; // 'grid' or 'list' for sounds page
 let currentSound = null; // The sound that is currently playing (if any)
 let soundAudioPlayer = null; // Separate audio player for sounds (for seamless looping)
+let soundLoopCheckFunction = null; // Stored reference to loop check function for removal
 let sleepTimerInterval = null; // Interval for sleep timer countdown
 let sleepTimerEndTime = null; // Timestamp when sleep timer will end
 let sleepTimerMinutes = 0; // Current sleep timer duration in minutes
@@ -1197,49 +1198,48 @@ function playSound(soundId) {
     // Create sound audio player if it doesn't exist
     if (!soundAudioPlayer) {
         soundAudioPlayer = document.createElement('audio');
-        soundAudioPlayer.loop = true; // Enable looping
+        soundAudioPlayer.preload = 'auto';
         document.body.appendChild(soundAudioPlayer);
-        
-        // Handle seamless looping - restart immediately when ended
-        soundAudioPlayer.addEventListener('ended', () => {
-            if (currentSound && soundAudioPlayer) {
-                soundAudioPlayer.currentTime = 0;
-                soundAudioPlayer.play().catch(err => {
-                    console.log('Error restarting sound:', err);
-                });
-            }
-        });
         
         // Update UI when sound starts playing
         soundAudioPlayer.addEventListener('play', () => {
             updateSoundPlayerUI();
-            updateSleepTimerUI(); // Update sidebar timer visibility
+            updateSleepTimerUI();
         });
         
         // Update UI when sound pauses
         soundAudioPlayer.addEventListener('pause', () => {
             updateSoundPlayerUI();
-            updateSleepTimerUI(); // Update sidebar timer visibility
+            updateSleepTimerUI();
         });
     }
     
     // If same sound is playing, toggle play/pause
     if (currentSound && currentSound.id === sound.id) {
-        if (soundAudioPlayer.paused) {
+        const isPlaying = !soundAudioPlayer.paused;
+        if (isPlaying) {
+            // Stop player
+            soundAudioPlayer.pause();
+            stopSeamlessLoop();
+        } else {
+            // Resume playing
             soundAudioPlayer.play().catch(err => {
                 console.log('Error playing sound:', err);
             });
-        } else {
-            soundAudioPlayer.pause();
+            startSeamlessLoop();
         }
         updateSoundPlayerUI();
         renderSounds(); // Update UI
         return;
     }
     
-    // New sound - set source and play
+    // New sound - set source and play with seamless looping
     currentSound = sound;
+    
+    // Set source
     soundAudioPlayer.src = sound.audio_url;
+    
+    // Load
     soundAudioPlayer.load();
     
     // Show sound player bar (unless on sound detail page)
@@ -1258,6 +1258,9 @@ function playSound(soundId) {
     if (currentPage === 'sound') {
         loadSoundDetailPage();
     }
+    
+    // Start seamless looping
+    startSeamlessLoop();
     
     // Try to play
     const playPromise = soundAudioPlayer.play();
@@ -1346,15 +1349,13 @@ function toggleSoundPlayPause() {
         return;
     }
     
-    if (soundAudioPlayer.paused) {
-        // If paused, play
-        soundAudioPlayer.play().catch(err => {
-            console.log('Error playing sound:', err);
-        });
-    } else {
+    const isPlaying = !soundAudioPlayer.paused;
+    
+    if (isPlaying) {
         // If playing, stop (pause and reset)
         soundAudioPlayer.pause();
         soundAudioPlayer.currentTime = 0;
+        stopSeamlessLoop();
         currentSound = null;
         
         // Hide sound player bar
@@ -1363,6 +1364,12 @@ function toggleSoundPlayPause() {
             soundPlayerBar.classList.add('hidden');
             document.body.classList.remove('sound-player-visible');
         }
+    } else {
+        // If paused, play
+        soundAudioPlayer.play().catch(err => {
+            console.log('Error playing sound:', err);
+        });
+        startSeamlessLoop();
     }
     
     updateSoundPlayerUI();
@@ -1453,13 +1460,49 @@ function goBackFromSound() {
     navigateTo('sounds');
 }
 
+// Start seamless looping using timeupdate to detect near-end
+function startSeamlessLoop() {
+    if (!soundAudioPlayer || !currentSound) return;
+    
+    // Clear any existing loop check
+    stopSeamlessLoop();
+    
+    // Create loop check function and store reference for removal
+    soundLoopCheckFunction = () => {
+        if (!soundAudioPlayer || !currentSound || soundAudioPlayer.paused) {
+            return;
+        }
+        
+        // Check if we're very close to the end (within 0.15 seconds)
+        // This ensures seamless restart without any gap
+        if (soundAudioPlayer.duration && 
+            soundAudioPlayer.currentTime >= soundAudioPlayer.duration - 0.15) {
+            // Seamlessly restart by resetting currentTime to 0
+            // This creates a seamless loop without any gap
+            soundAudioPlayer.currentTime = 0;
+        }
+    };
+    
+    // Listen to timeupdate for seamless looping
+    soundAudioPlayer.addEventListener('timeupdate', soundLoopCheckFunction);
+}
+
+// Stop seamless looping
+function stopSeamlessLoop() {
+    if (soundAudioPlayer && soundLoopCheckFunction) {
+        soundAudioPlayer.removeEventListener('timeupdate', soundLoopCheckFunction);
+        soundLoopCheckFunction = null;
+    }
+}
+
 // Stop sound
 function stopSound() {
     if (soundAudioPlayer) {
         soundAudioPlayer.pause();
         soundAudioPlayer.currentTime = 0;
-        currentSound = null;
     }
+    stopSeamlessLoop();
+    currentSound = null;
     
     // Hide sound player bar
     const soundPlayerBar = document.getElementById('sound-player-bar');
@@ -1512,14 +1555,18 @@ function closeSleepTimerMenu() {
 
 function toggleSidebarSleepTimerMenu() {
     const sidebarMenu = document.getElementById('sidebar-sleep-timer-menu');
-    if (sidebarMenu) {
-        sidebarMenu.classList.toggle('hidden');
-    }
-    // Close other menus
+    if (!sidebarMenu) return;
+    
+    const isCurrentlyHidden = sidebarMenu.classList.contains('hidden');
+    
+    // Close other menus first
     closeSleepTimerMenu();
-    if (sidebarMenu && !sidebarMenu.classList.contains('hidden')) {
-        // Keep sidebar menu open if it was just opened
+    
+    // Then toggle sidebar menu
+    if (isCurrentlyHidden) {
         sidebarMenu.classList.remove('hidden');
+    } else {
+        sidebarMenu.classList.add('hidden');
     }
 }
 
@@ -1527,6 +1574,22 @@ function closeSidebarSleepTimerMenu() {
     const sidebarMenu = document.getElementById('sidebar-sleep-timer-menu');
     if (sidebarMenu) {
         sidebarMenu.classList.add('hidden');
+    }
+}
+
+// Show sleep timer help modal
+function showSleepTimerHelp() {
+    const modal = document.getElementById('sleep-timer-help-modal');
+    if (modal) {
+        modal.classList.remove('hidden');
+    }
+}
+
+// Close sleep timer help modal
+function closeSleepTimerHelp() {
+    const modal = document.getElementById('sleep-timer-help-modal');
+    if (modal) {
+        modal.classList.add('hidden');
     }
 }
 
@@ -1657,21 +1720,11 @@ function updateSleepTimerCountdown() {
 
 function updateSleepTimerUI() {
     const hasTimer = sleepTimerEndTime !== null;
-    const isPlaying = (audioPlayer && currentEpisode && !audioPlayer.paused) || 
-                      (soundAudioPlayer && currentSound && !soundAudioPlayer.paused);
     
-    // Show sidebar timer on mobile always, or on desktop when media is playing
+    // Always show sidebar timer (it should always be accessible)
     const sidebarTimerSection = document.getElementById('sidebar-sleep-timer');
     if (sidebarTimerSection) {
-        // On mobile, always show (CSS will handle it)
-        // On desktop, show when media is playing
-        if (isMobileScreen()) {
-            sidebarTimerSection.classList.remove('hidden');
-        } else if (isPlaying) {
-            sidebarTimerSection.classList.remove('hidden');
-        } else {
-            sidebarTimerSection.classList.add('hidden');
-        }
+        sidebarTimerSection.classList.remove('hidden');
     }
     
     // Episode player UI

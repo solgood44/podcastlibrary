@@ -63,7 +63,10 @@
                 <div id="sidebar-sleep-timer-menu" class="sidebar-sleep-timer-menu hidden">
                     <div class="sleep-timer-header">
                         <span>Sleep Timer</span>
-                        <button class="btn-close-timer" onclick="closeSidebarSleepTimerMenu()">✕</button>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <button class="btn-help-timer" onclick="showSleepTimerHelp()" title="How it works">?</button>
+                            <button class="btn-close-timer" onclick="closeSidebarSleepTimerMenu()">✕</button>
+                        </div>
                     </div>
                     <div id="sidebar-sleep-timer-display" class="sleep-timer-display hidden">
                         <div class="sleep-timer-time">
