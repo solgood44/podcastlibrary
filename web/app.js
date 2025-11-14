@@ -1233,11 +1233,13 @@ function playSound(soundId) {
         // Update UI when sound starts playing
         soundAudioPlayer.addEventListener('play', () => {
             updateSoundPlayerUI();
+            updateSleepTimerUI(); // Update sidebar timer visibility
         });
         
         // Update UI when sound pauses
         soundAudioPlayer.addEventListener('pause', () => {
             updateSoundPlayerUI();
+            updateSleepTimerUI(); // Update sidebar timer visibility
         });
     }
     
@@ -1284,10 +1286,12 @@ function playSound(soundId) {
             .then(() => {
                 updateSoundPlayerUI();
                 renderSounds(); // Update UI to show playing state
+                updateSleepTimerUI(); // Update sidebar timer visibility
             })
             .catch(error => {
                 console.log('Error playing sound:', error);
                 updateSoundPlayerUI();
+                updateSleepTimerUI(); // Update sidebar timer visibility
             });
     }
     
@@ -1365,6 +1369,7 @@ function toggleSoundPlayPause() {
     
     updateSoundPlayerUI();
     updateSoundDetailPlayButton();
+    updateSleepTimerUI(); // Update sidebar timer visibility
 }
 
 // Open sound detail page
@@ -1498,9 +1503,31 @@ function toggleSleepTimerMenu() {
 function closeSleepTimerMenu() {
     const episodeMenu = document.getElementById('sleep-timer-menu');
     const soundMenu = document.getElementById('sound-sleep-timer-menu');
+    const sidebarMenu = document.getElementById('sidebar-sleep-timer-menu');
     
     if (episodeMenu) episodeMenu.classList.add('hidden');
     if (soundMenu) soundMenu.classList.add('hidden');
+    if (sidebarMenu) sidebarMenu.classList.add('hidden');
+}
+
+function toggleSidebarSleepTimerMenu() {
+    const sidebarMenu = document.getElementById('sidebar-sleep-timer-menu');
+    if (sidebarMenu) {
+        sidebarMenu.classList.toggle('hidden');
+    }
+    // Close other menus
+    closeSleepTimerMenu();
+    if (sidebarMenu && !sidebarMenu.classList.contains('hidden')) {
+        // Keep sidebar menu open if it was just opened
+        sidebarMenu.classList.remove('hidden');
+    }
+}
+
+function closeSidebarSleepTimerMenu() {
+    const sidebarMenu = document.getElementById('sidebar-sleep-timer-menu');
+    if (sidebarMenu) {
+        sidebarMenu.classList.add('hidden');
+    }
 }
 
 function setSleepTimer(minutes) {
@@ -1605,35 +1632,47 @@ function updateSleepTimerCountdown() {
     
     const timeString = `${minutes}:${seconds.toString().padStart(2, '0')}`;
     
-    // Update both countdown displays
+    // Update all countdown displays
     const episodeCountdown = document.getElementById('sleep-timer-countdown');
     const soundCountdown = document.getElementById('sound-sleep-timer-countdown');
+    const sidebarCountdown = document.getElementById('sidebar-sleep-timer-countdown');
     
     if (episodeCountdown) episodeCountdown.textContent = timeString;
     if (soundCountdown) soundCountdown.textContent = timeString;
+    if (sidebarCountdown) sidebarCountdown.textContent = timeString;
     
     // Update button text with minutes and seconds
     const episodeText = document.getElementById('sleep-timer-text');
     const soundText = document.getElementById('sound-sleep-timer-text');
+    const sidebarText = document.getElementById('sidebar-sleep-timer-text');
     
-    if (episodeText) {
-        if (minutes > 0) {
-            episodeText.textContent = seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
-        } else {
-            episodeText.textContent = seconds > 0 ? `${seconds}s` : 'Timer';
-        }
-    }
-    if (soundText) {
-        if (minutes > 0) {
-            soundText.textContent = seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
-        } else {
-            soundText.textContent = seconds > 0 ? `${seconds}s` : 'Timer';
-        }
-    }
+    const timerText = minutes > 0 
+        ? (seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`)
+        : (seconds > 0 ? `${seconds}s` : 'Timer');
+    
+    if (episodeText) episodeText.textContent = timerText;
+    if (soundText) soundText.textContent = timerText;
+    if (sidebarText) sidebarText.textContent = timerText;
 }
 
 function updateSleepTimerUI() {
     const hasTimer = sleepTimerEndTime !== null;
+    const isPlaying = (audioPlayer && currentEpisode && !audioPlayer.paused) || 
+                      (soundAudioPlayer && currentSound && !soundAudioPlayer.paused);
+    
+    // Show sidebar timer on mobile always, or on desktop when media is playing
+    const sidebarTimerSection = document.getElementById('sidebar-sleep-timer');
+    if (sidebarTimerSection) {
+        // On mobile, always show (CSS will handle it)
+        // On desktop, show when media is playing
+        if (isMobileScreen()) {
+            sidebarTimerSection.classList.remove('hidden');
+        } else if (isPlaying) {
+            sidebarTimerSection.classList.remove('hidden');
+        } else {
+            sidebarTimerSection.classList.add('hidden');
+        }
+    }
     
     // Episode player UI
     const episodeDisplay = document.getElementById('sleep-timer-display');
@@ -1665,6 +1704,17 @@ function updateSleepTimerUI() {
         soundIcon.style.opacity = hasTimer ? '1' : '0.6';
     }
     
+    // Sidebar timer UI
+    const sidebarDisplay = document.getElementById('sidebar-sleep-timer-display');
+    const sidebarPresets = document.getElementById('sidebar-sleep-timer-presets');
+    
+    if (sidebarDisplay) {
+        sidebarDisplay.classList.toggle('hidden', !hasTimer);
+    }
+    if (sidebarPresets) {
+        sidebarPresets.classList.toggle('hidden', hasTimer);
+    }
+    
     // Update countdown if timer is active (this will also update button text)
     if (hasTimer) {
         updateSleepTimerCountdown();
@@ -1672,8 +1722,10 @@ function updateSleepTimerUI() {
         // Reset button text when no timer
         const episodeText = document.getElementById('sleep-timer-text');
         const soundText = document.getElementById('sound-sleep-timer-text');
+        const sidebarText = document.getElementById('sidebar-sleep-timer-text');
         if (episodeText) episodeText.textContent = 'Timer';
         if (soundText) soundText.textContent = 'Timer';
+        if (sidebarText) sidebarText.textContent = 'Timer';
     }
 }
 
@@ -3862,6 +3914,7 @@ function playEpisode(episode) {
     
     // Update player UI immediately for better UX
     updatePlayerBar();
+    updateSleepTimerUI(); // Update sidebar timer visibility
     
     // Show player bar
     const playerBar = document.getElementById('player-bar');
@@ -3903,12 +3956,14 @@ function playEpisode(episode) {
                     .then(() => {
                         isPlaying = true;
                         updatePlayPauseButton();
+                        updateSleepTimerUI(); // Update sidebar timer visibility
                     })
                     .catch(error => {
                         // Autoplay was prevented - this is fine, user will click play
                         console.log('Autoplay prevented:', error);
                         isPlaying = false;
                         updatePlayPauseButton();
+                        updateSleepTimerUI(); // Update sidebar timer visibility
                     });
             } else {
                 isPlaying = true;
@@ -4063,6 +4118,7 @@ function togglePlayPause() {
         isPlaying = true;
     }
     updatePlayPauseButton();
+    updateSleepTimerUI(); // Update sidebar timer visibility
 }
 
 // Helper function to play episode by ID (used by onclick handlers)
@@ -4311,11 +4367,13 @@ function setupAudioPlayer() {
     audioPlayer.addEventListener('play', () => {
         isPlaying = true;
         updatePlayPauseButton();
+        updateSleepTimerUI(); // Update sidebar timer visibility
     });
     
     audioPlayer.addEventListener('pause', () => {
         isPlaying = false;
         updatePlayPauseButton();
+        updateSleepTimerUI(); // Update sidebar timer visibility
     });
     
     audioPlayer.addEventListener('loadedmetadata', () => {

@@ -340,6 +340,56 @@ body {
     padding: 20px 0;
 }
 
+/* Sidebar Sleep Timer */
+.sidebar-sleep-timer-section {
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+}
+
+.sidebar-sleep-timer-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: background 0.2s;
+}
+
+.sidebar-sleep-timer-header:hover {
+    background: var(--bg-hover);
+}
+
+.sidebar-sleep-timer-status {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.sidebar-sleep-timer-menu {
+    padding: 12px;
+    margin-top: 8px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.sidebar-sleep-timer-menu .sleep-timer-presets {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+}
+
+.sidebar-sleep-timer-menu .btn-timer-preset {
+    padding: 8px 10px;
+    font-size: 12px;
+}
+
+.sidebar-sleep-timer-menu .btn-timer-preset.btn-add-minutes {
+    grid-column: span 2;
+}
+
 .sidebar-item {
     display: flex;
     align-items: center;
@@ -3269,6 +3319,17 @@ body {
     
     .btn-timer-preset.btn-add-minutes {
         grid-column: span 2;
+    }
+    
+    /* Hide player bar timer on mobile, show sidebar timer instead */
+    .player-bar-right,
+    .sound-player-right {
+        display: none !important;
+    }
+    
+    /* Always show sidebar timer on mobile */
+    .sidebar-sleep-timer-section {
+        display: block !important;
     }
 }
 

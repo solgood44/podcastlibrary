@@ -53,6 +53,36 @@
         </div>
         
         <div class="sidebar-section">
+            <!-- Sleep Timer (visible on mobile, hidden on desktop when player bar is visible) -->
+            <div id="sidebar-sleep-timer" class="sidebar-sleep-timer-section hidden">
+                <div class="sidebar-sleep-timer-header" onclick="toggleSidebarSleepTimerMenu()">
+                    <span class="sidebar-item-icon">⏰</span>
+                    <span class="sidebar-item-title">Sleep Timer</span>
+                    <span id="sidebar-sleep-timer-text" class="sidebar-sleep-timer-status">Timer</span>
+                </div>
+                <div id="sidebar-sleep-timer-menu" class="sidebar-sleep-timer-menu hidden">
+                    <div class="sleep-timer-header">
+                        <span>Sleep Timer</span>
+                        <button class="btn-close-timer" onclick="closeSidebarSleepTimerMenu()">✕</button>
+                    </div>
+                    <div id="sidebar-sleep-timer-display" class="sleep-timer-display hidden">
+                        <div class="sleep-timer-time">
+                            <span id="sidebar-sleep-timer-countdown">0:00</span>
+                            <span class="sleep-timer-label">remaining</span>
+                        </div>
+                        <button class="btn-cancel-timer" onclick="cancelSleepTimer()">Cancel</button>
+                    </div>
+                    <div id="sidebar-sleep-timer-presets" class="sleep-timer-presets">
+                        <button class="btn-timer-preset" onclick="setSleepTimer(5)">5 min</button>
+                        <button class="btn-timer-preset" onclick="setSleepTimer(10)">10 min</button>
+                        <button class="btn-timer-preset" onclick="setSleepTimer(15)">15 min</button>
+                        <button class="btn-timer-preset" onclick="setSleepTimer(30)">30 min</button>
+                        <button class="btn-timer-preset" onclick="setSleepTimer(60)">1 hr</button>
+                        <button class="btn-timer-preset btn-add-minutes" onclick="addSleepTimerMinutes(5)" title="Add 5 minutes">+5 min</button>
+                    </div>
+                </div>
+            </div>
+            
             <div class="sidebar-item" onclick="navigateTo('grid')">
                 <span class="sidebar-item-icon">🔍</span>
                 <span class="sidebar-item-title">Search</span>
