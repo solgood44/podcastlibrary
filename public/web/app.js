@@ -1096,73 +1096,46 @@ function getSoundGradient(index, title) {
     return ['#30cfd0', '#330867']; // Cyan-Purple
 }
 
-// Render sounds grid or list
+// Render sounds list (grid mode removed)
 function renderSounds() {
     const sortedSounds = sortSounds(sounds);
-    const gridEl = document.getElementById('sounds-grid');
     const listEl = document.getElementById('sounds-list');
+    const gridEl = document.getElementById('sounds-grid');
     
-    if (!gridEl || !listEl) {
-        console.error('sounds-grid or sounds-list element not found');
+    if (!listEl) {
+        console.error('sounds-list element not found');
         return;
     }
     
-    // Render based on view mode
-    if (soundsViewMode === 'grid') {
-        gridEl.classList.remove('hidden');
-        listEl.classList.add('hidden');
+    // Hide grid, show list
+    if (gridEl) gridEl.classList.add('hidden');
+    listEl.classList.remove('hidden');
+    
+    listEl.innerHTML = sortedSounds.map((sound, index) => {
+        const soundIsPlaying = currentSound && currentSound.id === sound.id && 
+                               ((soundAudioSource && soundAudioContext && soundAudioContext.state === 'running') || 
+                                (soundAudioPlayer && !soundAudioPlayer.paused));
+        const [color1, color2] = getSoundGradient(index, sound.title);
+        const emoji = getSoundEmoji(sound.title);
         
-        gridEl.innerHTML = sortedSounds.map((sound, index) => {
-            const soundIsPlaying = currentSound && currentSound.id === sound.id && 
-                                   ((soundAudioSource && soundAudioContext && soundAudioContext.state === 'running') || 
-                                    (soundAudioPlayer && !soundAudioPlayer.paused));
-            const [color1, color2] = getSoundGradient(index, sound.title);
-            const emoji = getSoundEmoji(sound.title);
-            
-            return `
-            <div class="sound-card sound-card-gradient">
-                <div class="sound-card-content" onclick="playSound('${sound.id}')" style="background: linear-gradient(135deg, ${color1} 0%, ${color2} 100%);">
-                    <div class="sound-card-emoji">${emoji}</div>
-                    <div class="sound-card-title-wrapper">
-                        <div class="sound-card-title">${escapeHtml(sound.title || 'Untitled Sound')}</div>
-                        <div class="sound-card-play-icon ${soundIsPlaying ? 'playing' : ''}">
-                            ${soundIsPlaying ? '⏸' : '▶'}
-                        </div>
+        return `
+        <div class="podcast-list-item">
+            <div class="podcast-list-item-content" onclick="playSound('${sound.id}')">
+                <div class="podcast-list-image">
+                    <div class="sound-list-gradient" style="background: linear-gradient(135deg, ${color1} 0%, ${color2} 100%);">
+                        <span class="sound-list-gradient-icon">${emoji}</span>
                     </div>
+                </div>
+                <div class="podcast-list-info">
+                    <div class="podcast-list-title">${escapeHtml(sound.title || 'Untitled Sound')}</div>
                 </div>
             </div>
-        `;
-        }).join('');
-    } else {
-        listEl.classList.remove('hidden');
-        gridEl.classList.add('hidden');
-        
-        listEl.innerHTML = sortedSounds.map((sound, index) => {
-            const soundIsPlaying = currentSound && currentSound.id === sound.id && 
-                                   ((soundAudioSource && soundAudioContext && soundAudioContext.state === 'running') || 
-                                    (soundAudioPlayer && !soundAudioPlayer.paused));
-            const [color1, color2] = getSoundGradient(index, sound.title);
-            const emoji = getSoundEmoji(sound.title);
-            
-            return `
-            <div class="podcast-list-item">
-                <div class="podcast-list-item-content" onclick="playSound('${sound.id}')">
-                    <div class="podcast-list-image">
-                        <div class="sound-list-gradient" style="background: linear-gradient(135deg, ${color1} 0%, ${color2} 100%);">
-                            <span class="sound-list-gradient-icon">${emoji}</span>
-                        </div>
-                    </div>
-                    <div class="podcast-list-info">
-                        <div class="podcast-list-title">${escapeHtml(sound.title || 'Untitled Sound')}</div>
-                    </div>
-                </div>
-                <div class="sound-list-play-button ${soundIsPlaying ? 'playing' : ''}">
-                    ${soundIsPlaying ? '⏸' : '▶'}
-                </div>
+            <div class="sound-list-play-button ${soundIsPlaying ? 'playing' : ''}">
+                ${soundIsPlaying ? '⏸' : '▶'}
             </div>
-        `;
-        }).join('');
-    }
+        </div>
+    `;
+    }).join('');
 }
 
 // Sort sounds
