@@ -370,8 +370,17 @@ def match_images_to_sounds(image_folders, sound_titles: List[str]) -> Dict[str, 
 def upload_image_to_storage(image_path: str, sound_title: str) -> Optional[str]:
     """Upload image to Supabase Storage."""
     try:
+        # Check if file exists
+        if not Path(image_path).exists():
+            console.print(f"[red]Image file not found: {image_path}[/red]")
+            return None
+        
         with open(image_path, 'rb') as f:
             image_data = f.read()
+        
+        if len(image_data) == 0:
+            console.print(f"[red]Image file is empty: {image_path}[/red]")
+            return None
         
         # Generate safe filename
         safe_name = sanitize_filename(sound_title)
@@ -387,12 +396,20 @@ def upload_image_to_storage(image_path: str, sound_title: str) -> Optional[str]:
             }
         )
         
+        # Verify upload was successful
+        if not file_response:
+            console.print(f"[red]Upload returned no response for {filename}[/red]")
+            return None
+        
         # Get public URL
         public_url = f"{SUPABASE_URL}/storage/v1/object/public/{IMAGE_BUCKET}/{filename}"
+        console.print(f"[dim]Uploaded to: {public_url}[/dim]")
         return public_url
         
     except Exception as e:
         console.print(f"[red]Error uploading image {image_path}: {e}[/red]")
+        import traceback
+        console.print(f"[dim]{traceback.format_exc()}[/dim]")
         return None
 
 
@@ -650,6 +667,24 @@ def main():
     # Ensure all sounds have images
     if args.ensure_all_images and not args.dry_run:
         console.print(f"\n[cyan]Ensuring all sounds have images...[/cyan]")
+        
+        # Check if image bucket exists
+        try:
+            buckets = sb.storage.list_buckets()
+            bucket_names = [b.name for b in buckets]
+            if IMAGE_BUCKET not in bucket_names:
+                console.print(f"[red]❌ Image bucket '{IMAGE_BUCKET}' not found![/red]")
+                console.print(f"[yellow]Please create the '{IMAGE_BUCKET}' bucket in Supabase Storage:[/yellow]")
+                console.print(f"[yellow]1. Go to Supabase Dashboard > Storage[/yellow]")
+                console.print(f"[yellow]2. Click 'New bucket'[/yellow]")
+                console.print(f"[yellow]3. Name it '{IMAGE_BUCKET}'[/yellow]")
+                console.print(f"[yellow]4. Make it public[/yellow]")
+                console.print(f"[yellow]5. Run this command again[/yellow]")
+                return
+            else:
+                console.print(f"[green]✓ Image bucket '{IMAGE_BUCKET}' exists[/green]")
+        except Exception as e:
+            console.print(f"[yellow]Warning: Could not verify image bucket: {e}[/yellow]")
         
         try:
             # Get all sounds without images
