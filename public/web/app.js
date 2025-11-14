@@ -1220,6 +1220,7 @@ function playSound(soundId) {
             // Don't update UI if pause was due to interruption - we'll resume automatically
             if (currentSound && !soundAudioPlayer.ended) {
                 // Try to resume after a short delay (handles interruptions)
+                // This is important for background playback when phone locks
                 setTimeout(() => {
                     if (currentSound && soundAudioPlayer.paused && !soundAudioPlayer.ended) {
                         // Only resume if we're using HTML5 audio (not Web Audio API)
@@ -1229,10 +1230,21 @@ function playSound(soundId) {
                             });
                         }
                     }
-                }, 100);
+                }, 200);
             }
             updateSoundPlayerUI();
             updateSleepTimerUI();
+        });
+        
+        // Handle when audio ends (shouldn't happen with looping, but just in case)
+        soundAudioPlayer.addEventListener('ended', () => {
+            if (currentSound && !soundAudioPlayer.ended) {
+                // Restart if it somehow ended
+                soundAudioPlayer.currentTime = 0;
+                soundAudioPlayer.play().catch(err => {
+                    console.log('Error restarting after end:', err);
+                });
+            }
         });
         
         // Update UI when sound starts playing
@@ -1657,6 +1669,7 @@ async function startSeamlessLoop() {
                 
                 // Keep audio context alive for background playback
                 // Periodically resume if it gets suspended (handles phone sleep/lock)
+                // Check more frequently to catch suspensions quickly
                 const keepAliveInterval = setInterval(() => {
                     if (soundAudioContext && currentSound) {
                         if (soundAudioContext.state === 'suspended' || soundAudioContext.state === 'interrupted') {
@@ -1672,9 +1685,27 @@ async function startSeamlessLoop() {
                     } else {
                         clearInterval(keepAliveInterval);
                     }
-                }, 5000); // Check every 5 seconds
+                }, 1000); // Check every 1 second for faster response
                 
                 soundAudioSource._keepAliveInterval = keepAliveInterval;
+                
+                // Also set up a more aggressive resume on page visibility changes
+                const handleVisibilityChange = () => {
+                    if (soundAudioContext && currentSound) {
+                        if (soundAudioContext.state === 'suspended' || soundAudioContext.state === 'interrupted') {
+                            soundAudioContext.resume().then(() => {
+                                if (!soundAudioSource || !soundAudioSource.buffer) {
+                                    startSeamlessLoop();
+                                }
+                            }).catch(err => {
+                                console.log('Error resuming on visibility change:', err);
+                            });
+                        }
+                    }
+                };
+                
+                document.addEventListener('visibilitychange', handleVisibilityChange);
+                soundAudioSource._visibilityHandler = handleVisibilityChange;
                 
                 return Promise.resolve(); // Successfully using Web Audio API
             }
@@ -1724,6 +1755,9 @@ function stopSeamlessLoop() {
             }
             if (soundAudioSource._keepAliveInterval) {
                 clearInterval(soundAudioSource._keepAliveInterval);
+            }
+            if (soundAudioSource._visibilityHandler) {
+                document.removeEventListener('visibilitychange', soundAudioSource._visibilityHandler);
             }
             soundAudioSource.stop();
             soundAudioSource.disconnect();
