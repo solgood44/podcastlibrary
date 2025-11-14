@@ -810,6 +810,124 @@ body {
     background: rgba(0, 150, 255, 0.8);
 }
 
+/* Title-only sound cards (grid mode) */
+.sound-card-title-only {
+    background: var(--bg-card);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+    overflow: hidden;
+}
+
+.sound-card-title-only:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px var(--shadow-lg);
+    background: var(--bg-hover);
+}
+
+.sound-card-content {
+    cursor: pointer;
+    padding: 16px 20px;
+}
+
+.sound-card-title-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.sound-card-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.4;
+    flex: 1;
+    min-width: 0;
+}
+
+.sound-card-play-icon {
+    font-size: 18px;
+    color: var(--text-secondary);
+    transition: color 0.2s, transform 0.2s;
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--bg-tertiary);
+}
+
+.sound-card-title-only:hover .sound-card-play-icon {
+    color: var(--accent);
+    background: rgba(29, 185, 84, 0.1);
+    transform: scale(1.1);
+}
+
+.sound-card-play-icon.playing {
+    color: var(--accent);
+    background: rgba(29, 185, 84, 0.15);
+}
+
+/* Title-only sound list items */
+.sound-list-item {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.2s;
+}
+
+.sound-list-item:last-child {
+    border-bottom: none;
+}
+
+.sound-list-item:hover {
+    background: var(--bg-hover);
+}
+
+.sound-list-item-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    gap: 16px;
+    cursor: pointer;
+}
+
+.sound-list-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.4;
+    flex: 1;
+    min-width: 0;
+}
+
+.sound-list-play-icon {
+    font-size: 18px;
+    color: var(--text-secondary);
+    transition: color 0.2s, transform 0.2s;
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--bg-tertiary);
+}
+
+.sound-list-item:hover .sound-list-play-icon {
+    color: var(--accent);
+    background: rgba(29, 185, 84, 0.1);
+    transform: scale(1.1);
+}
+
+.sound-list-play-icon.playing {
+    color: var(--accent);
+    background: rgba(29, 185, 84, 0.15);
+}
+
 .sound-category {
     display: inline-block;
     padding: 2px 8px;

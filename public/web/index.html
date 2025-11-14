@@ -258,11 +258,16 @@
                     </div>
                 </div>
                 <div class="controls-right">
+                    <div class="view-toggle">
+                        <button id="sounds-view-grid" class="view-toggle-btn active" onclick="setSoundsViewMode('grid')" title="Grid view">⊞</button>
+                        <button id="sounds-view-list" class="view-toggle-btn" onclick="setSoundsViewMode('list')" title="List view">☰</button>
+                    </div>
                     <div id="sounds-count" class="podcast-count"></div>
                 </div>
             </div>
             <div id="sounds-container">
                 <div id="sounds-grid" class="podcast-grid"></div>
+                <div id="sounds-list" class="podcast-list hidden"></div>
             </div>
         </div>
 

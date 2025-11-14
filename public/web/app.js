@@ -29,6 +29,7 @@ let isSyncing = false; // Track if sync is in progress
 let syncEnabled = false; // Track if user has enabled sync
 let sounds = []; // All nature sounds
 let soundsSortMode = 'title-asc'; // 'title-asc', 'title-desc'
+let soundsViewMode = 'grid'; // 'grid' or 'list' for sounds page
 let currentSound = null; // The sound that is currently playing (if any)
 let soundAudioPlayer = null; // Separate audio player for sounds (for seamless looping)
 
@@ -990,38 +991,57 @@ async function loadSoundsPage() {
     }
 }
 
-// Render sounds grid
+// Render sounds grid or list
 function renderSounds() {
     const sortedSounds = sortSounds(sounds);
     const gridEl = document.getElementById('sounds-grid');
+    const listEl = document.getElementById('sounds-list');
     
-    if (!gridEl) {
-        console.error('sounds-grid element not found');
+    if (!gridEl || !listEl) {
+        console.error('sounds-grid or sounds-list element not found');
         return;
     }
     
-    gridEl.innerHTML = sortedSounds.map(sound => {
-        const soundIsPlaying = currentSound && currentSound.id === sound.id && soundAudioPlayer && !soundAudioPlayer.paused;
+    // Render based on view mode
+    if (soundsViewMode === 'grid') {
+        gridEl.classList.remove('hidden');
+        listEl.classList.add('hidden');
         
-        return `
-        <div class="podcast-card sound-card">
-            <div class="podcast-card-content" onclick="openSoundDetail('${sound.id}')">
-                <img 
-                    src="${sound.image_url || getPlaceholderImage()}" 
-                    alt="${escapeHtml(sound.title || 'Sound')}"
-                    class="podcast-image"
-                    onerror="this.src='${getPlaceholderImage()}'"
-                >
-                <div class="podcast-info">
-                    <div class="podcast-title">${escapeHtml(sound.title || 'Untitled Sound')}</div>
-                </div>
-                <div class="sound-play-overlay ${soundIsPlaying ? 'playing' : ''}">
-                    ${soundIsPlaying ? '⏸' : '▶'}
+        gridEl.innerHTML = sortedSounds.map(sound => {
+            const soundIsPlaying = currentSound && currentSound.id === sound.id && soundAudioPlayer && !soundAudioPlayer.paused;
+            
+            return `
+            <div class="sound-card sound-card-title-only">
+                <div class="sound-card-content" onclick="playSound('${sound.id}')">
+                    <div class="sound-card-title-wrapper">
+                        <div class="sound-card-title">${escapeHtml(sound.title || 'Untitled Sound')}</div>
+                        <div class="sound-card-play-icon ${soundIsPlaying ? 'playing' : ''}">
+                            ${soundIsPlaying ? '⏸' : '▶'}
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
-    `;
-    }).join('');
+        `;
+        }).join('');
+    } else {
+        listEl.classList.remove('hidden');
+        gridEl.classList.add('hidden');
+        
+        listEl.innerHTML = sortedSounds.map(sound => {
+            const soundIsPlaying = currentSound && currentSound.id === sound.id && soundAudioPlayer && !soundAudioPlayer.paused;
+            
+            return `
+            <div class="sound-list-item">
+                <div class="sound-list-item-content" onclick="playSound('${sound.id}')">
+                    <div class="sound-list-title">${escapeHtml(sound.title || 'Untitled Sound')}</div>
+                    <div class="sound-list-play-icon ${soundIsPlaying ? 'playing' : ''}">
+                        ${soundIsPlaying ? '⏸' : '▶'}
+                    </div>
+                </div>
+            </div>
+        `;
+        }).join('');
+    }
 }
 
 // Sort sounds
@@ -1049,6 +1069,29 @@ function applySoundsSorting() {
         soundsSortMode = sortSelect.value;
         renderSounds();
     }
+}
+
+// Set sounds view mode (grid or list)
+function setSoundsViewMode(mode) {
+    soundsViewMode = mode;
+    const gridBtn = document.getElementById('sounds-view-grid');
+    const listBtn = document.getElementById('sounds-view-list');
+    const gridEl = document.getElementById('sounds-grid');
+    const listEl = document.getElementById('sounds-list');
+    
+    if (mode === 'grid') {
+        gridBtn.classList.add('active');
+        listBtn.classList.remove('active');
+        gridEl.classList.remove('hidden');
+        listEl.classList.add('hidden');
+    } else {
+        listBtn.classList.add('active');
+        gridBtn.classList.remove('active');
+        gridEl.classList.add('hidden');
+        listEl.classList.remove('hidden');
+    }
+    
+    renderSounds();
 }
 
 // Play sound with seamless looping
@@ -1081,7 +1124,7 @@ function playSound(soundId) {
         
         // Handle seamless looping - restart immediately when ended
         soundAudioPlayer.addEventListener('ended', () => {
-            if (currentSound && currentSound.id === sound.id) {
+            if (currentSound && soundAudioPlayer) {
                 soundAudioPlayer.currentTime = 0;
                 soundAudioPlayer.play().catch(err => {
                     console.log('Error restarting sound:', err);
@@ -1186,11 +1229,12 @@ function updateSoundPlayerUI() {
     if (playIconEl) {
         playIconEl.textContent = isPlaying ? '⏸' : '▶';
     }
+    
     if (statusEl) {
         statusEl.textContent = isPlaying ? 'Playing' : 'Paused';
     }
     
-    // Update sound cards on sounds page
+    // Update sound cards if on sounds page
     if (currentPage === 'sounds') {
         renderSounds();
     }
