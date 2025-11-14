@@ -3278,6 +3278,31 @@ body {
     color: var(--text-primary);
 }
 
+.btn-help-timer {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    line-height: 1;
+    transition: all 0.2s;
+}
+
+.btn-help-timer:hover {
+    background: var(--bg-hover);
+    border-color: var(--accent);
+    color: var(--accent);
+    transform: scale(1.1);
+}
+
 .sleep-timer-display {
     margin-bottom: 12px;
     padding: 12px;
