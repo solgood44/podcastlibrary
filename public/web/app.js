@@ -1503,8 +1503,10 @@ function loadSoundDetailPage() {
 // Update play button on sound detail page
 function updateSoundDetailPlayButton() {
     const playIconEl = document.getElementById('sound-detail-play-icon');
-    if (playIconEl && soundAudioPlayer && currentSound) {
-        const isPlaying = !soundAudioPlayer.paused;
+    if (playIconEl && currentSound) {
+        // Check both Web Audio API and HTML5 audio
+        const isPlaying = (soundAudioSource && soundAudioContext && soundAudioContext.state === 'running') || 
+                          (soundAudioPlayer && !soundAudioPlayer.paused);
         // Show stop icon (⏹) when playing, play icon (▶) when stopped
         playIconEl.textContent = isPlaying ? '⏹' : '▶';
     }
