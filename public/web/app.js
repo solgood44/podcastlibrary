@@ -1080,17 +1080,19 @@ function renderSounds() {
         listEl.classList.add('hidden');
         
         gridEl.innerHTML = sortedSounds.map((sound, index) => {
-            const soundIsPlaying = currentSound && currentSound.id === sound.id && soundAudioPlayer && !soundAudioPlayer.paused;
+            const soundIsPlaying = currentSound && currentSound.id === sound.id && 
+                                   ((soundAudioSource && soundAudioContext && soundAudioContext.state === 'running') || 
+                                    (soundAudioPlayer && !soundAudioPlayer.paused));
             const [color1, color2] = getSoundGradient(index, sound.title);
             const emoji = getSoundEmoji(sound.title);
             
             return `
             <div class="sound-card sound-card-gradient">
-                <div class="sound-card-content" onclick="playSound('${sound.id}')" style="background: linear-gradient(135deg, ${color1} 0%, ${color2} 100%);">
+                <div class="sound-card-content" onclick="openSoundDetail('${sound.id}')" style="background: linear-gradient(135deg, ${color1} 0%, ${color2} 100%);">
                     <div class="sound-card-emoji">${emoji}</div>
                     <div class="sound-card-title-wrapper">
                         <div class="sound-card-title">${escapeHtml(sound.title || 'Untitled Sound')}</div>
-                        <div class="sound-card-play-icon ${soundIsPlaying ? 'playing' : ''}">
+                        <div class="sound-card-play-icon ${soundIsPlaying ? 'playing' : ''}" onclick="event.stopPropagation(); playSound('${sound.id}');">
                             ${soundIsPlaying ? '⏸' : '▶'}
                         </div>
                     </div>
@@ -1103,13 +1105,15 @@ function renderSounds() {
         gridEl.classList.add('hidden');
         
         listEl.innerHTML = sortedSounds.map((sound, index) => {
-            const soundIsPlaying = currentSound && currentSound.id === sound.id && soundAudioPlayer && !soundAudioPlayer.paused;
+            const soundIsPlaying = currentSound && currentSound.id === sound.id && 
+                                   ((soundAudioSource && soundAudioContext && soundAudioContext.state === 'running') || 
+                                    (soundAudioPlayer && !soundAudioPlayer.paused));
             const [color1, color2] = getSoundGradient(index, sound.title);
             const emoji = getSoundEmoji(sound.title);
             
             return `
             <div class="podcast-list-item">
-                <div class="podcast-list-item-content" onclick="playSound('${sound.id}')">
+                <div class="podcast-list-item-content" onclick="openSoundDetail('${sound.id}')">
                     <div class="podcast-list-image">
                         <div class="sound-list-gradient" style="background: linear-gradient(135deg, ${color1} 0%, ${color2} 100%);">
                             <span class="sound-list-gradient-icon">${emoji}</span>
@@ -1285,27 +1289,42 @@ function playSound(soundId) {
         // Add to history
         addSoundToHistory(sound.id);
     }).catch(err => {
-        console.log('Error starting seamless loop:', err);
-        // Fallback: try HTML5 audio
-        const playPromise = soundAudioPlayer.play();
-        if (playPromise !== undefined) {
-            playPromise
-                .then(() => {
-                    updateSoundPlayerUI();
-                    renderSounds();
-                    updateSleepTimerUI();
-                    addSoundToHistory(sound.id);
-                })
-                .catch(error => {
-                    console.log('Error playing sound:', error);
-                    updateSoundPlayerUI();
-                    updateSleepTimerUI();
-                });
-        } else {
-            updateSoundPlayerUI();
-            renderSounds();
-            updateSleepTimerUI();
-            addSoundToHistory(sound.id);
+        console.log('Error starting seamless loop, trying HTML5 fallback:', err);
+        // Fallback: try HTML5 audio directly
+        if (soundAudioPlayer) {
+            // Make sure HTML5 audio is ready
+            soundAudioPlayer.load();
+            const playPromise = soundAudioPlayer.play();
+            if (playPromise !== undefined) {
+                playPromise
+                    .then(() => {
+                        // Set up HTML5 loop check
+                        soundLoopCheckFunction = () => {
+                            if (!soundAudioPlayer || !currentSound || soundAudioPlayer.paused) {
+                                return;
+                            }
+                            if (soundAudioPlayer.duration && 
+                                soundAudioPlayer.currentTime >= soundAudioPlayer.duration - 0.1) {
+                                soundAudioPlayer.currentTime = 0;
+                            }
+                        };
+                        soundAudioPlayer.addEventListener('timeupdate', soundLoopCheckFunction);
+                        updateSoundPlayerUI();
+                        renderSounds();
+                        updateSleepTimerUI();
+                        addSoundToHistory(sound.id);
+                    })
+                    .catch(error => {
+                        console.log('Error playing HTML5 audio:', error);
+                        updateSoundPlayerUI();
+                        updateSleepTimerUI();
+                    });
+            } else {
+                updateSoundPlayerUI();
+                renderSounds();
+                updateSleepTimerUI();
+                addSoundToHistory(sound.id);
+            }
         }
     });
     
@@ -3969,8 +3988,13 @@ function seekToPositionOnPlayerPage(event) {
 // Set search mode
 function setSearchMode(mode) {
     searchMode = mode;
-    document.getElementById('search-mode-episodes').classList.toggle('active', mode === 'episodes');
-    document.getElementById('search-mode-podcasts').classList.toggle('active', mode === 'podcasts');
+    const episodesBtn = document.getElementById('search-mode-episodes');
+    const podcastsBtn = document.getElementById('search-mode-podcasts');
+    const soundsBtn = document.getElementById('search-mode-sounds');
+    
+    if (episodesBtn) episodesBtn.classList.toggle('active', mode === 'episodes');
+    if (podcastsBtn) podcastsBtn.classList.toggle('active', mode === 'podcasts');
+    if (soundsBtn) soundsBtn.classList.toggle('active', mode === 'sounds');
     
     // Update dropdown if it exists
     const dropdown = document.getElementById('search-mode-dropdown');
@@ -3979,7 +4003,20 @@ function setSearchMode(mode) {
     }
     
     const topSearchInput = document.getElementById('top-search-input');
-    topSearchInput.placeholder = mode === 'episodes' ? 'Search episodes...' : 'Search podcasts...';
+    if (topSearchInput) {
+        if (mode === 'episodes') {
+            topSearchInput.placeholder = 'Search episodes...';
+        } else if (mode === 'podcasts') {
+            topSearchInput.placeholder = 'Search podcasts...';
+        } else if (mode === 'sounds') {
+            topSearchInput.placeholder = 'Search sounds...';
+        }
+    }
+    
+    // If switching to sounds mode, navigate to sounds page
+    if (mode === 'sounds') {
+        navigateTo('sounds');
+    }
     
     // If no search query, navigate to show all items
     if (!topSearchInput.value || topSearchInput.value.trim() === '') {

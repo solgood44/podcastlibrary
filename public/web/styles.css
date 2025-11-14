@@ -908,10 +908,6 @@ body {
     min-width: 0;
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
     text-align: center;
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
     word-break: break-word;
     hyphens: auto;
 }
@@ -1189,11 +1185,7 @@ body {
 }
 
 .sound-player-center {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex: 1;
-    justify-content: center;
+    display: none; /* Hide center play button - use mobile button only */
 }
 
 .btn-sound-play-pause {
