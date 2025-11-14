@@ -29,7 +29,7 @@ let isSyncing = false; // Track if sync is in progress
 let syncEnabled = false; // Track if user has enabled sync
 let sounds = []; // All nature sounds
 let soundsSortMode = 'title-asc'; // 'title-asc', 'title-desc'
-let soundsViewMode = 'grid'; // 'grid' or 'list' for sounds page
+let soundsViewMode = 'list'; // Always use list mode (grid removed)
 let currentSound = null; // The sound that is currently playing (if any)
 let soundAudioPlayer = null; // Separate audio player for sounds (for seamless looping)
 let soundAudioContext = null; // Web Audio API context for seamless looping
@@ -1165,25 +1165,15 @@ function applySoundsSorting() {
     }
 }
 
-// Set sounds view mode (grid or list)
+// Set sounds view mode (list only - grid mode removed)
 function setSoundsViewMode(mode) {
-    soundsViewMode = mode;
-    const gridBtn = document.getElementById('sounds-view-grid');
-    const listBtn = document.getElementById('sounds-view-list');
-    const gridEl = document.getElementById('sounds-grid');
+    // Always use list mode
+    soundsViewMode = 'list';
     const listEl = document.getElementById('sounds-list');
+    const gridEl = document.getElementById('sounds-grid');
     
-    if (mode === 'grid') {
-        gridBtn.classList.add('active');
-        listBtn.classList.remove('active');
-        if (gridEl) gridEl.classList.remove('hidden');
-        if (listEl) listEl.classList.add('hidden');
-    } else {
-        listBtn.classList.add('active');
-        gridBtn.classList.remove('active');
-        if (gridEl) gridEl.classList.add('hidden');
-        if (listEl) listEl.classList.remove('hidden');
-    }
+    if (gridEl) gridEl.classList.add('hidden');
+    if (listEl) listEl.classList.remove('hidden');
     
     renderSounds();
 }
