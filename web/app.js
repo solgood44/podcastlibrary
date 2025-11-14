@@ -1293,6 +1293,24 @@ function playSound(soundId) {
         soundAudioPlayer.addEventListener('play', () => {
             updateSoundPlayerUI();
             updateSleepTimerUI();
+            // Update Media Session playback state
+            if ('mediaSession' in navigator) {
+                navigator.mediaSession.playbackState = 'playing';
+            }
+        });
+        
+        // Update UI when sound pauses
+        soundAudioPlayer.addEventListener('pause', () => {
+            // Only update Media Session if this is a user-initiated pause
+            // (not an interruption that we'll auto-resume)
+            if ('mediaSession' in navigator && currentSound) {
+                // Small delay to check if we're auto-resuming
+                setTimeout(() => {
+                    if (soundAudioPlayer && soundAudioPlayer.paused && currentSound) {
+                        navigator.mediaSession.playbackState = 'paused';
+                    }
+                }, 300);
+            }
         });
         
         // Handle audio errors
