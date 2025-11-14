@@ -464,7 +464,35 @@
                     <div class="player-bar-time-right" id="duration-bar">0:00</div>
                 </div>
             </div>
-            <div class="player-bar-right"></div>
+            <div class="player-bar-right">
+                <div class="sleep-timer-container">
+                    <button id="sleep-timer-btn" class="btn-sleep-timer" onclick="toggleSleepTimerMenu()" title="Sleep Timer">
+                        <span id="sleep-timer-icon">⏰</span>
+                        <span id="sleep-timer-text" class="sleep-timer-text">Timer</span>
+                    </button>
+                    <div id="sleep-timer-menu" class="sleep-timer-menu hidden">
+                        <div class="sleep-timer-header">
+                            <span>Sleep Timer</span>
+                            <button class="btn-close-timer" onclick="closeSleepTimerMenu()">✕</button>
+                        </div>
+                        <div id="sleep-timer-display" class="sleep-timer-display hidden">
+                            <div class="sleep-timer-time">
+                                <span id="sleep-timer-countdown">0:00</span>
+                                <span class="sleep-timer-label">remaining</span>
+                            </div>
+                            <button class="btn-cancel-timer" onclick="cancelSleepTimer()">Cancel</button>
+                        </div>
+                        <div id="sleep-timer-presets" class="sleep-timer-presets">
+                            <button class="btn-timer-preset" onclick="setSleepTimer(5)">5 min</button>
+                            <button class="btn-timer-preset" onclick="setSleepTimer(10)">10 min</button>
+                            <button class="btn-timer-preset" onclick="setSleepTimer(15)">15 min</button>
+                            <button class="btn-timer-preset" onclick="setSleepTimer(30)">30 min</button>
+                            <button class="btn-timer-preset" onclick="setSleepTimer(60)">1 hr</button>
+                            <button class="btn-timer-preset btn-add-minutes" onclick="addSleepTimerMinutes(5)" title="Add 5 minutes">+5 min</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
         <audio id="audio-player" preload="none"></audio>
     </div>
@@ -489,7 +517,35 @@
                     <span>⏹</span>
                 </button>
             </div>
-            <div class="sound-player-right"></div>
+            <div class="sound-player-right">
+                <div class="sleep-timer-container">
+                    <button id="sound-sleep-timer-btn" class="btn-sleep-timer" onclick="toggleSleepTimerMenu()" title="Sleep Timer">
+                        <span id="sound-sleep-timer-icon">⏰</span>
+                        <span id="sound-sleep-timer-text" class="sleep-timer-text">Timer</span>
+                    </button>
+                    <div id="sound-sleep-timer-menu" class="sleep-timer-menu hidden">
+                        <div class="sleep-timer-header">
+                            <span>Sleep Timer</span>
+                            <button class="btn-close-timer" onclick="closeSleepTimerMenu()">✕</button>
+                        </div>
+                        <div id="sound-sleep-timer-display" class="sleep-timer-display hidden">
+                            <div class="sleep-timer-time">
+                                <span id="sound-sleep-timer-countdown">0:00</span>
+                                <span class="sleep-timer-label">remaining</span>
+                            </div>
+                            <button class="btn-cancel-timer" onclick="cancelSleepTimer()">Cancel</button>
+                        </div>
+                        <div id="sound-sleep-timer-presets" class="sleep-timer-presets">
+                            <button class="btn-timer-preset" onclick="setSleepTimer(5)">5 min</button>
+                            <button class="btn-timer-preset" onclick="setSleepTimer(10)">10 min</button>
+                            <button class="btn-timer-preset" onclick="setSleepTimer(15)">15 min</button>
+                            <button class="btn-timer-preset" onclick="setSleepTimer(30)">30 min</button>
+                            <button class="btn-timer-preset" onclick="setSleepTimer(60)">1 hr</button>
+                            <button class="btn-timer-preset btn-add-minutes" onclick="addSleepTimerMinutes(5)" title="Add 5 minutes">+5 min</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 

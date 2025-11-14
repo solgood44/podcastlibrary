@@ -32,6 +32,9 @@ let soundsSortMode = 'title-asc'; // 'title-asc', 'title-desc'
 let soundsViewMode = 'grid'; // 'grid' or 'list' for sounds page
 let currentSound = null; // The sound that is currently playing (if any)
 let soundAudioPlayer = null; // Separate audio player for sounds (for seamless looping)
+let sleepTimerInterval = null; // Interval for sleep timer countdown
+let sleepTimerEndTime = null; // Timestamp when sleep timer will end
+let sleepTimerMinutes = 0; // Current sleep timer duration in minutes
 
 // Progress tracking key for localStorage
 const PROGRESS_KEY = 'podcast_progress';
@@ -1370,6 +1373,195 @@ function stopSound() {
         renderSounds();
     } else if (currentPage === 'sound') {
         navigateTo('sounds');
+    }
+}
+
+// Sleep Timer Functions
+function toggleSleepTimerMenu() {
+    const episodeMenu = document.getElementById('sleep-timer-menu');
+    const soundMenu = document.getElementById('sound-sleep-timer-menu');
+    
+    // Toggle episode player menu
+    if (episodeMenu) {
+        episodeMenu.classList.toggle('hidden');
+    }
+    
+    // Toggle sound player menu
+    if (soundMenu) {
+        soundMenu.classList.toggle('hidden');
+    }
+    
+    // Close other menu if open
+    if (episodeMenu && !episodeMenu.classList.contains('hidden') && soundMenu) {
+        soundMenu.classList.add('hidden');
+    }
+    if (soundMenu && !soundMenu.classList.contains('hidden') && episodeMenu) {
+        episodeMenu.classList.add('hidden');
+    }
+}
+
+function closeSleepTimerMenu() {
+    const episodeMenu = document.getElementById('sleep-timer-menu');
+    const soundMenu = document.getElementById('sound-sleep-timer-menu');
+    
+    if (episodeMenu) episodeMenu.classList.add('hidden');
+    if (soundMenu) soundMenu.classList.add('hidden');
+}
+
+function setSleepTimer(minutes) {
+    // Cancel existing timer if any
+    if (sleepTimerInterval) {
+        clearInterval(sleepTimerInterval);
+        sleepTimerInterval = null;
+    }
+    
+    // Set new timer
+    sleepTimerMinutes = minutes;
+    sleepTimerEndTime = Date.now() + (minutes * 60 * 1000);
+    
+    // Start countdown
+    startSleepTimerCountdown();
+    
+    // Update UI
+    updateSleepTimerUI();
+    
+    // Close menu
+    closeSleepTimerMenu();
+}
+
+function addSleepTimerMinutes(minutes) {
+    if (sleepTimerEndTime) {
+        // Add minutes to existing timer
+        sleepTimerEndTime += (minutes * 60 * 1000);
+        sleepTimerMinutes += minutes;
+    } else {
+        // Start new timer
+        setSleepTimer(minutes);
+        return;
+    }
+    
+    // Update UI
+    updateSleepTimerUI();
+}
+
+function cancelSleepTimer() {
+    if (sleepTimerInterval) {
+        clearInterval(sleepTimerInterval);
+        sleepTimerInterval = null;
+    }
+    
+    sleepTimerEndTime = null;
+    sleepTimerMinutes = 0;
+    
+    // Update UI
+    updateSleepTimerUI();
+    closeSleepTimerMenu();
+}
+
+function startSleepTimerCountdown() {
+    // Clear any existing interval
+    if (sleepTimerInterval) {
+        clearInterval(sleepTimerInterval);
+    }
+    
+    // Update immediately
+    updateSleepTimerCountdown();
+    
+    // Update every second
+    sleepTimerInterval = setInterval(() => {
+        updateSleepTimerCountdown();
+        
+        // Check if timer expired
+        if (sleepTimerEndTime && Date.now() >= sleepTimerEndTime) {
+            // Timer expired - pause media
+            if (audioPlayer && currentEpisode && !audioPlayer.paused) {
+                audioPlayer.pause();
+                isPlaying = false;
+                updatePlayPauseButton();
+                saveProgress(); // Save progress before pausing
+            }
+            
+            if (soundAudioPlayer && currentSound && !soundAudioPlayer.paused) {
+                soundAudioPlayer.pause();
+                updateSoundPlayerUI();
+            }
+            
+            // Cancel timer
+            cancelSleepTimer();
+            
+            // Show notification (optional)
+            if (window.analytics) {
+                window.analytics.trackEvent('sleep_timer_expired', {
+                    duration: sleepTimerMinutes
+                });
+            }
+        }
+    }, 1000);
+}
+
+function updateSleepTimerCountdown() {
+    if (!sleepTimerEndTime) {
+        return;
+    }
+    
+    const remaining = Math.max(0, sleepTimerEndTime - Date.now());
+    const minutes = Math.floor(remaining / 60000);
+    const seconds = Math.floor((remaining % 60000) / 1000);
+    
+    const timeString = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    
+    // Update both countdown displays
+    const episodeCountdown = document.getElementById('sleep-timer-countdown');
+    const soundCountdown = document.getElementById('sound-sleep-timer-countdown');
+    
+    if (episodeCountdown) episodeCountdown.textContent = timeString;
+    if (soundCountdown) soundCountdown.textContent = timeString;
+}
+
+function updateSleepTimerUI() {
+    const hasTimer = sleepTimerEndTime !== null;
+    
+    // Episode player UI
+    const episodeDisplay = document.getElementById('sleep-timer-display');
+    const episodePresets = document.getElementById('sleep-timer-presets');
+    const episodeText = document.getElementById('sleep-timer-text');
+    const episodeIcon = document.getElementById('sleep-timer-icon');
+    
+    if (episodeDisplay) {
+        episodeDisplay.classList.toggle('hidden', !hasTimer);
+    }
+    if (episodePresets) {
+        episodePresets.classList.toggle('hidden', hasTimer);
+    }
+    if (episodeText) {
+        episodeText.textContent = hasTimer ? `${sleepTimerMinutes}m` : 'Timer';
+    }
+    if (episodeIcon) {
+        episodeIcon.style.opacity = hasTimer ? '1' : '0.6';
+    }
+    
+    // Sound player UI
+    const soundDisplay = document.getElementById('sound-sleep-timer-display');
+    const soundPresets = document.getElementById('sound-sleep-timer-presets');
+    const soundText = document.getElementById('sound-sleep-timer-text');
+    const soundIcon = document.getElementById('sound-sleep-timer-icon');
+    
+    if (soundDisplay) {
+        soundDisplay.classList.toggle('hidden', !hasTimer);
+    }
+    if (soundPresets) {
+        soundPresets.classList.toggle('hidden', hasTimer);
+    }
+    if (soundText) {
+        soundText.textContent = hasTimer ? `${sleepTimerMinutes}m` : 'Timer';
+    }
+    if (soundIcon) {
+        soundIcon.style.opacity = hasTimer ? '1' : '0.6';
+    }
+    
+    // Update countdown if timer is active
+    if (hasTimer) {
+        updateSleepTimerCountdown();
     }
 }
 
