@@ -909,9 +909,11 @@ body {
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
     text-align: center;
     display: -webkit-box;
-    -webkit-line-clamp: 2;
+    -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
+    word-break: break-word;
+    hyphens: auto;
 }
 
 .sound-card-play-icon {
@@ -1052,6 +1054,7 @@ body {
         min-width: 0;
         flex: 1;
         gap: 8px;
+        flex-direction: row;
     }
     
     .sound-player-center {
@@ -1063,9 +1066,19 @@ body {
         display: none;
     }
     
+    .sound-player-text-wrapper {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+    }
+    
     .sound-player-text {
         min-width: 0;
-        flex: 1;
+        width: 100%;
+        text-align: center;
     }
     
     .sound-player-text h3 {
@@ -1100,8 +1113,8 @@ body {
         cursor: pointer;
         font-size: 18px;
         flex-shrink: 0;
-        margin-left: auto;
         transition: all 0.2s;
+        margin: 0 auto;
     }
     
     .sound-player-mobile-play:hover {
@@ -3580,6 +3593,7 @@ body {
         flex: 1;
         gap: 8px;
         order: 1;
+        flex-direction: row;
     }
     
     .player-bar-center {
@@ -3596,9 +3610,19 @@ body {
         flex-shrink: 0;
     }
     
+    .player-bar-text-wrapper {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+    }
+    
     .player-bar-text {
         min-width: 0;
-        flex: 1;
+        width: 100%;
+        text-align: center;
     }
     
     .player-bar-text h3 {
@@ -3620,13 +3644,7 @@ body {
         overflow: hidden;
     }
     
-    /* Add play/pause button to left section on mobile */
-    .player-bar-left::after {
-        content: '';
-        display: none;
-    }
-    
-    /* Show play button after text on mobile */
+    /* Show play button centered below text on mobile */
     .player-bar-mobile-play {
         display: flex;
         align-items: center;
@@ -3640,8 +3658,8 @@ body {
         cursor: pointer;
         font-size: 18px;
         flex-shrink: 0;
-        margin-left: auto;
         transition: all 0.2s;
+        margin: 0 auto;
     }
     
     .player-bar-mobile-play:hover {
