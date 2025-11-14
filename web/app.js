@@ -1053,28 +1053,8 @@ function anyWordIn(title, words) {
 
 // Generate gradient color based on sound title or index
 function getSoundGradient(index, title) {
-    // Predefined gradient color pairs
-    const gradients = [
-        ['#667eea', '#764ba2'], // Purple
-        ['#f093fb', '#f5576c'], // Pink
-        ['#4facfe', '#00f2fe'], // Blue
-        ['#43e97b', '#38f9d7'], // Green
-        ['#fa709a', '#fee140'], // Pink-Yellow
-        ['#30cfd0', '#330867'], // Cyan-Purple
-        ['#a8edea', '#fed6e3'], // Mint-Pink
-        ['#ff9a9e', '#fecfef'], // Coral-Pink
-        ['#ffecd2', '#fcb69f'], // Peach
-        ['#ff8a80', '#ea6100'], // Orange-Red
-        ['#84fab0', '#8fd3f4'], // Green-Blue
-        ['#a1c4fd', '#c2e9fb'], // Light Blue
-        ['#ff6e7f', '#bfe9ff'], // Red-Blue
-        ['#e0c3fc', '#8ec5fc'], // Purple-Blue
-        ['#fbc2eb', '#a6c1ee'], // Pink-Blue
-    ];
-    
-    // Use index to cycle through gradients
-    const gradientIndex = index % gradients.length;
-    return gradients[gradientIndex];
+    // Use the same gradient for all sounds (cyan-purple, like dripping icicles)
+    return ['#30cfd0', '#330867']; // Cyan-Purple
 }
 
 // Render sounds grid or list
@@ -1287,6 +1267,8 @@ function playSound(soundId) {
                 updateSoundPlayerUI();
                 renderSounds(); // Update UI to show playing state
                 updateSleepTimerUI(); // Update sidebar timer visibility
+                // Add to history
+                addSoundToHistory(sound.id);
             })
             .catch(error => {
                 console.log('Error playing sound:', error);
@@ -1327,17 +1309,18 @@ function updateSoundPlayerUI() {
         }
     }
     
-    // Update play/pause button
+    // Update play/pause/stop button - show stop icon when playing, play icon when stopped
     const isPlaying = soundAudioPlayer && !soundAudioPlayer.paused;
     if (playIconEl) {
-        playIconEl.textContent = isPlaying ? '⏸' : '▶';
+        // Show stop icon (⏹) when playing, play icon (▶) when stopped
+        playIconEl.textContent = isPlaying ? '⏹' : '▶';
     }
     if (mobilePlayIconEl) {
-        mobilePlayIconEl.textContent = isPlaying ? '⏸' : '▶';
+        mobilePlayIconEl.textContent = isPlaying ? '⏹' : '▶';
     }
     
     if (statusEl) {
-        statusEl.textContent = isPlaying ? 'Playing' : 'Paused';
+        statusEl.textContent = isPlaying ? 'Playing' : 'Stopped';
     }
     
     // Update sound cards if on sounds page
@@ -1351,7 +1334,7 @@ function updateSoundPlayerUI() {
     }
 }
 
-// Toggle sound play/pause
+// Toggle sound play/pause/stop - combines play and stop functionality
 function toggleSoundPlayPause() {
     if (!currentSound) return;
     
@@ -1364,16 +1347,28 @@ function toggleSoundPlayPause() {
     }
     
     if (soundAudioPlayer.paused) {
+        // If paused, play
         soundAudioPlayer.play().catch(err => {
             console.log('Error playing sound:', err);
         });
     } else {
+        // If playing, stop (pause and reset)
         soundAudioPlayer.pause();
+        soundAudioPlayer.currentTime = 0;
+        currentSound = null;
+        
+        // Hide sound player bar
+        const soundPlayerBar = document.getElementById('sound-player-bar');
+        if (soundPlayerBar) {
+            soundPlayerBar.classList.add('hidden');
+            document.body.classList.remove('sound-player-visible');
+        }
     }
     
     updateSoundPlayerUI();
     updateSoundDetailPlayButton();
     updateSleepTimerUI(); // Update sidebar timer visibility
+    renderSounds(); // Update UI
 }
 
 // Open sound detail page
@@ -1448,7 +1443,8 @@ function updateSoundDetailPlayButton() {
     const playIconEl = document.getElementById('sound-detail-play-icon');
     if (playIconEl && soundAudioPlayer && currentSound) {
         const isPlaying = !soundAudioPlayer.paused;
-        playIconEl.textContent = isPlaying ? '⏸' : '▶';
+        // Show stop icon (⏹) when playing, play icon (▶) when stopped
+        playIconEl.textContent = isPlaying ? '⏹' : '▶';
     }
 }
 
@@ -2342,6 +2338,20 @@ function addEpisodeToHistory(episodeId, podcastId) {
     const filtered = history.filter(item => item.episodeId !== episodeId);
     // Add to front
     filtered.unshift({ episodeId, podcastId, timestamp: Date.now() });
+    // Keep only MAX_HISTORY items
+    const limited = filtered.slice(0, MAX_HISTORY);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(limited));
+    renderSidebar(); // Update sidebar
+    debouncedSync(); // Sync to server if enabled
+}
+
+// Add sound to history
+function addSoundToHistory(soundId) {
+    const history = getHistory();
+    // Remove if already exists
+    const filtered = history.filter(item => item.soundId !== soundId);
+    // Add to front
+    filtered.unshift({ soundId, timestamp: Date.now() });
     // Keep only MAX_HISTORY items
     const limited = filtered.slice(0, MAX_HISTORY);
     localStorage.setItem(HISTORY_KEY, JSON.stringify(limited));
