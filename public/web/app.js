@@ -239,6 +239,30 @@ document.addEventListener('DOMContentLoaded', () => {
     // Handle window resize to manage sidebar state
     window.addEventListener('resize', handleResize);
     
+    // Handle page visibility changes (e.g., screen lock, tab switch)
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && currentSound) {
+            // Page became visible - resume audio if it was playing
+            if (soundAudioContext && soundAudioContext.state === 'suspended') {
+                soundAudioContext.resume().then(() => {
+                    // If source was stopped, restart it
+                    if (!soundAudioSource || !soundAudioSource.buffer) {
+                        startSeamlessLoop();
+                    }
+                }).catch(err => {
+                    console.log('Error resuming after visibility change:', err);
+                });
+            } else if (soundAudioPlayer && soundAudioPlayer.paused && currentSound) {
+                // Try to resume HTML5 audio if using fallback
+                if (!soundAudioSource) {
+                    soundAudioPlayer.play().catch(err => {
+                        console.log('Error resuming HTML5 audio:', err);
+                    });
+                }
+            }
+        }
+    });
+    
     // Set initial sidebar state based on screen size and user preference
     const sidebar = document.getElementById('sidebar');
     const body = document.body;
