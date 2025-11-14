@@ -1008,6 +1008,9 @@ body {
     z-index: 88;
     padding: 12px 16px;
     backdrop-filter: blur(10px);
+    margin: 0;
+    border-bottom: none;
+    border-radius: 0;
 }
 
 /* On desktop, sound player bar starts after sidebar */
@@ -1029,23 +1032,30 @@ body {
 /* On mobile */
 @media (max-width: 768px) {
     .sound-player-bar {
-        left: 0;
-        right: 0;
-        bottom: 0;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
         padding: 10px 12px;
         z-index: 100;
-        margin: 0;
-        border-radius: 0;
+        margin: 0 !important;
+        border-radius: 0 !important;
+        position: fixed !important;
     }
     
     body.player-bar-visible .sound-player-bar {
-        bottom: 80px;
+        bottom: 80px !important;
     }
     
-    /* Ensure no margin or padding on body that could push player up */
-    body {
-        margin: 0;
-        padding: 0;
+    /* Ensure no margin or padding on body/html that could push player up */
+    body,
+    html {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
+    /* Remove any transform that might affect positioning */
+    .sound-player-bar {
+        transform: none !important;
     }
 }
 
