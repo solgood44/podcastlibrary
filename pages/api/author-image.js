@@ -9,6 +9,8 @@ export default async function handler(req, res) {
 
   if (!name) {
     const fallbackUrl = `/api/og-author?name=&size=profile`;
+    // Cache empty responses for 1 hour
+    res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
     if (format === 'json') {
       return res.status(200).json({ imageUrl: fallbackUrl });
     }
@@ -22,6 +24,8 @@ export default async function handler(req, res) {
     const imageUrl = await fetchAuthorImageUrl(authorName);
     
     if (imageUrl) {
+      // Cache author images for 24 hours (they don't change often)
+      res.setHeader('Cache-Control', 'public, s-maxage=86400, stale-while-revalidate=604800');
       if (format === 'json') {
         return res.status(200).json({ imageUrl });
       }
@@ -31,6 +35,8 @@ export default async function handler(req, res) {
     
     // Fallback to generated image
     const fallbackUrl = `/api/og-author?name=${encodeURIComponent(authorName)}&size=profile`;
+    // Cache generated images for 1 hour
+    res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
     if (format === 'json') {
       return res.status(200).json({ imageUrl: fallbackUrl });
     }

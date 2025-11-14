@@ -38,6 +38,28 @@ sb: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # --- Helpers ---------------------------------------------------------------
 
+def generate_slug(title: str) -> str:
+    """
+    Generate URL-friendly slug from title.
+    Matches the JavaScript generateSlug function in lib/supabase.js
+    """
+    if not title:
+        return ''
+    
+    # Convert to lowercase and trim
+    slug = title.lower().strip()
+    
+    # Remove special characters
+    slug = re.sub(r'[^\w\s-]', '', slug)
+    
+    # Replace spaces and underscores with hyphens
+    slug = re.sub(r'[\s_-]+', '-', slug)
+    
+    # Remove leading/trailing hyphens
+    slug = re.sub(r'^-+|-+$', '', slug)
+    
+    return slug
+
 def retry_db_operation(func, max_retries=3, base_delay=1):
     """Retry a database operation with exponential backoff."""
     for attempt in range(max_retries):
@@ -54,13 +76,18 @@ def retry_db_operation(func, max_retries=3, base_delay=1):
     return None
 
 def upsert_podcast(feed_url: str, meta: dict):
+    # Generate slug from title for efficient querying
+    title = meta.get("title")
+    slug = generate_slug(title) if title else None
+    
     data = {
         "feed_url": feed_url,
-        "title": meta.get("title"),
+        "title": title,
         "author": meta.get("author"),
         "image_url": meta.get("image_url"),
         "description": meta.get("description"),
         "genre": meta.get("genre"),
+        "slug": slug,  # Add slug for efficient querying
         "etag": meta.get("etag"),
         "last_modified": meta.get("last_modified"),
         "last_refreshed": datetime.utcnow().isoformat()

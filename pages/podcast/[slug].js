@@ -308,9 +308,9 @@ export async function getStaticProps({ params }) {
         podcast,
         episodes: episodes || []
       },
-      // Revalidate every hour (3600 seconds)
-      // This means pages will be regenerated at most once per hour
-      revalidate: 3600
+      // Revalidate every 6 hours (21600 seconds)
+      // This reduces database queries while still keeping content relatively fresh
+      revalidate: 21600
     };
   } catch (error) {
     console.error('Error fetching podcast data:', error);

@@ -237,7 +237,7 @@ class AuthService {
         throw new Error('Not authenticated');
       }
 
-      const response = await fetch(`${this.supabaseUrl}/rest/v1/user_data?user_id=eq.${session.user.id}&select=*`, {
+      const response = await fetch(`${this.supabaseUrl}/rest/v1/user_data?user_id=eq.${session.user.id}&select=id,user_id,progress,history,favorites,sort_preferences,updated_at`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
