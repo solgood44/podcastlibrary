@@ -1547,7 +1547,7 @@ async function loadSoundAudioBuffer(audioUrl) {
 
 // Start seamless looping using Web Audio API
 async function startSeamlessLoop() {
-    if (!currentSound || !soundAudioPlayer) return;
+    if (!currentSound || !soundAudioPlayer) return Promise.resolve();
     
     // Stop any existing Web Audio source
     stopSeamlessLoop();
@@ -1555,6 +1555,11 @@ async function startSeamlessLoop() {
     // Try to use Web Audio API for seamless looping
     if (initSoundAudioContext()) {
         try {
+            // Resume audio context if suspended (required on mobile)
+            if (soundAudioContext.state === 'suspended') {
+                await soundAudioContext.resume();
+            }
+            
             // Load the audio buffer
             const buffer = await loadSoundAudioBuffer(currentSound.audio_url);
             if (buffer) {
@@ -1592,7 +1597,7 @@ async function startSeamlessLoop() {
                 // Store sync interval for cleanup
                 soundAudioSource._syncInterval = syncInterval;
                 
-                return; // Successfully using Web Audio API
+                return Promise.resolve(); // Successfully using Web Audio API
             }
         } catch (e) {
             console.error('Error with Web Audio API, falling back to HTML5:', e);
@@ -1602,9 +1607,12 @@ async function startSeamlessLoop() {
     // Fallback to HTML5 audio with timeupdate loop check
     // Start playing HTML5 audio if not already playing
     if (soundAudioPlayer && soundAudioPlayer.paused) {
-        soundAudioPlayer.play().catch(err => {
+        try {
+            await soundAudioPlayer.play();
+        } catch (err) {
             console.log('Error playing HTML5 audio fallback:', err);
-        });
+            return Promise.reject(err);
+        }
     }
     
     // Set up loop check for HTML5 audio
@@ -1623,6 +1631,8 @@ async function startSeamlessLoop() {
     if (soundAudioPlayer) {
         soundAudioPlayer.addEventListener('timeupdate', soundLoopCheckFunction);
     }
+    
+    return Promise.resolve();
 }
 
 // Stop seamless looping
