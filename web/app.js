@@ -994,6 +994,63 @@ async function loadSoundsPage() {
     }
 }
 
+// Get emoji for sound based on title
+function getSoundEmoji(title) {
+    if (!title) return '🎵';
+    
+    const titleLower = title.toLowerCase();
+    
+    // Water-related
+    if (anyWordIn(titleLower, ['ocean', 'wave', 'water', 'stream', 'brook', 'waterfall', 'tidepool', 'river'])) {
+        return '🌊';
+    }
+    // Rain-related
+    else if (anyWordIn(titleLower, ['rain', 'rainfall', 'dripping'])) {
+        return '🌧️';
+    }
+    // Wind-related
+    else if (titleLower.includes('wind')) {
+        return '💨';
+    }
+    // Thunder-related
+    else if (titleLower.includes('thunder')) {
+        return '⛈️';
+    }
+    // Bird-related
+    else if (anyWordIn(titleLower, ['bird', 'woodpecker', 'peeper'])) {
+        return '🐦';
+    }
+    // Insect-related
+    else if (anyWordIn(titleLower, ['cricket', 'katydid', 'insect'])) {
+        return '🦗';
+    }
+    // Forest-related
+    else if (anyWordIn(titleLower, ['forest', 'wood', 'swamp'])) {
+        return '🌲';
+    }
+    // Night-related
+    else if (anyWordIn(titleLower, ['night', 'dusk', 'duskfall'])) {
+        return '🌙';
+    }
+    // Snow-related
+    else if (anyWordIn(titleLower, ['snow', 'icicle', 'winter'])) {
+        return '❄️';
+    }
+    // Mountain-related
+    else if (titleLower.includes('mountain')) {
+        return '⛰️';
+    }
+    // Default nature
+    else {
+        return '🌿';
+    }
+}
+
+// Helper function to check if any word is in the title
+function anyWordIn(title, words) {
+    return words.some(word => title.includes(word));
+}
+
 // Generate gradient color based on sound title or index
 function getSoundGradient(index, title) {
     // Predefined gradient color pairs
@@ -1039,10 +1096,12 @@ function renderSounds() {
         gridEl.innerHTML = sortedSounds.map((sound, index) => {
             const soundIsPlaying = currentSound && currentSound.id === sound.id && soundAudioPlayer && !soundAudioPlayer.paused;
             const [color1, color2] = getSoundGradient(index, sound.title);
+            const emoji = getSoundEmoji(sound.title);
             
             return `
             <div class="sound-card sound-card-gradient">
                 <div class="sound-card-content" onclick="playSound('${sound.id}')" style="background: linear-gradient(135deg, ${color1} 0%, ${color2} 100%);">
+                    <div class="sound-card-emoji">${emoji}</div>
                     <div class="sound-card-title-wrapper">
                         <div class="sound-card-title">${escapeHtml(sound.title || 'Untitled Sound')}</div>
                         <div class="sound-card-play-icon ${soundIsPlaying ? 'playing' : ''}">
@@ -1060,13 +1119,14 @@ function renderSounds() {
         listEl.innerHTML = sortedSounds.map((sound, index) => {
             const soundIsPlaying = currentSound && currentSound.id === sound.id && soundAudioPlayer && !soundAudioPlayer.paused;
             const [color1, color2] = getSoundGradient(index, sound.title);
+            const emoji = getSoundEmoji(sound.title);
             
             return `
             <div class="podcast-list-item">
                 <div class="podcast-list-item-content" onclick="playSound('${sound.id}')">
                     <div class="podcast-list-image">
                         <div class="sound-list-gradient" style="background: linear-gradient(135deg, ${color1} 0%, ${color2} 100%);">
-                            <span class="sound-list-gradient-icon">🎵</span>
+                            <span class="sound-list-gradient-icon">${emoji}</span>
                         </div>
                     </div>
                     <div class="podcast-list-info">
@@ -1552,15 +1612,23 @@ function updateSleepTimerCountdown() {
     if (episodeCountdown) episodeCountdown.textContent = timeString;
     if (soundCountdown) soundCountdown.textContent = timeString;
     
-    // Update button text with minutes
+    // Update button text with minutes and seconds
     const episodeText = document.getElementById('sleep-timer-text');
     const soundText = document.getElementById('sound-sleep-timer-text');
     
     if (episodeText) {
-        episodeText.textContent = minutes > 0 ? `${minutes}m` : 'Timer';
+        if (minutes > 0) {
+            episodeText.textContent = seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
+        } else {
+            episodeText.textContent = seconds > 0 ? `${seconds}s` : 'Timer';
+        }
     }
     if (soundText) {
-        soundText.textContent = minutes > 0 ? `${minutes}m` : 'Timer';
+        if (minutes > 0) {
+            soundText.textContent = seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
+        } else {
+            soundText.textContent = seconds > 0 ? `${seconds}s` : 'Timer';
+        }
     }
 }
 
