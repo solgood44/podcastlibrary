@@ -347,8 +347,10 @@ def match_images_to_sounds(image_folders, sound_titles: List[str]) -> Dict[str, 
             match = match_by_filename(image_file.name, sound_titles, debug=False)
             
             if match:
+                # Store the full path to the image file
                 matches[match] = str(image_file)
-                console.print(f"[green]✓ Matched: {image_file.name} → {match}[/green]")
+                folder_name = image_file.parent.name
+                console.print(f"[green]✓ Matched: {image_file.name} → {match} (from: {folder_name})[/green]")
             else:
                 unmatched_images.append(image_file.name)
                 # Show what it normalized to for debugging
@@ -729,6 +731,9 @@ def main():
                     # Upload images and update database
                     uploaded_count = 0
                     for sound_title, image_path in image_matches.items():
+                        # Show which file we're uploading
+                        image_file = Path(image_path)
+                        console.print(f"[dim]Uploading: {image_file.name} from {image_file.parent.name}[/dim]")
                         image_url = upload_image_to_storage(image_path, sound_title)
                         if image_url:
                             if update_sound_image(sound_title, image_url):
