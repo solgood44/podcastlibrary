@@ -283,7 +283,8 @@ def match_by_filename(image_filename: str, sound_titles: List[str], debug: bool 
                 if len(common_words) > 0:
                     # Score based on how many words match relative to the shorter title
                     score = len(common_words) / min(len(image_words), len(sound_words))
-                    if score > best_score and score >= 0.5:  # At least 50% of words match
+                    # Lower threshold to 0.3 (30%) to catch more matches
+                    if score > best_score and score >= 0.3:  # At least 30% of words match
                         best_score = score
                         best_match = sound_title
         
@@ -295,29 +296,39 @@ def match_by_filename(image_filename: str, sound_titles: List[str], debug: bool 
     return None
 
 
-def match_images_to_sounds(image_folder: str, sound_titles: List[str]) -> Dict[str, str]:
-    """Match image files to sound titles using case-insensitive filename matching."""
-    image_folder_path = Path(image_folder)
-    if not image_folder_path.exists():
-        console.print(f"[yellow]Image folder not found: {image_folder}[/yellow]")
-        return {}
+def match_images_to_sounds(image_folders, sound_titles: List[str]) -> Dict[str, str]:
+    """Match image files to sound titles using case-insensitive filename matching.
     
-    # Find all image files (case-insensitive)
-    # Use case-insensitive glob pattern to find all image files
+    Args:
+        image_folders: Single folder path (str) or list of folder paths
+        sound_titles: List of sound titles to match against
+    """
+    # Handle both single folder and multiple folders
+    if isinstance(image_folders, str):
+        image_folders = [image_folders]
+    
+    # Find all image files from all folders
     image_files = []
-    # Try common extensions in both cases
-    extensions = ['jpg', 'jpeg', 'png', 'JPG', 'JPEG', 'PNG', 'Jpg', 'Jpeg', 'Png']
-    for ext in extensions:
-        image_files.extend(image_folder_path.glob(f'*.{ext}'))
+    for image_folder in image_folders:
+        image_folder_path = Path(image_folder)
+        if not image_folder_path.exists():
+            console.print(f"[yellow]Image folder not found: {image_folder}[/yellow]")
+            continue
+        
+        # Find all image files (case-insensitive)
+        # Try common extensions in both cases
+        extensions = ['jpg', 'jpeg', 'png', 'JPG', 'JPEG', 'PNG', 'Jpg', 'Jpeg', 'Png']
+        for ext in extensions:
+            image_files.extend(image_folder_path.glob(f'*.{ext}'))
     
-    # Remove duplicates (in case we found the same file with different case)
+    # Remove duplicates (in case we found the same file with different case or in multiple folders)
     image_files = list(set(image_files))
     
     if not image_files:
-        console.print(f"[yellow]No image files found in {image_folder}[/yellow]")
+        console.print(f"[yellow]No image files found in any of the specified folders[/yellow]")
         return {}
     
-    console.print(f"[cyan]Found {len(image_files)} image files. Matching by filename (case-insensitive)...[/cyan]")
+    console.print(f"[cyan]Found {len(image_files)} image files across {len(image_folders)} folder(s). Matching by filename (case-insensitive)...[/cyan]")
     
     matches = {}
     unmatched_images = []
@@ -466,8 +477,9 @@ def main():
     parser.add_argument(
         '--images',
         type=str,
-        default='/Users/solomon/Desktop/Sounds',
-        help='Path to folder containing sound images'
+        nargs='+',
+        default=['/Users/solomon/Desktop/Sounds', '/Users/solomon/Downloads/Copy of Steady Rain'],
+        help='Path(s) to folder(s) containing sound images (can specify multiple folders)'
     )
     parser.add_argument(
         '--match-images',
@@ -656,19 +668,22 @@ def main():
                 sound_titles_needing_images = [s['title'] for s in sounds_without_images]
                 
                 # Show available images for debugging
-                image_folder_path = Path(args.images)
-                if image_folder_path.exists():
-                    extensions = ['jpg', 'jpeg', 'png', 'JPG', 'JPEG', 'PNG', 'Jpg', 'Jpeg', 'Png']
-                    available_images = []
-                    for ext in extensions:
-                        available_images.extend(image_folder_path.glob(f'*.{ext}'))
-                    # Remove duplicates
-                    available_images = list(set(available_images))
-                    
-                    if available_images:
-                        console.print(f"\n[dim]Available images ({len(available_images)}):[/dim]")
-                        for img in sorted(available_images):
-                            console.print(f"[dim]  - {img.name}[/dim]")
+                image_folders = args.images if isinstance(args.images, list) else [args.images]
+                all_available_images = []
+                for image_folder in image_folders:
+                    image_folder_path = Path(image_folder)
+                    if image_folder_path.exists():
+                        extensions = ['jpg', 'jpeg', 'png', 'JPG', 'JPEG', 'PNG', 'Jpg', 'Jpeg', 'Png']
+                        for ext in extensions:
+                            all_available_images.extend(image_folder_path.glob(f'*.{ext}'))
+                
+                # Remove duplicates
+                all_available_images = list(set(all_available_images))
+                
+                if all_available_images:
+                    console.print(f"\n[dim]Available images ({len(all_available_images)}) from {len(image_folders)} folder(s):[/dim]")
+                    for img in sorted(all_available_images):
+                        console.print(f"[dim]  - {img.name} ({img.parent.name})[/dim]")
                 
                 # Match images to sounds by filename (case-insensitive)
                 image_matches = match_images_to_sounds(args.images, sound_titles_needing_images)
