@@ -1034,10 +1034,18 @@ body {
         bottom: 0;
         padding: 10px 12px;
         z-index: 100;
+        margin: 0;
+        border-radius: 0;
     }
     
     body.player-bar-visible .sound-player-bar {
         bottom: 80px;
+    }
+    
+    /* Ensure no margin or padding on body that could push player up */
+    body {
+        margin: 0;
+        padding: 0;
     }
 }
 

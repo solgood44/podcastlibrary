@@ -1462,25 +1462,19 @@ function toggleSoundPlayPause() {
                       (soundAudioPlayer && !soundAudioPlayer.paused);
     
     if (isPlaying) {
-        // If playing, stop (pause and reset)
+        // If playing, pause (don't stop completely - allow resume)
         stopSeamlessLoop();
         if (soundAudioPlayer) {
             soundAudioPlayer.pause();
-            soundAudioPlayer.currentTime = 0;
         }
-        currentSound = null;
-        
-        // Clear Media Session
-        if ('mediaSession' in navigator) {
-            navigator.mediaSession.metadata = null;
+        if (soundAudioSource) {
+            try {
+                soundAudioSource.stop();
+            } catch (e) {
+                // Source may already be stopped
+            }
         }
-        
-        // Hide sound player bar
-        const soundPlayerBar = document.getElementById('sound-player-bar');
-        if (soundPlayerBar) {
-            soundPlayerBar.classList.add('hidden');
-            document.body.classList.remove('sound-player-visible');
-        }
+        // Don't clear currentSound or hide player - allow resume
     } else {
         // If paused, play
         startSeamlessLoop().then(() => {
