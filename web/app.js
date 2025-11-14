@@ -241,25 +241,65 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Handle page visibility changes (e.g., screen lock, tab switch)
     document.addEventListener('visibilitychange', () => {
-        if (!document.hidden && currentSound) {
-            // Page became visible - resume audio if it was playing
-            if (soundAudioContext && soundAudioContext.state === 'suspended') {
-                soundAudioContext.resume().then(() => {
-                    // If source was stopped, restart it
-                    if (!soundAudioSource || !soundAudioSource.buffer) {
-                        startSeamlessLoop();
-                    }
-                }).catch(err => {
-                    console.log('Error resuming after visibility change:', err);
-                });
-            } else if (soundAudioPlayer && soundAudioPlayer.paused && currentSound) {
-                // Try to resume HTML5 audio if using fallback
-                if (!soundAudioSource) {
-                    soundAudioPlayer.play().catch(err => {
-                        console.log('Error resuming HTML5 audio:', err);
+        if (currentSound) {
+            if (document.hidden) {
+                // Page became hidden (phone locked, tab switched) - try to keep audio playing
+                if (soundAudioContext && soundAudioContext.state === 'suspended') {
+                    soundAudioContext.resume().then(() => {
+                        if (!soundAudioSource || !soundAudioSource.buffer) {
+                            startSeamlessLoop();
+                        }
+                    }).catch(err => {
+                        console.log('Error resuming when hidden:', err);
                     });
                 }
+                // Also ensure HTML5 audio keeps playing if using fallback
+                if (soundAudioPlayer && soundAudioPlayer.paused && !soundAudioSource) {
+                    soundAudioPlayer.play().catch(err => {
+                        console.log('Error resuming HTML5 audio when hidden:', err);
+                    });
+                }
+            } else {
+                // Page became visible - resume audio if it was playing
+                if (soundAudioContext && soundAudioContext.state === 'suspended') {
+                    soundAudioContext.resume().then(() => {
+                        // If source was stopped, restart it
+                        if (!soundAudioSource || !soundAudioSource.buffer) {
+                            startSeamlessLoop();
+                        }
+                    }).catch(err => {
+                        console.log('Error resuming after visibility change:', err);
+                    });
+                } else if (soundAudioPlayer && soundAudioPlayer.paused && currentSound) {
+                    // Try to resume HTML5 audio if using fallback
+                    if (!soundAudioSource) {
+                        soundAudioPlayer.play().catch(err => {
+                            console.log('Error resuming HTML5 audio:', err);
+                        });
+                    }
+                }
             }
+        }
+    });
+    
+    // Also handle page focus/blur events for additional background playback support
+    window.addEventListener('blur', () => {
+        if (currentSound && soundAudioContext && soundAudioContext.state === 'suspended') {
+            soundAudioContext.resume().catch(err => {
+                console.log('Error resuming on blur:', err);
+            });
+        }
+    });
+    
+    window.addEventListener('focus', () => {
+        if (currentSound && soundAudioContext && soundAudioContext.state === 'suspended') {
+            soundAudioContext.resume().then(() => {
+                if (!soundAudioSource || !soundAudioSource.buffer) {
+                    startSeamlessLoop();
+                }
+            }).catch(err => {
+                console.log('Error resuming on focus:', err);
+            });
         }
     });
     
