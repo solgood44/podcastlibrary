@@ -755,5 +755,35 @@
         import { inject } from 'https://esm.sh/@vercel/analytics@1';
         inject();
     </script>
+
+    <!-- Sleep Timer Help Modal -->
+    <div id="sleep-timer-help-modal" class="auth-modal hidden">
+        <div class="auth-modal-overlay" onclick="closeSleepTimerHelp()"></div>
+        <div class="auth-modal-content" style="max-width: 500px;">
+            <div class="auth-modal-header">
+                <h2>Sleep Timer</h2>
+                <button class="btn-close-modal" onclick="closeSleepTimerHelp()">✕</button>
+            </div>
+            <div class="auth-modal-body">
+                <div style="padding: 20px 0;">
+                    <p style="margin-bottom: 16px; line-height: 1.6;">
+                        The Sleep Timer automatically pauses your audio after a set amount of time. Perfect for falling asleep to podcasts or nature sounds!
+                    </p>
+                    <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 12px; margin-top: 24px;">How it works:</h3>
+                    <ul style="margin-left: 20px; line-height: 1.8;">
+                        <li>Select a preset time (5 min, 10 min, 15 min, 30 min, or 1 hour)</li>
+                        <li>Or use the "+5 min" button to add more time to an active timer</li>
+                        <li>When the timer ends, your audio will pause automatically</li>
+                        <li>You can cancel the timer at any time</li>
+                        <li>The timer works for both podcasts and nature sounds</li>
+                    </ul>
+                    <p style="margin-top: 20px; padding: 12px; background: var(--bg-tertiary); border-radius: 8px; font-size: 14px; line-height: 1.6;">
+                        <strong>Tip:</strong> The timer countdown is shown in the sidebar and player bar. You can always access it from the sidebar menu.
+                    </p>
+                </div>
+                <button class="btn-auth-primary" onclick="closeSleepTimerHelp()" style="width: 100%;">Got it!</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
