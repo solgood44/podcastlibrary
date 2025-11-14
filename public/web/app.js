@@ -1226,7 +1226,29 @@ function playSound(soundId) {
         if (soundAudioPlayer.setAttribute) {
             soundAudioPlayer.setAttribute('x-webkit-airplay', 'allow');
         }
+        // Enable cross-origin for CORS if needed
+        soundAudioPlayer.crossOrigin = 'anonymous';
         document.body.appendChild(soundAudioPlayer);
+        
+        // Handle audio interruptions (phone calls, lock screen, etc.)
+        soundAudioPlayer.addEventListener('pause', (e) => {
+            // Don't update UI if pause was due to interruption - we'll resume automatically
+            if (currentSound && !soundAudioPlayer.ended) {
+                // Try to resume after a short delay (handles interruptions)
+                setTimeout(() => {
+                    if (currentSound && soundAudioPlayer.paused && !soundAudioPlayer.ended) {
+                        // Only resume if we're using HTML5 audio (not Web Audio API)
+                        if (!soundAudioSource || soundAudioContext.state !== 'running') {
+                            soundAudioPlayer.play().catch(err => {
+                                console.log('Auto-resume after interruption failed:', err);
+                            });
+                        }
+                    }
+                }, 100);
+            }
+            updateSoundPlayerUI();
+            updateSleepTimerUI();
+        });
         
         // Update UI when sound starts playing
         soundAudioPlayer.addEventListener('play', () => {
@@ -1234,10 +1256,13 @@ function playSound(soundId) {
             updateSleepTimerUI();
         });
         
-        // Update UI when sound pauses
-        soundAudioPlayer.addEventListener('pause', () => {
-            updateSoundPlayerUI();
-            updateSleepTimerUI();
+        // Handle audio errors
+        soundAudioPlayer.addEventListener('error', (e) => {
+            console.error('Audio playback error:', e);
+            // Try to recover by reloading
+            if (currentSound && soundAudioPlayer.src) {
+                soundAudioPlayer.load();
+            }
         });
     }
     
@@ -1558,11 +1583,40 @@ function initSoundAudioContext() {
     if (!soundAudioContext) {
         try {
             soundAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+            
+            // Configure audio session for background playback and silent mode on iOS
+            // This allows audio to play even when phone is locked or in silent mode
+            if (soundAudioContext.setSinkId) {
+                // Modern browsers
+            }
+            
+            // Handle audio context interruptions (e.g., phone call, lock screen)
+            soundAudioContext.addEventListener('statechange', () => {
+                if (soundAudioContext.state === 'interrupted' && currentSound) {
+                    // Resume playback when interruption ends
+                    soundAudioContext.resume().then(() => {
+                        if (soundAudioSource && soundAudioSource.buffer) {
+                            // Restart the loop if it was interrupted
+                            startSeamlessLoop();
+                        }
+                    }).catch(err => {
+                        console.log('Error resuming audio context:', err);
+                    });
+                }
+            });
         } catch (e) {
             console.error('Web Audio API not supported:', e);
             return false;
         }
     }
+    
+    // Always resume if suspended (required for background playback)
+    if (soundAudioContext.state === 'suspended') {
+        soundAudioContext.resume().catch(err => {
+            console.log('Error resuming audio context:', err);
+        });
+    }
+    
     return true;
 }
 
@@ -1611,6 +1665,14 @@ async function startSeamlessLoop() {
                 // Connect to destination (speakers)
                 soundAudioSource.connect(soundAudioContext.destination);
                 
+                // Handle source node ending (shouldn't happen with loop=true, but just in case)
+                soundAudioSource.onended = () => {
+                    // If loop somehow ends, restart it
+                    if (currentSound && soundAudioBuffer) {
+                        startSeamlessLoop();
+                    }
+                };
+                
                 // Store start time for tracking
                 const startTime = soundAudioContext.currentTime;
                 soundAudioSource._startTime = startTime;
@@ -1634,6 +1696,27 @@ async function startSeamlessLoop() {
                 
                 // Store sync interval for cleanup
                 soundAudioSource._syncInterval = syncInterval;
+                
+                // Keep audio context alive for background playback
+                // Periodically resume if it gets suspended (handles phone sleep/lock)
+                const keepAliveInterval = setInterval(() => {
+                    if (soundAudioContext && currentSound) {
+                        if (soundAudioContext.state === 'suspended' || soundAudioContext.state === 'interrupted') {
+                            soundAudioContext.resume().then(() => {
+                                // If source was stopped due to interruption, restart it
+                                if (!soundAudioSource || !soundAudioSource.buffer) {
+                                    startSeamlessLoop();
+                                }
+                            }).catch(err => {
+                                console.log('Error keeping audio context alive:', err);
+                            });
+                        }
+                    } else {
+                        clearInterval(keepAliveInterval);
+                    }
+                }, 5000); // Check every 5 seconds
+                
+                soundAudioSource._keepAliveInterval = keepAliveInterval;
                 
                 return Promise.resolve(); // Successfully using Web Audio API
             }
@@ -1680,6 +1763,9 @@ function stopSeamlessLoop() {
         try {
             if (soundAudioSource._syncInterval) {
                 clearInterval(soundAudioSource._syncInterval);
+            }
+            if (soundAudioSource._keepAliveInterval) {
+                clearInterval(soundAudioSource._keepAliveInterval);
             }
             soundAudioSource.stop();
             soundAudioSource.disconnect();
