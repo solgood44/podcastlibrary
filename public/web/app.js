@@ -4110,6 +4110,7 @@ function setSearchMode(mode) {
     if (mode === 'sounds') {
         navigateTo('sounds');
         loadSoundsPage();
+        return; // Don't continue with search logic
     }
     
     // If no search query, navigate to show all items
