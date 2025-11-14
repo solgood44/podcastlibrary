@@ -1315,6 +1315,7 @@ function updateSoundPlayerUI() {
     const imageEl = document.getElementById('sound-player-image');
     const statusEl = document.getElementById('sound-player-status');
     const playIconEl = document.getElementById('sound-play-icon');
+    const mobilePlayIconEl = document.getElementById('sound-player-mobile-play-icon');
     
     if (titleEl) titleEl.textContent = currentSound.title || 'Nature Sound';
     if (imageEl) {
@@ -1330,6 +1331,9 @@ function updateSoundPlayerUI() {
     const isPlaying = soundAudioPlayer && !soundAudioPlayer.paused;
     if (playIconEl) {
         playIconEl.textContent = isPlaying ? '⏸' : '▶';
+    }
+    if (mobilePlayIconEl) {
+        mobilePlayIconEl.textContent = isPlaying ? '⏸' : '▶';
     }
     
     if (statusEl) {
@@ -4256,6 +4260,11 @@ function updatePlayPauseButton() {
     const icon = document.getElementById('play-icon-bar');
     if (icon) {
         icon.textContent = isPlaying ? '⏸' : '▶';
+    }
+    // Update mobile play button
+    const mobileIcon = document.getElementById('player-bar-mobile-play-icon');
+    if (mobileIcon) {
+        mobileIcon.textContent = isPlaying ? '⏸' : '▶';
     }
     // Also update player page button if it exists
     const playerPageIcon = document.getElementById('play-icon-player-page');

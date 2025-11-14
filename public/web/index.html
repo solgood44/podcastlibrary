@@ -469,14 +469,17 @@
     <!-- Persistent Audio Player (always visible when playing episodes) -->
     <div id="player-bar" class="player-bar hidden">
         <div class="player-bar-content">
-            <div class="player-bar-left" onclick="navigateTo('episode')">
-                <div class="player-bar-artwork">
+            <div class="player-bar-left">
+                <div class="player-bar-artwork" onclick="navigateTo('episode')">
                     <img id="player-bar-image" src="" alt="" onerror="this.style.display='none'">
                 </div>
-                <div class="player-bar-text">
+                <div class="player-bar-text" onclick="navigateTo('episode')">
                     <h3 id="player-bar-title">Now Playing</h3>
                     <p id="player-bar-episode">Select an episode</p>
                 </div>
+                <button id="player-bar-mobile-play" class="player-bar-mobile-play" onclick="event.stopPropagation(); togglePlayPause();">
+                    <span id="player-bar-mobile-play-icon">▶</span>
+                </button>
             </div>
             <div class="player-bar-center">
                 <div class="player-bar-controls">
@@ -542,6 +545,9 @@
                     <h3 id="sound-player-title">Nature Sound</h3>
                     <p id="sound-player-status">Playing</p>
                 </div>
+                <button id="sound-player-mobile-play" class="sound-player-mobile-play" onclick="event.stopPropagation(); toggleSoundPlayPause();">
+                    <span id="sound-player-mobile-play-icon">⏸</span>
+                </button>
             </div>
             <div class="sound-player-center">
                 <button id="sound-play-pause-btn" class="btn-sound-play-pause" onclick="toggleSoundPlayPause()">

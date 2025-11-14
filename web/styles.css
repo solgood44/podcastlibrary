@@ -1036,11 +1036,85 @@ body {
 @media (max-width: 768px) {
     .sound-player-bar {
         left: 0;
+        padding: 8px 12px;
     }
     
     /* When episode player is visible, sound player should be above it */
     body.player-bar-visible .sound-player-bar {
         bottom: 80px; /* Height of episode player bar */
+    }
+    
+    .sound-player-content {
+        gap: 8px;
+    }
+    
+    .sound-player-left {
+        min-width: 0;
+        flex: 1;
+        gap: 8px;
+    }
+    
+    .sound-player-center {
+        display: none; /* Hide center controls on mobile */
+    }
+    
+    .sound-player-artwork {
+        width: 44px;
+        height: 44px;
+        flex-shrink: 0;
+    }
+    
+    .sound-player-text {
+        min-width: 0;
+        flex: 1;
+    }
+    
+    .sound-player-text h3 {
+        font-size: 13px;
+        margin-bottom: 2px;
+        line-height: 1.2;
+        display: -webkit-box;
+        -webkit-line-clamp: 1;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    
+    .sound-player-text p {
+        font-size: 11px;
+        line-height: 1.2;
+        display: -webkit-box;
+        -webkit-line-clamp: 1;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    
+    .sound-player-mobile-play {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: var(--accent);
+        color: white;
+        border: none;
+        cursor: pointer;
+        font-size: 18px;
+        flex-shrink: 0;
+        margin-left: auto;
+        transition: all 0.2s;
+    }
+    
+    .sound-player-mobile-play:hover {
+        background: var(--accent-hover);
+        transform: scale(1.05);
+    }
+}
+
+/* Hide mobile play button on desktop */
+@media (min-width: 769px) {
+    .sound-player-mobile-play {
+        display: none;
     }
 }
 
@@ -3468,21 +3542,24 @@ body {
         height: 60px;
     }
     
+    .player-bar {
+        padding: 8px 12px;
+    }
+    
     .player-bar-content {
-        gap: 12px;
-        padding: 10px 16px;
-        flex-wrap: wrap;
+        gap: 8px;
+        flex-wrap: nowrap;
     }
     
     .player-bar-left {
         min-width: 0;
-        flex: 1 1 100%;
+        flex: 1;
+        gap: 8px;
         order: 1;
     }
     
     .player-bar-center {
-        flex: 1 1 100%;
-        order: 2;
+        display: none; /* Hide center controls on mobile - use simplified layout */
     }
     
     .player-bar-right {
@@ -3490,8 +3567,69 @@ body {
     }
     
     .player-bar-artwork {
-        width: 48px;
-        height: 48px;
+        width: 44px;
+        height: 44px;
+        flex-shrink: 0;
+    }
+    
+    .player-bar-text {
+        min-width: 0;
+        flex: 1;
+    }
+    
+    .player-bar-text h3 {
+        font-size: 13px;
+        margin-bottom: 2px;
+        line-height: 1.2;
+        display: -webkit-box;
+        -webkit-line-clamp: 1;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    
+    .player-bar-text p {
+        font-size: 11px;
+        line-height: 1.2;
+        display: -webkit-box;
+        -webkit-line-clamp: 1;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    
+    /* Add play/pause button to left section on mobile */
+    .player-bar-left::after {
+        content: '';
+        display: none;
+    }
+    
+    /* Show play button after text on mobile */
+    .player-bar-mobile-play {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: var(--accent);
+        color: white;
+        border: none;
+        cursor: pointer;
+        font-size: 18px;
+        flex-shrink: 0;
+        margin-left: auto;
+        transition: all 0.2s;
+    }
+    
+    .player-bar-mobile-play:hover {
+        background: var(--accent-hover);
+        transform: scale(1.05);
+    }
+}
+
+/* Hide mobile play button on desktop */
+@media (min-width: 769px) {
+    .player-bar-mobile-play {
+        display: none;
     }
     
     .player-bar-progress-wrapper {
