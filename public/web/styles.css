@@ -811,23 +811,25 @@ body {
 }
 
 /* Title-only sound cards (grid mode) */
-.sound-card-title-only {
-    background: var(--bg-card);
+.sound-card-gradient {
     border-radius: 12px;
-    border: 1px solid var(--border);
-    transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
     overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: 1px solid var(--border);
 }
 
-.sound-card-title-only:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px var(--shadow-lg);
-    background: var(--bg-hover);
+.sound-card-gradient:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px var(--shadow-lg);
 }
 
 .sound-card-content {
     cursor: pointer;
-    padding: 16px 20px;
+    padding: 20px;
+    min-height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .sound-card-title-wrapper {
@@ -838,94 +840,83 @@ body {
 }
 
 .sound-card-title {
-    font-size: 15px;
+    font-size: 16px;
     font-weight: 600;
-    color: var(--text-primary);
+    color: white;
     line-height: 1.4;
     flex: 1;
     min-width: 0;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .sound-card-play-icon {
-    font-size: 18px;
-    color: var(--text-secondary);
-    transition: color 0.2s, transform 0.2s;
+    font-size: 20px;
+    color: white;
+    transition: transform 0.2s, opacity 0.2s;
     flex-shrink: 0;
-    width: 32px;
-    height: 32px;
+    width: 40px;
+    height: 40px;
     display: flex;
     align-items: center;
     justify-content: center;
     border-radius: 50%;
-    background: var(--bg-tertiary);
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(8px);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
-.sound-card-title-only:hover .sound-card-play-icon {
-    color: var(--accent);
-    background: rgba(29, 185, 84, 0.1);
+.sound-card-gradient:hover .sound-card-play-icon {
+    background: rgba(255, 255, 255, 0.3);
     transform: scale(1.1);
 }
 
 .sound-card-play-icon.playing {
-    color: var(--accent);
-    background: rgba(29, 185, 84, 0.15);
+    background: rgba(255, 255, 255, 0.3);
 }
 
-/* Title-only sound list items */
-.sound-list-item {
-    border-bottom: 1px solid var(--border);
-    transition: background 0.2s;
-}
-
-.sound-list-item:last-child {
-    border-bottom: none;
-}
-
-.sound-list-item:hover {
-    background: var(--bg-hover);
-}
-
-.sound-list-item-content {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 16px 20px;
-    gap: 16px;
-    cursor: pointer;
-}
-
-.sound-list-title {
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--text-primary);
-    line-height: 1.4;
-    flex: 1;
-    min-width: 0;
-}
-
-.sound-list-play-icon {
-    font-size: 18px;
-    color: var(--text-secondary);
-    transition: color 0.2s, transform 0.2s;
-    flex-shrink: 0;
-    width: 36px;
-    height: 36px;
+/* Sound list items matching podcast list style */
+.sound-list-gradient {
+    width: 80px;
+    height: 80px;
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.sound-list-gradient-icon {
+    font-size: 32px;
+    opacity: 0.8;
+}
+
+.sound-list-play-button {
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
 }
 
-.sound-list-item:hover .sound-list-play-icon {
-    color: var(--accent);
-    background: rgba(29, 185, 84, 0.1);
-    transform: scale(1.1);
+.sound-list-play-button:hover {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+    transform: scale(1.05);
 }
 
-.sound-list-play-icon.playing {
-    color: var(--accent);
-    background: rgba(29, 185, 84, 0.15);
+.sound-list-play-button.playing {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
 }
 
 .sound-category {

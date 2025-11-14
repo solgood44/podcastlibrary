@@ -994,6 +994,32 @@ async function loadSoundsPage() {
     }
 }
 
+// Generate gradient color based on sound title or index
+function getSoundGradient(index, title) {
+    // Predefined gradient color pairs
+    const gradients = [
+        ['#667eea', '#764ba2'], // Purple
+        ['#f093fb', '#f5576c'], // Pink
+        ['#4facfe', '#00f2fe'], // Blue
+        ['#43e97b', '#38f9d7'], // Green
+        ['#fa709a', '#fee140'], // Pink-Yellow
+        ['#30cfd0', '#330867'], // Cyan-Purple
+        ['#a8edea', '#fed6e3'], // Mint-Pink
+        ['#ff9a9e', '#fecfef'], // Coral-Pink
+        ['#ffecd2', '#fcb69f'], // Peach
+        ['#ff8a80', '#ea6100'], // Orange-Red
+        ['#84fab0', '#8fd3f4'], // Green-Blue
+        ['#a1c4fd', '#c2e9fb'], // Light Blue
+        ['#ff6e7f', '#bfe9ff'], // Red-Blue
+        ['#e0c3fc', '#8ec5fc'], // Purple-Blue
+        ['#fbc2eb', '#a6c1ee'], // Pink-Blue
+    ];
+    
+    // Use index to cycle through gradients
+    const gradientIndex = index % gradients.length;
+    return gradients[gradientIndex];
+}
+
 // Render sounds grid or list
 function renderSounds() {
     const sortedSounds = sortSounds(sounds);
@@ -1010,12 +1036,13 @@ function renderSounds() {
         gridEl.classList.remove('hidden');
         listEl.classList.add('hidden');
         
-        gridEl.innerHTML = sortedSounds.map(sound => {
+        gridEl.innerHTML = sortedSounds.map((sound, index) => {
             const soundIsPlaying = currentSound && currentSound.id === sound.id && soundAudioPlayer && !soundAudioPlayer.paused;
+            const [color1, color2] = getSoundGradient(index, sound.title);
             
             return `
-            <div class="sound-card sound-card-title-only">
-                <div class="sound-card-content" onclick="playSound('${sound.id}')">
+            <div class="sound-card sound-card-gradient">
+                <div class="sound-card-content" onclick="playSound('${sound.id}')" style="background: linear-gradient(135deg, ${color1} 0%, ${color2} 100%);">
                     <div class="sound-card-title-wrapper">
                         <div class="sound-card-title">${escapeHtml(sound.title || 'Untitled Sound')}</div>
                         <div class="sound-card-play-icon ${soundIsPlaying ? 'playing' : ''}">
@@ -1030,16 +1057,24 @@ function renderSounds() {
         listEl.classList.remove('hidden');
         gridEl.classList.add('hidden');
         
-        listEl.innerHTML = sortedSounds.map(sound => {
+        listEl.innerHTML = sortedSounds.map((sound, index) => {
             const soundIsPlaying = currentSound && currentSound.id === sound.id && soundAudioPlayer && !soundAudioPlayer.paused;
+            const [color1, color2] = getSoundGradient(index, sound.title);
             
             return `
-            <div class="sound-list-item">
-                <div class="sound-list-item-content" onclick="playSound('${sound.id}')">
-                    <div class="sound-list-title">${escapeHtml(sound.title || 'Untitled Sound')}</div>
-                    <div class="sound-list-play-icon ${soundIsPlaying ? 'playing' : ''}">
-                        ${soundIsPlaying ? '⏸' : '▶'}
+            <div class="podcast-list-item">
+                <div class="podcast-list-item-content" onclick="playSound('${sound.id}')">
+                    <div class="podcast-list-image">
+                        <div class="sound-list-gradient" style="background: linear-gradient(135deg, ${color1} 0%, ${color2} 100%);">
+                            <span class="sound-list-gradient-icon">🎵</span>
+                        </div>
                     </div>
+                    <div class="podcast-list-info">
+                        <div class="podcast-list-title">${escapeHtml(sound.title || 'Untitled Sound')}</div>
+                    </div>
+                </div>
+                <div class="sound-list-play-button ${soundIsPlaying ? 'playing' : ''}" onclick="event.stopPropagation(); playSound('${sound.id}');">
+                    ${soundIsPlaying ? '⏸' : '▶'}
                 </div>
             </div>
         `;
@@ -1085,13 +1120,13 @@ function setSoundsViewMode(mode) {
     if (mode === 'grid') {
         gridBtn.classList.add('active');
         listBtn.classList.remove('active');
-        gridEl.classList.remove('hidden');
-        listEl.classList.add('hidden');
+        if (gridEl) gridEl.classList.remove('hidden');
+        if (listEl) listEl.classList.add('hidden');
     } else {
         listBtn.classList.add('active');
         gridBtn.classList.remove('active');
-        gridEl.classList.add('hidden');
-        listEl.classList.remove('hidden');
+        if (gridEl) gridEl.classList.add('hidden');
+        if (listEl) listEl.classList.remove('hidden');
     }
     
     renderSounds();
@@ -1516,6 +1551,17 @@ function updateSleepTimerCountdown() {
     
     if (episodeCountdown) episodeCountdown.textContent = timeString;
     if (soundCountdown) soundCountdown.textContent = timeString;
+    
+    // Update button text with minutes
+    const episodeText = document.getElementById('sleep-timer-text');
+    const soundText = document.getElementById('sound-sleep-timer-text');
+    
+    if (episodeText) {
+        episodeText.textContent = minutes > 0 ? `${minutes}m` : 'Timer';
+    }
+    if (soundText) {
+        soundText.textContent = minutes > 0 ? `${minutes}m` : 'Timer';
+    }
 }
 
 function updateSleepTimerUI() {
@@ -1524,7 +1570,6 @@ function updateSleepTimerUI() {
     // Episode player UI
     const episodeDisplay = document.getElementById('sleep-timer-display');
     const episodePresets = document.getElementById('sleep-timer-presets');
-    const episodeText = document.getElementById('sleep-timer-text');
     const episodeIcon = document.getElementById('sleep-timer-icon');
     
     if (episodeDisplay) {
@@ -1533,9 +1578,6 @@ function updateSleepTimerUI() {
     if (episodePresets) {
         episodePresets.classList.toggle('hidden', hasTimer);
     }
-    if (episodeText) {
-        episodeText.textContent = hasTimer ? `${sleepTimerMinutes}m` : 'Timer';
-    }
     if (episodeIcon) {
         episodeIcon.style.opacity = hasTimer ? '1' : '0.6';
     }
@@ -1543,7 +1585,6 @@ function updateSleepTimerUI() {
     // Sound player UI
     const soundDisplay = document.getElementById('sound-sleep-timer-display');
     const soundPresets = document.getElementById('sound-sleep-timer-presets');
-    const soundText = document.getElementById('sound-sleep-timer-text');
     const soundIcon = document.getElementById('sound-sleep-timer-icon');
     
     if (soundDisplay) {
@@ -1552,16 +1593,19 @@ function updateSleepTimerUI() {
     if (soundPresets) {
         soundPresets.classList.toggle('hidden', hasTimer);
     }
-    if (soundText) {
-        soundText.textContent = hasTimer ? `${sleepTimerMinutes}m` : 'Timer';
-    }
     if (soundIcon) {
         soundIcon.style.opacity = hasTimer ? '1' : '0.6';
     }
     
-    // Update countdown if timer is active
+    // Update countdown if timer is active (this will also update button text)
     if (hasTimer) {
         updateSleepTimerCountdown();
+    } else {
+        // Reset button text when no timer
+        const episodeText = document.getElementById('sleep-timer-text');
+        const soundText = document.getElementById('sound-sleep-timer-text');
+        if (episodeText) episodeText.textContent = 'Timer';
+        if (soundText) soundText.textContent = 'Timer';
     }
 }
 
