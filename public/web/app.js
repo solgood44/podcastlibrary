@@ -511,6 +511,17 @@ function showPage(page) {
     const pageEl = document.getElementById(`page-${page}`);
     if (pageEl) {
         pageEl.classList.remove('hidden');
+        
+        // Load page-specific content
+        if (page === 'sound') {
+            loadSoundDetailPage();
+        } else if (page === 'sounds') {
+            loadSoundsPage();
+        } else if (page === 'episodes' && currentPodcast) {
+            loadEpisodesPage();
+        } else if (page === 'player') {
+            loadPlayerPage();
+        }
     }
     updatePageTitle(page);
 }
@@ -1208,6 +1219,13 @@ function playSound(soundId) {
     if (!soundAudioPlayer) {
         soundAudioPlayer = document.createElement('audio');
         soundAudioPlayer.preload = 'auto';
+        soundAudioPlayer.playsInline = true; // Allow playing in silent mode on iOS
+        soundAudioPlayer.setAttribute('playsinline', 'true');
+        soundAudioPlayer.setAttribute('webkit-playsinline', 'true');
+        // Configure for background playback
+        if (soundAudioPlayer.setAttribute) {
+            soundAudioPlayer.setAttribute('x-webkit-airplay', 'allow');
+        }
         document.body.appendChild(soundAudioPlayer);
         
         // Update UI when sound starts playing
@@ -1503,19 +1521,18 @@ function loadSoundDetailPage() {
         backgroundEl.className = `sound-detail-background sound-category-${category}`;
     }
     
-    // Check if this sound is already loaded and playing
-    const isCurrentSoundPlaying = soundAudioPlayer && 
-                                  currentSound && 
-                                  soundAudioPlayer.src && 
-                                  (soundAudioPlayer.src === currentSound.audio_url || soundAudioPlayer.src.endsWith(currentSound.audio_url.split('/').pop()));
+    // Update play button state
+    updateSoundDetailPlayButton();
     
-    // If sound player doesn't exist or different sound is loaded, initialize it
-    if (!soundAudioPlayer || !isCurrentSoundPlaying) {
-        // Initialize and play the sound
-        playSound(currentSound.id);
-    } else {
-        // Just update the UI to reflect current play state
-        updateSoundDetailPlayButton();
+    // Don't auto-play when opening detail page - let user click play button
+    // Just ensure the sound is ready if it's the current sound
+    if (soundAudioPlayer && currentSound && soundAudioPlayer.src) {
+        const isCurrentSound = soundAudioPlayer.src === currentSound.audio_url || 
+                              soundAudioPlayer.src.endsWith(currentSound.audio_url.split('/').pop());
+        if (isCurrentSound) {
+            // Sound is already loaded, just update UI
+            updateSoundDetailPlayButton();
+        }
     }
 }
 

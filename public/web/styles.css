@@ -1051,6 +1051,8 @@ body {
         flex: 1;
         gap: 8px;
         flex-direction: row;
+        justify-content: center;
+        align-items: center;
     }
     
     .sound-player-center {
