@@ -513,9 +513,7 @@ function showPage(page) {
         pageEl.classList.remove('hidden');
         
         // Load page-specific content
-        if (page === 'sound') {
-            loadSoundDetailPage();
-        } else if (page === 'sounds') {
+        if (page === 'sounds') {
             loadSoundsPage();
         } else if (page === 'episodes' && currentPodcast) {
             loadEpisodesPage();
@@ -1099,11 +1097,11 @@ function renderSounds() {
             
             return `
             <div class="sound-card sound-card-gradient">
-                <div class="sound-card-content" onclick="openSoundDetail('${sound.id}')" style="background: linear-gradient(135deg, ${color1} 0%, ${color2} 100%);">
+                <div class="sound-card-content" onclick="playSound('${sound.id}')" style="background: linear-gradient(135deg, ${color1} 0%, ${color2} 100%);">
                     <div class="sound-card-emoji">${emoji}</div>
                     <div class="sound-card-title-wrapper">
                         <div class="sound-card-title">${escapeHtml(sound.title || 'Untitled Sound')}</div>
-                        <div class="sound-card-play-icon ${soundIsPlaying ? 'playing' : ''}" onclick="event.stopPropagation(); playSound('${sound.id}');">
+                        <div class="sound-card-play-icon ${soundIsPlaying ? 'playing' : ''}">
                             ${soundIsPlaying ? '⏸' : '▶'}
                         </div>
                     </div>
@@ -1124,7 +1122,7 @@ function renderSounds() {
             
             return `
             <div class="podcast-list-item">
-                <div class="podcast-list-item-content" onclick="openSoundDetail('${sound.id}')">
+                <div class="podcast-list-item-content" onclick="playSound('${sound.id}')">
                     <div class="podcast-list-image">
                         <div class="sound-list-gradient" style="background: linear-gradient(135deg, ${color1} 0%, ${color2} 100%);">
                             <span class="sound-list-gradient-icon">${emoji}</span>
@@ -1134,7 +1132,7 @@ function renderSounds() {
                         <div class="podcast-list-title">${escapeHtml(sound.title || 'Untitled Sound')}</div>
                     </div>
                 </div>
-                <div class="sound-list-play-button ${soundIsPlaying ? 'playing' : ''}" onclick="event.stopPropagation(); playSound('${sound.id}');">
+                <div class="sound-list-play-button ${soundIsPlaying ? 'playing' : ''}">
                     ${soundIsPlaying ? '⏸' : '▶'}
                 </div>
             </div>
@@ -1304,22 +1302,15 @@ function playSound(soundId) {
     // Load
     soundAudioPlayer.load();
     
-    // Show sound player bar (unless on sound detail page)
-    if (currentPage !== 'sound') {
-        const soundPlayerBar = document.getElementById('sound-player-bar');
-        if (soundPlayerBar) {
-            soundPlayerBar.classList.remove('hidden');
-            document.body.classList.add('sound-player-visible');
-        }
+    // Show sound player bar
+    const soundPlayerBar = document.getElementById('sound-player-bar');
+    if (soundPlayerBar) {
+        soundPlayerBar.classList.remove('hidden');
+        document.body.classList.add('sound-player-visible');
     }
     
     // Update sound player UI
     updateSoundPlayerUI();
-    
-    // If on sound detail page, update it
-    if (currentPage === 'sound') {
-        loadSoundDetailPage();
-    }
     
     // Update Media Session API for lock screen
     updateMediaSessionMetadata();
@@ -1495,16 +1486,9 @@ function toggleSoundPlayPause() {
     renderSounds(); // Update UI
 }
 
-// Open sound detail page
+// Open sound detail page - now just plays the sound
 function openSoundDetail(soundId) {
-    const sound = sounds.find(s => s.id === soundId);
-    if (!sound) {
-        console.error('Sound not found:', soundId);
-        return;
-    }
-    
-    currentSound = sound;
-    navigateTo('sound');
+    playSound(soundId);
 }
 
 // Load sound detail page
@@ -1601,6 +1585,11 @@ function initSoundAudioContext() {
                         }
                     }).catch(err => {
                         console.log('Error resuming audio context:', err);
+                    });
+                } else if (soundAudioContext.state === 'suspended' && currentSound) {
+                    // Auto-resume if suspended (e.g., phone locked)
+                    soundAudioContext.resume().catch(err => {
+                        console.log('Error auto-resuming audio context:', err);
                     });
                 }
             });
@@ -4119,6 +4108,7 @@ function setSearchMode(mode) {
     // If switching to sounds mode, navigate to sounds page
     if (mode === 'sounds') {
         navigateTo('sounds');
+        loadSoundsPage();
     }
     
     // If no search query, navigate to show all items

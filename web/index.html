@@ -548,46 +548,38 @@
     <!-- Simple Sound Player (for looping nature sounds) -->
     <div id="sound-player-bar" class="sound-player-bar hidden">
         <div class="sound-player-content">
-            <div class="sound-player-left">
-                <div class="sound-player-artwork">
-                    <img id="sound-player-image" src="" alt="" onerror="this.style.display='none'">
+            <div class="sound-player-main">
+                <div class="sound-player-info">
+                    <h3 id="sound-player-title" class="sound-player-title">Nature Sound</h3>
                 </div>
-                <div class="sound-player-text-wrapper">
-                    <div class="sound-player-text">
-                        <h3 id="sound-player-title">Nature Sound</h3>
-                        <p id="sound-player-status">Playing</p>
-                    </div>
-                    <button id="sound-player-mobile-play" class="sound-player-mobile-play" onclick="event.stopPropagation(); toggleSoundPlayPause();">
-                        <span id="sound-player-mobile-play-icon">⏸</span>
-                    </button>
-                </div>
+                <button id="sound-player-play-btn" class="sound-player-play-btn" onclick="toggleSoundPlayPause()">
+                    <span id="sound-player-play-icon">▶</span>
+                </button>
             </div>
-            <div class="sound-player-right">
-                <div class="sleep-timer-container">
-                    <button id="sound-sleep-timer-btn" class="btn-sleep-timer" onclick="toggleSleepTimerMenu()" title="Sleep Timer">
-                        <span id="sound-sleep-timer-icon">⏰</span>
-                        <span id="sound-sleep-timer-text" class="sleep-timer-text">Timer</span>
-                    </button>
-                    <div id="sound-sleep-timer-menu" class="sleep-timer-menu hidden">
-                        <div class="sleep-timer-header">
-                            <span>Sleep Timer</span>
-                            <button class="btn-close-timer" onclick="closeSleepTimerMenu()">✕</button>
+            <div class="sound-player-timer">
+                <button id="sound-sleep-timer-btn" class="btn-sleep-timer-small" onclick="toggleSleepTimerMenu()" title="Sleep Timer">
+                    <span id="sound-sleep-timer-icon">⏰</span>
+                    <span id="sound-sleep-timer-text" class="sleep-timer-text-small">Timer</span>
+                </button>
+                <div id="sound-sleep-timer-menu" class="sleep-timer-menu hidden">
+                    <div class="sleep-timer-header">
+                        <span>Sleep Timer</span>
+                        <button class="btn-close-timer" onclick="closeSleepTimerMenu()">✕</button>
+                    </div>
+                    <div id="sound-sleep-timer-display" class="sleep-timer-display hidden">
+                        <div class="sleep-timer-time">
+                            <span id="sound-sleep-timer-countdown">0:00</span>
+                            <span class="sleep-timer-label">remaining</span>
                         </div>
-                        <div id="sound-sleep-timer-display" class="sleep-timer-display hidden">
-                            <div class="sleep-timer-time">
-                                <span id="sound-sleep-timer-countdown">0:00</span>
-                                <span class="sleep-timer-label">remaining</span>
-                            </div>
-                            <button class="btn-cancel-timer" onclick="cancelSleepTimer()">Cancel</button>
-                        </div>
-                        <div id="sound-sleep-timer-presets" class="sleep-timer-presets">
-                            <button class="btn-timer-preset" onclick="setSleepTimer(5)">5 min</button>
-                            <button class="btn-timer-preset" onclick="setSleepTimer(10)">10 min</button>
-                            <button class="btn-timer-preset" onclick="setSleepTimer(15)">15 min</button>
-                            <button class="btn-timer-preset" onclick="setSleepTimer(30)">30 min</button>
-                            <button class="btn-timer-preset" onclick="setSleepTimer(60)">1 hr</button>
-                            <button class="btn-timer-preset btn-add-minutes" onclick="addSleepTimerMinutes(5)" title="Add 5 minutes">+5 min</button>
-                        </div>
+                        <button class="btn-cancel-timer" onclick="cancelSleepTimer()">Cancel</button>
+                    </div>
+                    <div id="sound-sleep-timer-presets" class="sleep-timer-presets">
+                        <button class="btn-timer-preset" onclick="setSleepTimer(5)">5 min</button>
+                        <button class="btn-timer-preset" onclick="setSleepTimer(10)">10 min</button>
+                        <button class="btn-timer-preset" onclick="setSleepTimer(15)">15 min</button>
+                        <button class="btn-timer-preset" onclick="setSleepTimer(30)">30 min</button>
+                        <button class="btn-timer-preset" onclick="setSleepTimer(60)">1 hr</button>
+                        <button class="btn-timer-preset btn-add-minutes" onclick="addSleepTimerMinutes(5)" title="Add 5 minutes">+5 min</button>
                     </div>
                 </div>
             </div>
