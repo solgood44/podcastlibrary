@@ -1420,6 +1420,11 @@ function toggleSoundPlayPause() {
                 // Source may already be stopped
             }
         }
+        // Update UI to show pause state
+        updateSoundPlayerUI();
+        updateSoundDetailPlayButton();
+        updateSleepTimerUI();
+        renderSounds();
         // Don't clear currentSound or hide player - allow resume
     } else {
         // If paused, play
