@@ -1768,6 +1768,7 @@ async function startSeamlessLoop() {
                 
                 // Start playing
                 soundAudioSource.start(0);
+                soundIsActuallyPlaying = true; // Mark as playing
                 
                 // Pause the HTML5 audio player (we'll use it for time tracking)
                 soundAudioPlayer.pause();
@@ -1841,6 +1842,7 @@ async function startSeamlessLoop() {
             // Set loop attribute for seamless looping
             soundAudioPlayer.loop = true;
             await soundAudioPlayer.play();
+            soundIsActuallyPlaying = true; // Mark as playing
             
             // Simple backup check - if loop attribute doesn't work perfectly, reset near the end
             soundLoopCheckFunction = () => {
@@ -1910,6 +1912,9 @@ function stopSeamlessLoop() {
         soundAudioSource = null;
     }
     
+    // Mark as not playing
+    soundIsActuallyPlaying = false;
+    
     // Stop HTML5 audio loop check
     if (soundAudioPlayer && soundLoopCheckFunction) {
         soundAudioPlayer.removeEventListener('timeupdate', soundLoopCheckFunction);
@@ -1972,8 +1977,10 @@ function stopSound() {
     if (soundAudioPlayer) {
         soundAudioPlayer.pause();
         soundAudioPlayer.currentTime = 0;
+        soundAudioPlayer.loop = false;
     }
     stopSeamlessLoop();
+    soundIsActuallyPlaying = false; // Mark as not playing
     currentSound = null;
     
     // Hide sound player bar
