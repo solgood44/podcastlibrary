@@ -1481,15 +1481,22 @@ function toggleSoundPlayPause() {
     
     if (isPlaying) {
         // If playing, pause (don't stop completely - allow resume)
-        stopSeamlessLoop();
-        if (soundAudioPlayer) {
+        // First pause HTML5 audio (works for both iOS HTML5 and fallback)
+        if (soundAudioPlayer && !soundAudioPlayer.paused) {
             soundAudioPlayer.pause();
         }
+        // Then stop Web Audio API if it's being used
         if (soundAudioSource) {
             try {
-                soundAudioSource.stop();
+                stopSeamlessLoop();
             } catch (e) {
                 // Source may already be stopped
+            }
+        } else {
+            // If using HTML5 audio only, just ensure loop check is removed
+            if (soundLoopCheckFunction && soundAudioPlayer) {
+                soundAudioPlayer.removeEventListener('timeupdate', soundLoopCheckFunction);
+                soundLoopCheckFunction = null;
             }
         }
         // Update UI to show pause state
@@ -1497,6 +1504,10 @@ function toggleSoundPlayPause() {
         updateSoundDetailPlayButton();
         updateSleepTimerUI();
         renderSounds();
+        // Update Media Session playback state
+        if ('mediaSession' in navigator) {
+            navigator.mediaSession.playbackState = 'paused';
+        }
         // Don't clear currentSound or hide player - allow resume
     } else {
         // If paused, play
