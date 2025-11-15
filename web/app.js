@@ -1155,9 +1155,8 @@ function renderSounds() {
     listEl.classList.remove('hidden');
     
     listEl.innerHTML = sortedSounds.map((sound, index) => {
-        const soundIsPlaying = currentSound && currentSound.id === sound.id && 
-                               ((soundAudioSource && soundAudioContext && soundAudioContext.state === 'running') || 
-                                (soundAudioPlayer && !soundAudioPlayer.paused));
+        // Use tracking flag for reliable play state detection
+        const soundIsPlaying = currentSound && currentSound.id === sound.id && soundIsActuallyPlaying;
         const [color1, color2] = getSoundGradient(index, sound.title);
         const emoji = getSoundEmoji(sound.title);
         
@@ -1227,6 +1226,17 @@ function playSound(soundId) {
     if (!sound) {
         console.error('Sound not found:', soundId);
         return;
+    }
+    
+    // ALWAYS stop any currently playing sound first (whether same or different)
+    if (currentSound) {
+        stopSeamlessLoop();
+        if (soundAudioPlayer) {
+            soundAudioPlayer.pause();
+            soundAudioPlayer.currentTime = 0;
+            soundAudioPlayer.loop = false;
+        }
+        soundIsActuallyPlaying = false;
     }
     
     // Stop any currently playing episode and hide episode player
@@ -1326,36 +1336,7 @@ function playSound(soundId) {
         });
     }
     
-    // If same sound is playing, toggle play/pause
-    if (currentSound && currentSound.id === sound.id) {
-        const isPlaying = (soundAudioSource && soundAudioContext && soundAudioContext.state === 'running') || 
-                          (soundAudioPlayer && !soundAudioPlayer.paused);
-        if (isPlaying) {
-            // Stop player
-            stopSeamlessLoop();
-            if (soundAudioPlayer) {
-                soundAudioPlayer.pause();
-            }
-        } else {
-            // Resume playing
-            startSeamlessLoop().then(() => {
-                updateSoundPlayerUI();
-                renderSounds();
-            }).catch(err => {
-                console.log('Error resuming sound:', err);
-                if (soundAudioPlayer) {
-                    soundAudioPlayer.play().catch(e => console.log('Error:', e));
-                }
-                updateSoundPlayerUI();
-                renderSounds();
-            });
-        }
-        updateSoundPlayerUI();
-        renderSounds(); // Update UI
-        return;
-    }
-    
-    // New sound - set source and play with seamless looping
+    // Set current sound and start playing
     currentSound = sound;
     
     // Set source (for fallback and time tracking)
@@ -1503,13 +1484,10 @@ function updateSoundPlayerUI() {
     
     if (titleEl) titleEl.textContent = currentSound.title || 'Nature Sound';
     
-    // Update play/pause button - show pause icon when playing, play icon when paused
-    // Check both Web Audio API and HTML5 audio
-    const isPlaying = (soundAudioSource && soundAudioContext && soundAudioContext.state === 'running') || 
-                      (soundAudioPlayer && !soundAudioPlayer.paused);
+    // Update play/pause button - use tracking flag for reliable detection
     if (playIconEl) {
         // Show pause icon (⏸) when playing, play icon (▶) when paused
-        playIconEl.textContent = isPlaying ? '⏸' : '▶';
+        playIconEl.textContent = soundIsActuallyPlaying ? '⏸' : '▶';
     }
     
     // Update sound cards if on sounds page
@@ -1530,66 +1508,58 @@ function toggleSoundPlayPause() {
         return;
     }
     
-    // Check if playing (Web Audio API or HTML5)
-    // Use our tracking flag first, then fall back to checking actual state
-    const isPlaying = soundIsActuallyPlaying || 
-                      (soundAudioSource && soundAudioContext && soundAudioContext.state === 'running') || 
-                      (soundAudioPlayer && !soundAudioPlayer.paused);
+    // Check if playing - use tracking flag for reliable detection
+    const isPlaying = soundIsActuallyPlaying;
     
     if (isPlaying) {
         // If playing, stop completely (reset to beginning)
-        // Stop Web Audio API first if it's being used
-        if (soundAudioSource) {
-            try {
-                stopSeamlessLoop();
-            } catch (e) {
-                // Source may already be stopped
-            }
-        }
-        // Stop HTML5 audio completely (reset to beginning)
+        stopSeamlessLoop();
+        
+        // Stop HTML5 audio completely
         if (soundAudioPlayer) {
             soundAudioPlayer.pause();
-            soundAudioPlayer.currentTime = 0; // Reset to beginning
-            soundAudioPlayer.loop = false; // Disable loop to prevent auto-restart
+            soundAudioPlayer.currentTime = 0;
+            soundAudioPlayer.loop = false;
         }
-        // Remove loop check function and stop second player if using HTML5 audio
+        
+        // Remove loop check function
         if (soundLoopCheckFunction && soundAudioPlayer) {
             soundAudioPlayer.removeEventListener('timeupdate', soundLoopCheckFunction);
             soundLoopCheckFunction = null;
         }
-        // Also stop second player if it exists and reset its volume
+        
+        // Stop second player if it exists
         if (soundAudioPlayer2) {
             soundAudioPlayer2.pause();
             soundAudioPlayer2.currentTime = 0;
-            soundAudioPlayer2.volume = 0; // Reset volume
-            soundAudioPlayer2.loop = false; // Disable loop
+            soundAudioPlayer2.volume = 0;
+            soundAudioPlayer2.loop = false;
         }
+        
         // Stop crossfade interval if running
         if (soundLoopFadeInterval) {
             clearInterval(soundLoopFadeInterval);
             soundLoopFadeInterval = null;
         }
-        // Reset volume of main player in case it was being faded
+        
+        // Reset volume
         if (soundAudioPlayer) {
             soundAudioPlayer.volume = 1;
         }
-        // Don't suspend audio context - just stop the source
-        // Suspending the context prevents it from starting again easily
-        // The source.stop() is enough to stop playback
         
         // Mark as not playing
         soundIsActuallyPlaying = false;
         
-        // Update UI to show stopped state immediately
+        // Update UI
         updateSoundPlayerUI();
         updateSoundDetailPlayButton();
         updateSleepTimerUI();
         renderSounds();
-        // Update Media Session playback state
+        
+        // Update Media Session
         if ('mediaSession' in navigator) {
             navigator.mediaSession.playbackState = 'paused';
         }
-        // Don't clear currentSound or hide player - allow resume
     } else {
         // If paused/stopped, play
         // Resume audio context if it was suspended
@@ -1730,11 +1700,17 @@ function loadSoundDetailPage() {
 function updateSoundDetailPlayButton() {
     const playIconEl = document.getElementById('sound-detail-play-icon');
     if (playIconEl && currentSound) {
-        // Check both Web Audio API and HTML5 audio
-        const isPlaying = (soundAudioSource && soundAudioContext && soundAudioContext.state === 'running') || 
-                          (soundAudioPlayer && !soundAudioPlayer.paused);
-        // Show stop icon (⏹) when playing, play icon (▶) when stopped
-        playIconEl.textContent = isPlaying ? '⏹' : '▶';
+        // Use tracking flag for reliable detection
+        playIconEl.textContent = soundIsActuallyPlaying ? '⏸' : '▶';
+    }
+}
+
+// Toggle sound play/pause from list view
+function toggleSoundPlayPauseFromList(soundId) {
+    if (currentSound && currentSound.id === soundId && soundIsActuallyPlaying) {
+        toggleSoundPlayPause(); // If same sound and playing, pause
+    } else {
+        playSound(soundId); // If different sound or not playing, play it
     }
 }
 

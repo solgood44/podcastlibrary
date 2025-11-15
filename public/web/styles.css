@@ -3776,57 +3776,80 @@ body {
     }
     
     .podcast-list-item {
-        padding: 14px 16px;
-        min-height: 80px; /* Better touch target */
+        padding: 16px 18px;
+        min-height: 88px; /* Better touch target */
     }
     
     .podcast-list-image {
-        width: 64px;
-        height: 64px;
+        width: 72px;
+        height: 72px;
     }
     
     /* Better spacing for list items */
     .podcast-list-item-content {
-        gap: 12px;
+        gap: 14px;
+    }
+    
+    .podcast-list-title {
+        font-size: 16px; /* Larger text */
     }
     
     /* Improve sound list items */
     .sound-list-gradient {
-        width: 64px;
-        height: 64px;
+        width: 72px;
+        height: 72px;
     }
     
     .sound-list-gradient-icon {
-        font-size: 28px;
+        font-size: 32px;
     }
     
     .sound-list-play-button {
-        width: 48px;
-        height: 48px;
-        font-size: 20px;
+        width: 56px;
+        height: 56px;
+        font-size: 24px;
     }
     
     /* Better sidebar spacing */
     .sidebar-item {
-        padding: 14px 16px;
-        min-height: 52px;
+        padding: 16px 18px;
+        min-height: 56px;
+    }
+    
+    .sidebar-item-title {
+        font-size: 16px;
     }
     
     /* Improve button spacing */
     .btn-skip-text-only {
-        padding: 10px 12px;
-        min-width: 50px;
+        padding: 12px 14px;
+        min-width: 56px;
+        font-size: 14px;
     }
     
     .btn-play-pause-main {
-        width: 48px;
-        height: 48px;
-        font-size: 20px;
+        width: 56px;
+        height: 56px;
+        font-size: 24px;
     }
     
     .btn-sleep-timer-small {
-        padding: 8px 12px;
-        min-height: 44px;
+        padding: 10px 14px;
+        min-height: 48px;
+        font-size: 14px;
+    }
+    
+    /* Larger player buttons */
+    .sound-player-play-btn {
+        width: 56px;
+        height: 56px;
+        font-size: 24px;
+    }
+    
+    .player-bar-play-btn {
+        width: 56px;
+        height: 56px;
+        font-size: 24px;
     }
 }
 
