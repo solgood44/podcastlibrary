@@ -812,7 +812,18 @@ function renderHistory() {
     const history = getHistory();
     
     if (historyEl) {
-        historyEl.textContent = String(history.length);
+        // Count unique podcasts/episodes listened to (not just total history items)
+        const uniqueItems = new Set();
+        history.forEach(item => {
+            if (item.episodeId) {
+                uniqueItems.add(`episode-${item.episodeId}`);
+            } else if (item.podcastId) {
+                uniqueItems.add(`podcast-${item.podcastId}`);
+            } else if (item.soundId) {
+                uniqueItems.add(`sound-${item.soundId}`);
+            }
+        });
+        historyEl.textContent = String(uniqueItems.size);
     }
 }
 

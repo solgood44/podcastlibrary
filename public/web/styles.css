@@ -38,7 +38,7 @@ body {
     background: var(--bg-primary);
     color: var(--text-primary);
     line-height: 1.6;
-    padding-top: 60px; /* Space for top bar */
+    padding-top: 64px; /* Space for top bar */
     padding-bottom: 80px; /* Space for player bar */
     transition: background 0.3s ease, color 0.3s ease;
 }
@@ -49,16 +49,17 @@ body {
     top: 0;
     left: 0;
     right: 0;
-    height: 60px;
+    height: 64px;
     background: var(--bg-secondary);
     border-bottom: 1px solid var(--border);
     transition: margin-left 0.3s ease, padding-left 0.3s ease;
     display: flex;
     align-items: center;
-    padding: 0 20px;
+    padding: 0 24px;
     z-index: 90;
-    backdrop-filter: blur(10px);
+    backdrop-filter: blur(20px) saturate(180%);
     gap: 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .btn-menu {
@@ -71,6 +72,11 @@ body {
     border-radius: 8px;
     transition: background 0.2s;
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    min-height: 40px;
 }
 
 .btn-menu:hover {
@@ -82,12 +88,24 @@ body {
     .top-bar {
         left: var(--sidebar-width);
         transition: left 0.3s ease;
+        padding-left: 20px;
     }
     
     /* When sidebar is closed, top bar should fill the screen */
     body:has(.sidebar:not(.open)) .top-bar,
     body.sidebar-closed .top-bar {
         left: 0;
+    }
+    
+    /* Hide hamburger menu on desktop when sidebar is open (use X button in sidebar instead) */
+    /* By default, sidebar is open on desktop, so hide hamburger */
+    .top-bar .btn-menu {
+        display: none;
+    }
+    
+    /* Show hamburger menu when sidebar is closed on desktop */
+    body.sidebar-closed .top-bar .btn-menu {
+        display: flex;
     }
 }
 
@@ -211,6 +229,7 @@ body {
 @media (min-width: 769px) {
     .sidebar {
         transform: translateX(0);
+        box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
     }
     
     /* On desktop, sidebar can be closed but defaults to open */
@@ -472,7 +491,7 @@ body {
 .main-content {
     max-width: 1400px;
     margin: 0 auto;
-    padding: 20px;
+    padding: 32px 40px;
     transition: margin-left 0.3s ease, padding-left 0.3s ease;
 }
 
@@ -480,7 +499,10 @@ body {
 @media (min-width: 769px) {
     .main-content {
         margin-left: var(--sidebar-width);
-        padding-left: 40px;
+        padding-left: 48px;
+        padding-right: 48px;
+        padding-top: 40px;
+        padding-bottom: 40px;
         transition: margin-left 0.3s ease, padding-left 0.3s ease;
     }
     
@@ -488,7 +510,8 @@ body {
     body:has(.sidebar:not(.open)) .main-content,
     body.sidebar-closed .main-content {
         margin-left: 0;
-        padding-left: 20px;
+        padding-left: 40px;
+        padding-right: 40px;
     }
 }
 
@@ -524,14 +547,15 @@ body {
     display: flex;
     align-items: center;
     gap: 16px;
-    margin-bottom: 24px;
-    padding-bottom: 16px;
+    margin-bottom: 32px;
+    padding-bottom: 20px;
     border-bottom: 1px solid var(--border);
 }
 
 .page-header h1 {
-    font-size: 28px;
+    font-size: 32px;
     font-weight: 700;
+    letter-spacing: -0.5px;
 }
 
 .btn-back {
@@ -730,8 +754,8 @@ body {
 .podcast-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-    gap: 24px;
-    padding: 20px 0;
+    gap: 28px;
+    padding: 24px 0;
 }
 
 @media (max-width: 768px) {
@@ -745,9 +769,10 @@ body {
     background: var(--bg-card);
     border-radius: 12px;
     overflow: hidden;
-    transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s;
     border: 1px solid var(--border);
     position: relative;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .podcast-card-content {
@@ -755,8 +780,8 @@ body {
 }
 
 .podcast-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 24px var(--shadow-lg);
+    transform: translateY(-6px) scale(1.02);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.05);
     background: var(--bg-hover);
 }
 
@@ -1629,14 +1654,15 @@ body {
     border-radius: 16px;
     overflow: hidden;
     border: 1px solid var(--border);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 }
 
 .podcast-list-item {
     display: flex;
     align-items: center;
-    padding: 16px 20px;
+    padding: 20px 24px;
     border-bottom: 1px solid var(--border);
-    transition: background 0.2s;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     gap: 16px;
 }
 
@@ -1646,6 +1672,8 @@ body {
 
 .podcast-list-item:hover {
     background: var(--bg-hover);
+    transform: translateX(4px);
+    box-shadow: -4px 0 12px rgba(0, 0, 0, 0.1);
 }
 
 .podcast-list-item-content {
@@ -3895,9 +3923,9 @@ body {
 }
 
 .btn-auth {
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border);
-    color: var(--text-primary);
+    background: var(--accent);
+    border: 1px solid var(--accent);
+    color: white;
     padding: 8px 16px;
     border-radius: 8px;
     cursor: pointer;
@@ -3907,8 +3935,10 @@ body {
 }
 
 .btn-auth:hover {
-    background: var(--bg-hover);
-    border-color: var(--border-light);
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(29, 185, 84, 0.3);
 }
 
 .btn-auth.signed-in {
