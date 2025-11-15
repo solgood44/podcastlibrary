@@ -1478,7 +1478,10 @@ function toggleSoundPlayPause() {
     }
     
     // Check if playing (Web Audio API or HTML5)
-    const isPlaying = (soundAudioSource && soundAudioContext && soundAudioContext.state === 'running') || 
+    // For Web Audio API, check if source exists and context is running
+    // For HTML5, check if player is not paused
+    const isPlaying = (soundAudioSource && soundAudioContext && 
+                      (soundAudioContext.state === 'running' || soundAudioContext.state === 'suspended')) || 
                       (soundAudioPlayer && !soundAudioPlayer.paused);
     
     if (isPlaying) {
@@ -1714,7 +1717,7 @@ async function startSeamlessLoop() {
     if (initSoundAudioContext()) {
         try {
             // Resume audio context if suspended (required on mobile)
-            if (soundAudioContext.state === 'suspended') {
+            if (soundAudioContext.state === 'suspended' || soundAudioContext.state === 'interrupted') {
                 await soundAudioContext.resume();
             }
             
@@ -1857,6 +1860,10 @@ function stopSeamlessLoop() {
     // Stop Web Audio API source
     if (soundAudioSource) {
         try {
+            // Mark as manually stopped to prevent auto-restart
+            soundAudioSource._manuallyStopped = true;
+            
+            // Clear intervals
             if (soundAudioSource._syncInterval) {
                 clearInterval(soundAudioSource._syncInterval);
             }
@@ -1866,10 +1873,21 @@ function stopSeamlessLoop() {
             if (soundAudioSource._visibilityHandler) {
                 document.removeEventListener('visibilitychange', soundAudioSource._visibilityHandler);
             }
-            soundAudioSource.stop();
-            soundAudioSource.disconnect();
+            
+            // Stop and disconnect the source
+            try {
+                soundAudioSource.stop();
+            } catch (e) {
+                // Source may already be stopped or not started yet
+            }
+            try {
+                soundAudioSource.disconnect();
+            } catch (e) {
+                // Source may already be disconnected
+            }
         } catch (e) {
             // Source may already be stopped
+            console.log('Error stopping Web Audio source:', e);
         }
         soundAudioSource = null;
     }
