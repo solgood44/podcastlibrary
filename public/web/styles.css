@@ -3721,6 +3721,113 @@ body {
         height: 40px;
         font-size: 16px;
     }
+    
+    /* Improve touch targets - minimum 44x44px for accessibility */
+    button, .btn-menu, .sidebar-item, .podcast-list-item-content,
+    .btn-skip-text-only, .btn-play-pause-main, .btn-sleep-timer-small,
+    .player-bar-play-btn, .sound-player-play-btn {
+        min-height: 44px;
+        min-width: 44px;
+    }
+    
+    /* Better spacing for mobile */
+    .page-header {
+        margin-bottom: 16px;
+    }
+    
+    .page-header h1 {
+        font-size: 22px;
+        line-height: 1.3;
+    }
+    
+    .top-bar {
+        height: 56px; /* Slightly taller for better touch */
+    }
+    
+    .search-mode-dropdown {
+        padding: 10px 28px 10px 12px;
+        font-size: 13px;
+        min-height: 44px;
+    }
+    
+    .search-mode-btn {
+        padding: 8px 14px;
+        font-size: 12px;
+        min-height: 44px;
+    }
+    
+    .top-search-input {
+        font-size: 16px; /* Prevent zoom on iOS */
+        padding: 12px 16px;
+        min-height: 44px;
+    }
+    
+    .btn-auth {
+        padding: 10px 14px;
+        font-size: 14px;
+        min-height: 44px;
+    }
+    
+    .sort-select,
+    .filter-select {
+        font-size: 14px;
+        padding: 10px 12px;
+        min-height: 44px;
+    }
+    
+    .podcast-list-item {
+        padding: 14px 16px;
+        min-height: 80px; /* Better touch target */
+    }
+    
+    .podcast-list-image {
+        width: 64px;
+        height: 64px;
+    }
+    
+    /* Better spacing for list items */
+    .podcast-list-item-content {
+        gap: 12px;
+    }
+    
+    /* Improve sound list items */
+    .sound-list-gradient {
+        width: 64px;
+        height: 64px;
+    }
+    
+    .sound-list-gradient-icon {
+        font-size: 28px;
+    }
+    
+    .sound-list-play-button {
+        width: 48px;
+        height: 48px;
+        font-size: 20px;
+    }
+    
+    /* Better sidebar spacing */
+    .sidebar-item {
+        padding: 14px 16px;
+        min-height: 52px;
+    }
+    
+    /* Improve button spacing */
+    .btn-skip-text-only {
+        padding: 10px 12px;
+        min-width: 50px;
+    }
+    
+    .btn-play-pause-main {
+        width: 48px;
+        height: 48px;
+        font-size: 20px;
+    }
+    
+    .btn-sleep-timer-small {
+        padding: 8px 12px;
+        min-height: 44px;
+    }
 }
 
 /* Hide mobile play button on desktop */
