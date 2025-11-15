@@ -1483,25 +1483,24 @@ function toggleSoundPlayPause() {
     
     if (isPlaying) {
         // If playing, pause (don't stop completely - allow resume)
-        // First pause HTML5 audio (works for both iOS HTML5 and fallback)
-        if (soundAudioPlayer && !soundAudioPlayer.paused) {
-            soundAudioPlayer.pause();
-        }
-        // Then stop Web Audio API if it's being used
+        // Stop Web Audio API first if it's being used
         if (soundAudioSource) {
             try {
                 stopSeamlessLoop();
             } catch (e) {
                 // Source may already be stopped
             }
-        } else {
-            // If using HTML5 audio only, just ensure loop check is removed
-            if (soundLoopCheckFunction && soundAudioPlayer) {
-                soundAudioPlayer.removeEventListener('timeupdate', soundLoopCheckFunction);
-                soundLoopCheckFunction = null;
-            }
         }
-        // Update UI to show pause state
+        // Then pause HTML5 audio (works for both iOS HTML5 and fallback)
+        if (soundAudioPlayer && !soundAudioPlayer.paused) {
+            soundAudioPlayer.pause();
+        }
+        // Remove loop check function if using HTML5 audio only
+        if (soundLoopCheckFunction && soundAudioPlayer) {
+            soundAudioPlayer.removeEventListener('timeupdate', soundLoopCheckFunction);
+            soundLoopCheckFunction = null;
+        }
+        // Update UI to show pause state immediately
         updateSoundPlayerUI();
         updateSoundDetailPlayButton();
         updateSleepTimerUI();
@@ -1696,24 +1695,82 @@ async function startSeamlessLoop() {
     // On iOS, prefer HTML5 audio for better background playback support
     // Web Audio API has issues with background playback on iOS
     if (isIOSDevice()) {
-        // Use HTML5 audio with seamless looping for iOS
+        // Use HTML5 audio with overlapping playback for truly seamless looping
         if (soundAudioPlayer && soundAudioPlayer.paused) {
             try {
                 // Set loop attribute for seamless looping
                 soundAudioPlayer.loop = true;
                 await soundAudioPlayer.play();
                 
-                // Set up seamless loop check with early reset for perfect looping
-                // Reset 0.3 seconds before the end to ensure no gap
+                // Use overlapping playback for truly seamless loop
+                // Start a second player slightly before the first ends, then crossfade
+                const setupOverlappingLoop = () => {
+                    if (!soundAudioPlayer || !currentSound || soundAudioPlayer.paused) {
+                        return;
+                    }
+                    
+                    const duration = soundAudioPlayer.duration;
+                    if (!duration || duration < 1) return; // Wait for duration to load
+                    
+                    // When we're 0.5 seconds from the end, start the next loop
+                    if (soundAudioPlayer.currentTime >= duration - 0.5) {
+                        // Create second player if it doesn't exist
+                        if (!soundAudioPlayer2) {
+                            soundAudioPlayer2 = document.createElement('audio');
+                            soundAudioPlayer2.src = soundAudioPlayer.src;
+                            soundAudioPlayer2.loop = true;
+                            soundAudioPlayer2.volume = 0;
+                            soundAudioPlayer2.playsInline = true;
+                            soundAudioPlayer2.setAttribute('playsinline', 'true');
+                            soundAudioPlayer2.setAttribute('webkit-playsinline', 'true');
+                            document.body.appendChild(soundAudioPlayer2);
+                            
+                            // Start second player at beginning
+                            soundAudioPlayer2.currentTime = 0;
+                            soundAudioPlayer2.play().catch(err => {
+                                console.log('Error starting second player:', err);
+                            });
+                            
+                            // Fade in second player while fading out first
+                            let fadeProgress = 0;
+                            const fadeInterval = setInterval(() => {
+                                if (!soundAudioPlayer || !soundAudioPlayer2 || !currentSound) {
+                                    clearInterval(fadeInterval);
+                                    return;
+                                }
+                                
+                                fadeProgress += 0.1;
+                                if (fadeProgress >= 1) {
+                                    // Fade complete - switch to second player
+                                    soundAudioPlayer.pause();
+                                    soundAudioPlayer.currentTime = 0;
+                                    soundAudioPlayer2.volume = 1;
+                                    
+                                    // Swap players
+                                    const temp = soundAudioPlayer;
+                                    soundAudioPlayer = soundAudioPlayer2;
+                                    soundAudioPlayer2 = temp;
+                                    
+                                    clearInterval(fadeInterval);
+                                    soundLoopFadeInterval = null;
+                                } else {
+                                    // Crossfade
+                                    soundAudioPlayer.volume = 1 - fadeProgress;
+                                    soundAudioPlayer2.volume = fadeProgress;
+                                }
+                            }, 50);
+                            
+                            soundLoopFadeInterval = fadeInterval;
+                        }
+                    }
+                };
+                
+                // Check every 100ms for seamless transition
                 soundLoopCheckFunction = () => {
                     if (!soundAudioPlayer || !currentSound || soundAudioPlayer.paused) {
                         return;
                     }
-                    // Reset 0.3 seconds before the end for seamless transition
-                    if (soundAudioPlayer.duration && 
-                        soundAudioPlayer.currentTime >= soundAudioPlayer.duration - 0.3) {
-                        soundAudioPlayer.currentTime = 0;
-                    }
+                    setupOverlappingLoop();
                 };
                 soundAudioPlayer.addEventListener('timeupdate', soundLoopCheckFunction);
                 
