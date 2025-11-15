@@ -1500,14 +1500,21 @@ function toggleSoundPlayPause() {
             soundAudioPlayer.removeEventListener('timeupdate', soundLoopCheckFunction);
             soundLoopCheckFunction = null;
         }
-        // Also pause second player if it exists
-        if (soundAudioPlayer2 && !soundAudioPlayer2.paused) {
-            soundAudioPlayer2.pause();
+        // Also pause second player if it exists and reset its volume
+        if (soundAudioPlayer2) {
+            if (!soundAudioPlayer2.paused) {
+                soundAudioPlayer2.pause();
+            }
+            soundAudioPlayer2.volume = 0; // Reset volume
         }
         // Stop crossfade interval if running
         if (soundLoopFadeInterval) {
             clearInterval(soundLoopFadeInterval);
             soundLoopFadeInterval = null;
+        }
+        // Reset volume of main player in case it was being faded
+        if (soundAudioPlayer) {
+            soundAudioPlayer.volume = 1;
         }
         // Update UI to show pause state immediately
         updateSoundPlayerUI();
@@ -1714,7 +1721,12 @@ async function startSeamlessLoop() {
                 // Use overlapping playback for truly seamless loop
                 // Start a second player slightly before the first ends, then crossfade
                 const setupOverlappingLoop = () => {
+                    // Check if paused first - don't set up loop if paused
                     if (!soundAudioPlayer || !currentSound || soundAudioPlayer.paused) {
+                        return;
+                    }
+                    // Double-check paused state to prevent auto-resume
+                    if (soundAudioPlayer.paused) {
                         return;
                     }
                     
@@ -1776,7 +1788,12 @@ async function startSeamlessLoop() {
                 
                 // Check every 100ms for seamless transition
                 soundLoopCheckFunction = () => {
+                    // Double-check paused state to prevent auto-resume
                     if (!soundAudioPlayer || !currentSound || soundAudioPlayer.paused) {
+                        return;
+                    }
+                    // Additional check - if paused, don't set up loop
+                    if (soundAudioPlayer.paused) {
                         return;
                     }
                     setupOverlappingLoop();
@@ -1908,7 +1925,12 @@ async function startSeamlessLoop() {
     
     // Use overlapping playback for truly seamless loop
     const setupOverlappingLoop = () => {
+        // Check if paused first - don't set up loop if paused
         if (!soundAudioPlayer || !currentSound || soundAudioPlayer.paused) {
+            return;
+        }
+        // Double-check paused state to prevent auto-resume
+        if (soundAudioPlayer.paused) {
             return;
         }
         

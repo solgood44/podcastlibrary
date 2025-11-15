@@ -948,9 +948,24 @@ body {
     flex-shrink: 0;
 }
 
+.sound-list-gradient {
+    width: 80px;
+    height: 80px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
 .sound-list-gradient-icon {
     font-size: 32px;
     opacity: 0.8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
 }
 
 .sound-list-play-button {
