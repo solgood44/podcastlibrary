@@ -4912,7 +4912,7 @@ function updatePlayPauseButton() {
         icon.textContent = isPlaying ? '⏸' : '▶';
     }
     // Update mobile play button
-    const mobileIcon = document.getElementById('player-bar-mobile-play-icon');
+    const mobileIcon = document.getElementById('player-bar-play-icon');
     if (mobileIcon) {
         mobileIcon.textContent = isPlaying ? '⏸' : '▶';
     }
