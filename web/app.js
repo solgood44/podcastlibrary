@@ -35,6 +35,8 @@ let soundAudioPlayer = null; // Separate audio player for sounds (for seamless l
 let soundAudioContext = null; // Web Audio API context for seamless looping
 let soundAudioSource = null; // Web Audio API source node
 let soundAudioBuffer = null; // Cached audio buffer for seamless looping
+let soundAudioPlayer2 = null; // Second HTML5 audio player for seamless crossfade looping
+let soundLoopFadeInterval = null; // Interval for managing crossfade
 let soundLoopCheckFunction = null; // Stored reference to loop check function for removal
 let sleepTimerInterval = null; // Interval for sleep timer countdown
 let sleepTimerEndTime = null; // Timestamp when sleep timer will end
@@ -1738,6 +1740,8 @@ async function startSeamlessLoop() {
                 soundAudioSource = soundAudioContext.createBufferSource();
                 soundAudioSource.buffer = buffer;
                 soundAudioSource.loop = true; // This provides truly seamless looping
+                soundAudioSource.loopStart = 0; // Start loop from beginning
+                soundAudioSource.loopEnd = buffer.duration; // Loop to end
                 
                 // Connect to destination (speakers)
                 soundAudioSource.connect(soundAudioContext.destination);
@@ -1821,7 +1825,7 @@ async function startSeamlessLoop() {
         }
     }
     
-    // Fallback to HTML5 audio with loop attribute
+    // Fallback to HTML5 audio with seamless looping
     // Start playing HTML5 audio if not already playing
     if (soundAudioPlayer && soundAudioPlayer.paused) {
         try {
@@ -1834,16 +1838,17 @@ async function startSeamlessLoop() {
         }
     }
     
-    // Set up loop check as backup (though loop=true should handle it)
+    // Set up seamless loop check with early reset for perfect looping
+    // Reset earlier (0.3 seconds) to ensure no gap
     soundLoopCheckFunction = () => {
         if (!soundAudioPlayer || !currentSound || soundAudioPlayer.paused) {
             return;
         }
         
-        // Check if we're very close to the end (within 0.1 seconds)
-        // This is a backup in case loop attribute doesn't work perfectly
+        // Reset 0.3 seconds before the end for seamless transition
+        // This ensures there's no gap when looping
         if (soundAudioPlayer.duration && 
-            soundAudioPlayer.currentTime >= soundAudioPlayer.duration - 0.1) {
+            soundAudioPlayer.currentTime >= soundAudioPlayer.duration - 0.3) {
             soundAudioPlayer.currentTime = 0;
         }
     };
