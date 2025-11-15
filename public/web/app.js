@@ -2990,8 +2990,13 @@ function openPodcast(podcastId) {
 
 // Add episode to history
 function addEpisodeToHistory(episodeId, podcastId) {
+    if (!episodeId || !podcastId) {
+        console.warn('addEpisodeToHistory called with invalid parameters:', { episodeId, podcastId });
+        return;
+    }
+    
     const history = getHistory();
-    // Remove if already exists
+    // Remove if already exists (deduplicate by episodeId)
     const filtered = history.filter(item => item.episodeId !== episodeId);
     // Add to front
     filtered.unshift({ episodeId, podcastId, timestamp: Date.now() });
@@ -4598,8 +4603,9 @@ function playEpisode(episode) {
         window.analytics.trackEpisodePlay(episode, currentPodcast);
     }
     
-    // Add to history
-    if (currentPodcast) {
+    // Add to history only once when episode starts playing
+    // Check if this episode is already the current episode to avoid duplicate additions
+    if (currentPodcast && (!currentEpisode || currentEpisode.id !== episode.id)) {
         addEpisodeToHistory(episode.id, currentPodcast.id);
     }
     
