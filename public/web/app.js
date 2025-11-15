@@ -1737,9 +1737,11 @@ async function startSeamlessLoop() {
                 soundAudioSource.connect(soundAudioContext.destination);
                 
                 // Handle source node ending (shouldn't happen with loop=true, but just in case)
+                // Store a flag to prevent auto-restart when we manually stop
+                soundAudioSource._manuallyStopped = false;
                 soundAudioSource.onended = () => {
-                    // If loop somehow ends, restart it
-                    if (currentSound && soundAudioBuffer) {
+                    // Only restart if it wasn't manually stopped and we still have a current sound
+                    if (!soundAudioSource._manuallyStopped && currentSound && soundAudioBuffer) {
                         startSeamlessLoop();
                     }
                 };
