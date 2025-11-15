@@ -4582,6 +4582,9 @@ function playEpisode(episode) {
         }
     }
     
+    // Check if this is a new episode (before we update currentEpisode)
+    const isNewEpisode = !currentEpisode || currentEpisode.id !== episode.id;
+    
     // Save previous progress if switching episodes
     if (currentEpisode && currentEpisode.id !== episode.id) {
         saveProgress();
@@ -4603,9 +4606,8 @@ function playEpisode(episode) {
         window.analytics.trackEpisodePlay(episode, currentPodcast);
     }
     
-    // Add to history only once when episode starts playing
-    // Check if this episode is already the current episode to avoid duplicate additions
-    if (currentPodcast && (!currentEpisode || currentEpisode.id !== episode.id)) {
+    // Add to history only when starting a NEW episode (not when resuming the same one)
+    if (currentPodcast && isNewEpisode) {
         addEpisodeToHistory(episode.id, currentPodcast.id);
     }
     
