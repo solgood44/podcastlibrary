@@ -1495,10 +1495,19 @@ function toggleSoundPlayPause() {
         if (soundAudioPlayer && !soundAudioPlayer.paused) {
             soundAudioPlayer.pause();
         }
-        // Remove loop check function if using HTML5 audio only
+        // Remove loop check function and stop second player if using HTML5 audio
         if (soundLoopCheckFunction && soundAudioPlayer) {
             soundAudioPlayer.removeEventListener('timeupdate', soundLoopCheckFunction);
             soundLoopCheckFunction = null;
+        }
+        // Also pause second player if it exists
+        if (soundAudioPlayer2 && !soundAudioPlayer2.paused) {
+            soundAudioPlayer2.pause();
+        }
+        // Stop crossfade interval if running
+        if (soundLoopFadeInterval) {
+            clearInterval(soundLoopFadeInterval);
+            soundLoopFadeInterval = null;
         }
         // Update UI to show pause state immediately
         updateSoundPlayerUI();
