@@ -812,33 +812,29 @@ function renderHistory() {
     const history = getHistory();
     
     if (historyEl) {
-        // Count unique podcasts/episodes that can actually be displayed
-        // This matches what's shown on the history page - only valid items
-        const uniqueItems = new Set();
+        // Count items that would actually be displayed on the history page
+        // This matches exactly what loadHistoryPage() shows - items with valid episode AND podcast
+        let displayableCount = 0;
         history.forEach(item => {
             if (item && typeof item === 'object') {
-                // For episodes: only count if we can find the episode and podcast
+                // For episodes: only count if we can find BOTH the episode AND podcast
+                // This matches the history page filter: if (!episode || !podcast) return '';
                 if (item.episodeId) {
                     const episode = allEpisodes.find(e => e.id === item.episodeId);
                     const podcast = podcasts.find(p => p.id === item.podcastId);
                     if (episode && podcast) {
-                        uniqueItems.add(`episode-${item.episodeId}`);
+                        displayableCount++;
                     }
                 } 
-                // For sounds: count if soundId exists
+                // For sounds: count if soundId exists (sounds don't need podcast validation)
                 else if (item.soundId) {
-                    uniqueItems.add(`sound-${item.soundId}`);
-                } 
-                // For podcasts: only count if we can find the podcast
-                else if (item.podcastId) {
-                    const podcast = podcasts.find(p => p.id === item.podcastId);
-                    if (podcast) {
-                        uniqueItems.add(`podcast-${item.podcastId}`);
-                    }
+                    displayableCount++;
                 }
+                // For podcasts only (no episodeId): these aren't shown on history page
+                // The history page only shows items with episodeId, so don't count these
             }
         });
-        historyEl.textContent = String(uniqueItems.size);
+        historyEl.textContent = String(displayableCount);
     }
 }
 
