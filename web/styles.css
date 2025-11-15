@@ -3745,34 +3745,34 @@ body {
     }
     
     .search-mode-dropdown {
-        padding: 10px 28px 10px 12px;
-        font-size: 13px;
-        min-height: 44px;
+        padding: 12px 32px 12px 14px;
+        font-size: 15px;
+        min-height: 48px;
     }
     
     .search-mode-btn {
-        padding: 8px 14px;
-        font-size: 12px;
-        min-height: 44px;
+        padding: 10px 16px;
+        font-size: 14px;
+        min-height: 48px;
     }
     
     .top-search-input {
         font-size: 16px; /* Prevent zoom on iOS */
-        padding: 12px 16px;
-        min-height: 44px;
+        padding: 14px 18px;
+        min-height: 48px;
     }
     
     .btn-auth {
-        padding: 10px 14px;
-        font-size: 14px;
-        min-height: 44px;
+        padding: 12px 16px;
+        font-size: 15px;
+        min-height: 48px;
     }
     
     .sort-select,
     .filter-select {
-        font-size: 14px;
-        padding: 10px 12px;
-        min-height: 44px;
+        font-size: 15px;
+        padding: 12px 14px;
+        min-height: 48px;
     }
     
     .podcast-list-item {
