@@ -1478,10 +1478,9 @@ function toggleSoundPlayPause() {
     }
     
     // Check if playing (Web Audio API or HTML5)
-    // For Web Audio API, check if source exists and context is running
-    // For HTML5, check if player is not paused
-    const isPlaying = (soundAudioSource && soundAudioContext && 
-                      (soundAudioContext.state === 'running' || soundAudioContext.state === 'suspended')) || 
+    // Use our tracking flag first, then fall back to checking actual state
+    const isPlaying = soundIsActuallyPlaying || 
+                      (soundAudioSource && soundAudioContext && soundAudioContext.state === 'running') || 
                       (soundAudioPlayer && !soundAudioPlayer.paused);
     
     if (isPlaying) {
@@ -1531,6 +1530,10 @@ function toggleSoundPlayPause() {
                 console.log('Error suspending audio context:', e);
             }
         }
+        
+        // Mark as not playing
+        soundIsActuallyPlaying = false;
+        
         // Update UI to show stopped state immediately
         updateSoundPlayerUI();
         updateSoundDetailPlayButton();
