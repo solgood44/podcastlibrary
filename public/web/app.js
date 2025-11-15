@@ -812,18 +812,29 @@ function renderHistory() {
     const history = getHistory();
     
     if (historyEl) {
-        // Count unique podcasts/episodes listened to (not just total history items)
-        // Prioritize episodes over podcasts (if an item has both, count it as an episode)
+        // Count unique podcasts/episodes that can actually be displayed
+        // This matches what's shown on the history page - only valid items
         const uniqueItems = new Set();
         history.forEach(item => {
             if (item && typeof item === 'object') {
+                // For episodes: only count if we can find the episode and podcast
                 if (item.episodeId) {
-                    uniqueItems.add(`episode-${item.episodeId}`);
-                } else if (item.soundId) {
+                    const episode = allEpisodes.find(e => e.id === item.episodeId);
+                    const podcast = podcasts.find(p => p.id === item.podcastId);
+                    if (episode && podcast) {
+                        uniqueItems.add(`episode-${item.episodeId}`);
+                    }
+                } 
+                // For sounds: count if soundId exists
+                else if (item.soundId) {
                     uniqueItems.add(`sound-${item.soundId}`);
-                } else if (item.podcastId) {
-                    // Only count podcast if it doesn't have an episodeId
-                    uniqueItems.add(`podcast-${item.podcastId}`);
+                } 
+                // For podcasts: only count if we can find the podcast
+                else if (item.podcastId) {
+                    const podcast = podcasts.find(p => p.id === item.podcastId);
+                    if (podcast) {
+                        uniqueItems.add(`podcast-${item.podcastId}`);
+                    }
                 }
             }
         });
