@@ -1378,29 +1378,27 @@ function playSound(soundId) {
     updateMediaSessionMetadata();
     
     // Start seamless looping (will use Web Audio API if available)
-    startSeamlessLoop().then(() => {
-        updateSoundPlayerUI();
-        renderSounds(); // Update UI to show playing state
-        updateSleepTimerUI(); // Update sidebar timer visibility
-        // Add to history
-        addSoundToHistory(sound.id);
-    }).catch(err => {
-        console.log('Error starting seamless loop, trying HTML5 fallback:', err);
-        // Fallback: try HTML5 audio directly
-        if (soundAudioPlayer) {
-            // Make sure HTML5 audio is ready
-            soundAudioPlayer.load();
-            const playPromise = soundAudioPlayer.play();
-            if (playPromise !== undefined) {
-                playPromise
-                    .then(() => {
-                        // Set up HTML5 loop check
+    // Resume audio context first if it was suspended
+    if (soundAudioContext && soundAudioContext.state === 'suspended') {
+        soundAudioContext.resume().then(() => {
+            startSeamlessLoop().then(() => {
+                updateSoundPlayerUI();
+                renderSounds();
+                updateSleepTimerUI();
+                addSoundToHistory(sound.id);
+            }).catch(err => {
+                console.log('Error starting seamless loop, trying HTML5 fallback:', err);
+                if (soundAudioPlayer) {
+                    soundAudioPlayer.loop = true;
+                    soundAudioPlayer.load();
+                    soundAudioPlayer.play().then(() => {
+                        soundIsActuallyPlaying = true;
                         soundLoopCheckFunction = () => {
                             if (!soundAudioPlayer || !currentSound || soundAudioPlayer.paused) {
                                 return;
                             }
                             if (soundAudioPlayer.duration && 
-                                soundAudioPlayer.currentTime >= soundAudioPlayer.duration - 0.1) {
+                                soundAudioPlayer.currentTime >= soundAudioPlayer.duration - 0.05) {
                                 soundAudioPlayer.currentTime = 0;
                             }
                         };
@@ -1409,20 +1407,74 @@ function playSound(soundId) {
                         renderSounds();
                         updateSleepTimerUI();
                         addSoundToHistory(sound.id);
-                    })
-                    .catch(error => {
+                    }).catch(error => {
                         console.log('Error playing HTML5 audio:', error);
                         updateSoundPlayerUI();
                         updateSleepTimerUI();
                     });
-            } else {
+                }
+            });
+        }).catch(err => {
+            console.log('Error resuming audio context, trying to start anyway:', err);
+            startSeamlessLoop().then(() => {
                 updateSoundPlayerUI();
                 renderSounds();
                 updateSleepTimerUI();
                 addSoundToHistory(sound.id);
+            }).catch(err2 => {
+                console.log('Error starting seamless loop:', err2);
+                if (soundAudioPlayer) {
+                    soundAudioPlayer.loop = true;
+                    soundAudioPlayer.load();
+                    soundAudioPlayer.play().then(() => {
+                        soundIsActuallyPlaying = true;
+                        updateSoundPlayerUI();
+                        renderSounds();
+                        updateSleepTimerUI();
+                        addSoundToHistory(sound.id);
+                    }).catch(error => {
+                        console.log('Error playing HTML5 audio:', error);
+                        updateSoundPlayerUI();
+                        updateSleepTimerUI();
+                    });
+                }
+            });
+        });
+    } else {
+        startSeamlessLoop().then(() => {
+            updateSoundPlayerUI();
+            renderSounds();
+            updateSleepTimerUI();
+            addSoundToHistory(sound.id);
+        }).catch(err => {
+            console.log('Error starting seamless loop, trying HTML5 fallback:', err);
+            if (soundAudioPlayer) {
+                soundAudioPlayer.loop = true;
+                soundAudioPlayer.load();
+                soundAudioPlayer.play().then(() => {
+                    soundIsActuallyPlaying = true;
+                    soundLoopCheckFunction = () => {
+                        if (!soundAudioPlayer || !currentSound || soundAudioPlayer.paused) {
+                            return;
+                        }
+                        if (soundAudioPlayer.duration && 
+                            soundAudioPlayer.currentTime >= soundAudioPlayer.duration - 0.05) {
+                            soundAudioPlayer.currentTime = 0;
+                        }
+                    };
+                    soundAudioPlayer.addEventListener('timeupdate', soundLoopCheckFunction);
+                    updateSoundPlayerUI();
+                    renderSounds();
+                    updateSleepTimerUI();
+                    addSoundToHistory(sound.id);
+                }).catch(error => {
+                    console.log('Error playing HTML5 audio:', error);
+                    updateSoundPlayerUI();
+                    updateSleepTimerUI();
+                });
             }
-        }
-    });
+        });
+    }
     
     // Track sound play
     if (window.analytics) {
