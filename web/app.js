@@ -813,14 +813,18 @@ function renderHistory() {
     
     if (historyEl) {
         // Count unique podcasts/episodes listened to (not just total history items)
+        // Prioritize episodes over podcasts (if an item has both, count it as an episode)
         const uniqueItems = new Set();
         history.forEach(item => {
-            if (item.episodeId) {
-                uniqueItems.add(`episode-${item.episodeId}`);
-            } else if (item.podcastId) {
-                uniqueItems.add(`podcast-${item.podcastId}`);
-            } else if (item.soundId) {
-                uniqueItems.add(`sound-${item.soundId}`);
+            if (item && typeof item === 'object') {
+                if (item.episodeId) {
+                    uniqueItems.add(`episode-${item.episodeId}`);
+                } else if (item.soundId) {
+                    uniqueItems.add(`sound-${item.soundId}`);
+                } else if (item.podcastId) {
+                    // Only count podcast if it doesn't have an episodeId
+                    uniqueItems.add(`podcast-${item.podcastId}`);
+                }
             }
         });
         historyEl.textContent = String(uniqueItems.size);
@@ -2939,6 +2943,20 @@ async function showAuthorPage(authorName) {
             renderPodcasts(filteredPodcasts, podcastsGridEl);
         }
     }, 300);
+}
+
+// Add podcast to history (when opening podcast page)
+function addToHistory(podcastId) {
+    const history = getHistory();
+    // Remove if already exists (by podcastId, but only if no episodeId)
+    const filtered = history.filter(item => !(item.podcastId === podcastId && !item.episodeId && !item.soundId));
+    // Add to front
+    filtered.unshift({ podcastId, timestamp: Date.now() });
+    // Keep only MAX_HISTORY items
+    const limited = filtered.slice(0, MAX_HISTORY);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(limited));
+    renderSidebar(); // Update sidebar
+    debouncedSync(); // Sync to server if enabled
 }
 
 // Open podcast (adds to history)
