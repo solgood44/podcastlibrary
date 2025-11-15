@@ -38,6 +38,7 @@ let soundAudioBuffer = null; // Cached audio buffer for seamless looping
 let soundAudioPlayer2 = null; // Second HTML5 audio player for seamless crossfade looping
 let soundLoopFadeInterval = null; // Interval for managing crossfade
 let soundLoopCheckFunction = null; // Stored reference to loop check function for removal
+let soundIsActuallyPlaying = false; // Track if sound is actually playing (to fix pause detection)
 let sleepTimerInterval = null; // Interval for sleep timer countdown
 let sleepTimerEndTime = null; // Timestamp when sleep timer will end
 let sleepTimerMinutes = 0; // Current sleep timer duration in minutes
