@@ -1546,25 +1546,73 @@ function toggleSoundPlayPause() {
         }
         // Don't clear currentSound or hide player - allow resume
     } else {
-        // If paused, play
-        startSeamlessLoop().then(() => {
-            updateMediaSessionMetadata();
-            updateSoundPlayerUI();
-            updateSoundDetailPlayButton();
-            updateSleepTimerUI();
-            renderSounds();
-        }).catch(err => {
-            console.log('Error starting seamless loop:', err);
-            // Fallback to HTML5
-            if (soundAudioPlayer) {
-                soundAudioPlayer.play().catch(e => console.log('Error:', e));
-            }
-            updateMediaSessionMetadata();
-            updateSoundPlayerUI();
-            updateSoundDetailPlayButton();
-            updateSleepTimerUI();
-            renderSounds();
-        });
+        // If paused/stopped, play
+        // Resume audio context if it was suspended
+        if (soundAudioContext && soundAudioContext.state === 'suspended') {
+            soundAudioContext.resume().then(() => {
+                startSeamlessLoop().then(() => {
+                    updateMediaSessionMetadata();
+                    updateSoundPlayerUI();
+                    updateSoundDetailPlayButton();
+                    updateSleepTimerUI();
+                    renderSounds();
+                }).catch(err => {
+                    console.log('Error starting seamless loop:', err);
+                    // Fallback to HTML5
+                    if (soundAudioPlayer) {
+                        soundAudioPlayer.loop = true;
+                        soundAudioPlayer.play().catch(e => console.log('Error:', e));
+                    }
+                    updateMediaSessionMetadata();
+                    updateSoundPlayerUI();
+                    updateSoundDetailPlayButton();
+                    updateSleepTimerUI();
+                    renderSounds();
+                });
+            }).catch(err => {
+                console.log('Error resuming audio context:', err);
+                // Try to start anyway
+                startSeamlessLoop().then(() => {
+                    updateMediaSessionMetadata();
+                    updateSoundPlayerUI();
+                    updateSoundDetailPlayButton();
+                    updateSleepTimerUI();
+                    renderSounds();
+                }).catch(err2 => {
+                    console.log('Error starting seamless loop:', err2);
+                    // Fallback to HTML5
+                    if (soundAudioPlayer) {
+                        soundAudioPlayer.loop = true;
+                        soundAudioPlayer.play().catch(e => console.log('Error:', e));
+                    }
+                    updateMediaSessionMetadata();
+                    updateSoundPlayerUI();
+                    updateSoundDetailPlayButton();
+                    updateSleepTimerUI();
+                    renderSounds();
+                });
+            });
+        } else {
+            startSeamlessLoop().then(() => {
+                updateMediaSessionMetadata();
+                updateSoundPlayerUI();
+                updateSoundDetailPlayButton();
+                updateSleepTimerUI();
+                renderSounds();
+            }).catch(err => {
+                console.log('Error starting seamless loop:', err);
+                // Fallback to HTML5
+                if (soundAudioPlayer) {
+                    soundAudioPlayer.loop = true;
+                    soundAudioPlayer.play().catch(e => console.log('Error:', e));
+                }
+                updateMediaSessionMetadata();
+                updateSoundPlayerUI();
+                updateSoundDetailPlayButton();
+                updateSleepTimerUI();
+                renderSounds();
+            });
+        }
         return; // Early return since startSeamlessLoop handles UI updates
     }
     
@@ -1733,7 +1781,12 @@ async function startSeamlessLoop() {
     if (initSoundAudioContext()) {
         try {
             // Resume audio context if suspended (required on mobile)
+            // Always try to resume to ensure context is active
             if (soundAudioContext.state === 'suspended' || soundAudioContext.state === 'interrupted') {
+                await soundAudioContext.resume();
+            }
+            // If still suspended after resume attempt, try again
+            if (soundAudioContext.state === 'suspended') {
                 await soundAudioContext.resume();
             }
             
