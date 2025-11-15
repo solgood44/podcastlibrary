@@ -1521,16 +1521,9 @@ function toggleSoundPlayPause() {
         if (soundAudioPlayer) {
             soundAudioPlayer.volume = 1;
         }
-        // Suspend audio context to ensure it stops completely
-        if (soundAudioContext && soundAudioContext.state !== 'closed') {
-            try {
-                soundAudioContext.suspend().catch(err => {
-                    console.log('Error suspending audio context:', err);
-                });
-            } catch (e) {
-                console.log('Error suspending audio context:', e);
-            }
-        }
+        // Don't suspend audio context - just stop the source
+        // Suspending the context prevents it from starting again easily
+        // The source.stop() is enough to stop playback
         
         // Mark as not playing
         soundIsActuallyPlaying = false;
