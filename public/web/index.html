@@ -53,7 +53,10 @@
     <div id="sidebar" class="sidebar">
         <div class="sidebar-header">
             <h2>Menu</h2>
-            <button class="btn-close-sidebar" onclick="toggleSidebar()">✕</button>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <button class="btn-help-nav" onclick="showNavigationHelp()" title="Navigation Help">?</button>
+                <button class="btn-close-sidebar" onclick="toggleSidebar()">✕</button>
+            </div>
         </div>
         
         <div class="sidebar-section">
@@ -777,6 +780,82 @@
                     </p>
                 </div>
                 <button class="btn-auth-primary" onclick="closeSleepTimerHelp()" style="width: 100%;">Got it!</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation Help Modal -->
+    <div id="navigation-help-modal" class="auth-modal hidden">
+        <div class="auth-modal-overlay" onclick="closeNavigationHelp()"></div>
+        <div class="auth-modal-content" style="max-width: 600px;">
+            <div class="auth-modal-header">
+                <h2>Navigation Guide</h2>
+                <button class="btn-close-modal" onclick="closeNavigationHelp()">✕</button>
+            </div>
+            <div class="auth-modal-body">
+                <div style="padding: 20px 0;">
+                    <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 12px; margin-top: 0;">Getting Started</h3>
+                    <p style="margin-bottom: 16px; line-height: 1.6;">
+                        Welcome to Podcast Library! Here's how to navigate and get the most out of the app.
+                    </p>
+                    
+                    <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 12px; margin-top: 24px;">🔍 Search</h3>
+                    <ul style="margin-left: 20px; line-height: 1.8; margin-bottom: 20px;">
+                        <li>Use the search bar at the top to find podcasts or episodes</li>
+                        <li>Toggle between "Episodes" and "Podcasts" search modes</li>
+                        <li>Click any result to view details and start listening</li>
+                    </ul>
+
+                    <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 12px; margin-top: 24px;">🕒 History</h3>
+                    <ul style="margin-left: 20px; line-height: 1.8; margin-bottom: 20px;">
+                        <li>View all podcasts and episodes you've listened to</li>
+                        <li>The number shows unique items you've played</li>
+                        <li>Click "Clear History" to remove all history</li>
+                    </ul>
+
+                    <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 12px; margin-top: 24px;">⭐ Favorites</h3>
+                    <ul style="margin-left: 20px; line-height: 1.8; margin-bottom: 20px;">
+                        <li>Click the heart icon on any podcast or episode to favorite it</li>
+                        <li>Access all your favorites from the sidebar</li>
+                        <li>Organize your favorite content for easy access</li>
+                    </ul>
+
+                    <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 12px; margin-top: 24px;">✍️ Authors</h3>
+                    <ul style="margin-left: 20px; line-height: 1.8; margin-bottom: 20px;">
+                        <li>Browse podcasts by author</li>
+                        <li>See all podcasts from your favorite creators</li>
+                        <li>Click an author to view their podcast collection</li>
+                    </ul>
+
+                    <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 12px; margin-top: 24px;">📂 Categories</h3>
+                    <ul style="margin-left: 20px; line-height: 1.8; margin-bottom: 20px;">
+                        <li>Explore podcasts by category (Arts, Business, Comedy, etc.)</li>
+                        <li>Click any category to see all podcasts in that genre</li>
+                        <li>Numbers show how many podcasts are in each category</li>
+                    </ul>
+
+                    <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 12px; margin-top: 24px;">🎵 Playing Audio</h3>
+                    <ul style="margin-left: 20px; line-height: 1.8; margin-bottom: 20px;">
+                        <li>Click the play button (▶) on any episode to start listening</li>
+                        <li>The player bar at the bottom shows what's currently playing</li>
+                        <li>Use skip buttons to jump forward/backward 15 seconds</li>
+                        <li>Progress is automatically saved - resume where you left off</li>
+                    </ul>
+
+                    <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 12px; margin-top: 24px;">⏰ Sleep Timer</h3>
+                    <ul style="margin-left: 20px; line-height: 1.8; margin-bottom: 20px;">
+                        <li>Set a timer to automatically pause audio after a set time</li>
+                        <li>Perfect for falling asleep to podcasts</li>
+                        <li>Access from the sidebar or player bar</li>
+                    </ul>
+
+                    <div style="margin-top: 24px; padding: 16px; background: var(--bg-tertiary); border-radius: 8px; border-left: 3px solid var(--accent);">
+                        <p style="margin: 0; font-size: 14px; line-height: 1.6;">
+                            <strong>💡 Tip:</strong> On desktop, the sidebar stays open by default. On mobile, tap the menu icon (☰) to open it. You can close the sidebar anytime using the X button.
+                        </p>
+                    </div>
+                </div>
+                <button class="btn-auth-primary" onclick="closeNavigationHelp()" style="width: 100%;">Got it!</button>
             </div>
         </div>
     </div>

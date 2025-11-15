@@ -2172,6 +2172,21 @@ function closeSleepTimerHelp() {
     }
 }
 
+// Navigation Help Functions
+function showNavigationHelp() {
+    const modal = document.getElementById('navigation-help-modal');
+    if (modal) {
+        modal.classList.remove('hidden');
+    }
+}
+
+function closeNavigationHelp() {
+    const modal = document.getElementById('navigation-help-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+}
+
 function setSleepTimer(minutes) {
     // Cancel existing timer if any
     if (sleepTimerInterval) {
