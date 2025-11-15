@@ -1755,8 +1755,18 @@ async function startSeamlessLoop() {
                             // Fade in second player while fading out first
                             let fadeProgress = 0;
                             const fadeInterval = setInterval(() => {
-                                if (!soundAudioPlayer || !soundAudioPlayer2 || !currentSound) {
+                                // Check if paused - if so, stop fade and cleanup
+                                if (!soundAudioPlayer || !soundAudioPlayer2 || !currentSound || 
+                                    soundAudioPlayer.paused || soundAudioPlayer2.paused) {
                                     clearInterval(fadeInterval);
+                                    if (soundAudioPlayer2) {
+                                        soundAudioPlayer2.pause();
+                                        soundAudioPlayer2.volume = 0;
+                                    }
+                                    if (soundAudioPlayer) {
+                                        soundAudioPlayer.volume = 1;
+                                    }
+                                    soundLoopFadeInterval = null;
                                     return;
                                 }
                                 
@@ -1959,8 +1969,18 @@ async function startSeamlessLoop() {
                 // Fade in second player while fading out first
                 let fadeProgress = 0;
                 const fadeInterval = setInterval(() => {
-                    if (!soundAudioPlayer || !soundAudioPlayer2 || !currentSound) {
+                    // Check if paused - if so, stop fade and cleanup
+                    if (!soundAudioPlayer || !soundAudioPlayer2 || !currentSound || 
+                        soundAudioPlayer.paused || soundAudioPlayer2.paused) {
                         clearInterval(fadeInterval);
+                        if (soundAudioPlayer2) {
+                            soundAudioPlayer2.pause();
+                            soundAudioPlayer2.volume = 0;
+                        }
+                        if (soundAudioPlayer) {
+                            soundAudioPlayer.volume = 1;
+                        }
+                        soundLoopFadeInterval = null;
                         return;
                     }
                     
