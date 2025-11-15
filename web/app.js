@@ -1696,20 +1696,22 @@ async function startSeamlessLoop() {
     // On iOS, prefer HTML5 audio for better background playback support
     // Web Audio API has issues with background playback on iOS
     if (isIOSDevice()) {
-        // Use HTML5 audio with loop attribute for iOS
+        // Use HTML5 audio with seamless looping for iOS
         if (soundAudioPlayer && soundAudioPlayer.paused) {
             try {
                 // Set loop attribute for seamless looping
                 soundAudioPlayer.loop = true;
                 await soundAudioPlayer.play();
                 
-                // Set up loop check as backup (though loop=true should handle it)
+                // Set up seamless loop check with early reset for perfect looping
+                // Reset 0.3 seconds before the end to ensure no gap
                 soundLoopCheckFunction = () => {
                     if (!soundAudioPlayer || !currentSound || soundAudioPlayer.paused) {
                         return;
                     }
+                    // Reset 0.3 seconds before the end for seamless transition
                     if (soundAudioPlayer.duration && 
-                        soundAudioPlayer.currentTime >= soundAudioPlayer.duration - 0.1) {
+                        soundAudioPlayer.currentTime >= soundAudioPlayer.duration - 0.3) {
                         soundAudioPlayer.currentTime = 0;
                     }
                 };
