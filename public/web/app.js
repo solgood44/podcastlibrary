@@ -1498,6 +1498,7 @@ function toggleSoundPlayPause() {
         if (soundAudioPlayer) {
             soundAudioPlayer.pause();
             soundAudioPlayer.currentTime = 0; // Reset to beginning
+            soundAudioPlayer.loop = false; // Disable loop to prevent auto-restart
         }
         // Remove loop check function and stop second player if using HTML5 audio
         if (soundLoopCheckFunction && soundAudioPlayer) {
@@ -1509,6 +1510,7 @@ function toggleSoundPlayPause() {
             soundAudioPlayer2.pause();
             soundAudioPlayer2.currentTime = 0;
             soundAudioPlayer2.volume = 0; // Reset volume
+            soundAudioPlayer2.loop = false; // Disable loop
         }
         // Stop crossfade interval if running
         if (soundLoopFadeInterval) {
@@ -1518,6 +1520,16 @@ function toggleSoundPlayPause() {
         // Reset volume of main player in case it was being faded
         if (soundAudioPlayer) {
             soundAudioPlayer.volume = 1;
+        }
+        // Suspend audio context to ensure it stops completely
+        if (soundAudioContext && soundAudioContext.state !== 'closed') {
+            try {
+                soundAudioContext.suspend().catch(err => {
+                    console.log('Error suspending audio context:', err);
+                });
+            } catch (e) {
+                console.log('Error suspending audio context:', e);
+            }
         }
         // Update UI to show stopped state immediately
         updateSoundPlayerUI();
