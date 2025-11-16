@@ -109,6 +109,10 @@ const prefetchAudioLink = new Map(); // Map of episode ID to link element
 
 // Prefetch audio for an episode (loads metadata and starts buffering)
 function prefetchEpisodeAudio(episode) {
+    // EMERGENCY MODE: Disable audio prefetching to halt egress
+    if (typeof EMERGENCY_EGRESS_HALT !== 'undefined' && EMERGENCY_EGRESS_HALT) {
+        return;
+    }
     if (!episode || !episode.audio_url || prefetchedAudio.has(episode.id)) {
         return;
     }
@@ -144,6 +148,11 @@ function prefetchEpisodeAudio(episode) {
 
 // Setup audio prefetching on episode hover/visibility
 function setupAudioPrefetching() {
+    // EMERGENCY MODE: Disable audio prefetching to halt egress
+    if (typeof EMERGENCY_EGRESS_HALT !== 'undefined' && EMERGENCY_EGRESS_HALT) {
+        console.warn('[EGRESS HALT] Audio prefetching disabled');
+        return;
+    }
     // Use event delegation for hover events on episode items
     document.addEventListener('mouseenter', (e) => {
         // e.target might be a text node or other non-Element, so we need to get the Element
@@ -604,7 +613,7 @@ function updatePageTitle(page) {
         description = currentPodcast.description 
             ? sanitizeHtml(currentPodcast.description).substring(0, 200) + '...'
             : `Listen to ${currentPodcast.title || 'this podcast'}`;
-        image = currentPodcast.image_url || image;
+        image = sanitizeImageUrl(currentPodcast.image_url) || image;
         url = `https://podcastlibrary.org/podcast/${generateSlug(currentPodcast.title || '')}`;
     } else if (page === 'author' && currentAuthor) {
         title = `${currentAuthor} - Author - ${baseTitle}`;
@@ -617,7 +626,7 @@ function updatePageTitle(page) {
         description = displayedEpisode.description 
             ? sanitizeHtml(displayedEpisode.description).substring(0, 200) + '...'
             : `Listen to ${displayedEpisode.title || 'this episode'}`;
-        image = displayedEpisode.image_url || currentPodcast.image_url || image;
+        image = sanitizeImageUrl(displayedEpisode.image_url) || sanitizeImageUrl(currentPodcast.image_url) || image;
         url = `https://podcastlibrary.org/podcast/${generateSlug(currentPodcast.title || '')}`;
     } else if (page === 'category' && currentCategory) {
         title = `${currentCategory} - ${baseTitle}`;
@@ -1680,8 +1689,8 @@ function loadSoundDetailPage() {
     if (titleEl) titleEl.textContent = currentSound.title || 'Nature Sound';
     
     if (imageEl) {
-        if (currentSound.image_url) {
-            imageEl.src = currentSound.image_url;
+            if (currentSound.image_url) {
+            imageEl.src = sanitizeImageUrl(currentSound.image_url) || getPlaceholderImage();
             imageEl.style.display = '';
         } else {
             imageEl.style.display = 'none';
@@ -2028,7 +2037,7 @@ function updateMediaSessionMetadata() {
             artist: 'Nature Sounds',
             album: 'Ambient Sounds',
             artwork: currentSound.image_url ? [
-                { src: currentSound.image_url, sizes: '512x512', type: 'image/jpeg' }
+                { src: sanitizeImageUrl(currentSound.image_url) || getPlaceholderImage(), sizes: '512x512', type: 'image/jpeg' }
             ] : []
         });
         
@@ -2437,7 +2446,7 @@ function loadFavoritesPage() {
                     <div class="podcast-card">
                         <div class="podcast-card-content" onclick="openEpisodes('${podcast.id}')">
                             <img 
-                                src="${podcast.image_url || getPlaceholderImage()}" 
+                                src="${sanitizeImageUrl(podcast.image_url) || getPlaceholderImage()}" 
                                 alt="${escapeHtml(podcast.title || 'Podcast')}"
                                 class="podcast-image"
                                 onerror="this.src='${getPlaceholderImage()}'"
@@ -2797,10 +2806,36 @@ function renderAuthorsList(sortedAuthors) {
     });
 }
 
+// Helper function to check if URL is from Supabase Storage
+function isSupabaseStorageUrl(url) {
+    if (!url || typeof url !== 'string') return false;
+    return url.includes('/storage/v1/object/public/') || url.includes('supabase.co/storage');
+}
+
+// Helper function to replace Supabase Storage URLs with placeholders in emergency mode
+function sanitizeImageUrl(url) {
+    if (!url) return getPlaceholderImage();
+    // EMERGENCY MODE: Replace all Supabase Storage URLs with placeholders
+    if (typeof EMERGENCY_EGRESS_HALT !== 'undefined' && EMERGENCY_EGRESS_HALT) {
+        if (isSupabaseStorageUrl(url)) {
+            console.warn('[EGRESS HALT] Replaced Supabase Storage image with placeholder:', url);
+            return getPlaceholderImage();
+        }
+    }
+    return url;
+}
+
 // Get author image URL (with caching)
 const authorImageCache = {};
 async function getAuthorImageUrl(author) {
     if (!author) return `/api/og-author?name=${encodeURIComponent('')}&size=profile`;
+    
+    // EMERGENCY MODE: Skip API call and use generated image only
+    if (typeof EMERGENCY_EGRESS_HALT !== 'undefined' && EMERGENCY_EGRESS_HALT) {
+        const fallbackUrl = `/api/og-author?name=${encodeURIComponent(author)}&size=profile`;
+        authorImageCache[author] = fallbackUrl;
+        return fallbackUrl;
+    }
     
     // Check cache first
     if (authorImageCache[author]) {
@@ -2811,7 +2846,11 @@ async function getAuthorImageUrl(author) {
         const response = await fetch(`/api/author-image?name=${encodeURIComponent(author)}`);
         if (response.ok) {
             const data = await response.json();
-            const imageUrl = data.imageUrl || `/api/og-author?name=${encodeURIComponent(author)}&size=profile`;
+            let imageUrl = data.imageUrl || `/api/og-author?name=${encodeURIComponent(author)}&size=profile`;
+            // In emergency mode, replace Supabase Storage URLs
+            if (isSupabaseStorageUrl(imageUrl)) {
+                imageUrl = `/api/og-author?name=${encodeURIComponent(author)}&size=profile`;
+            }
             authorImageCache[author] = imageUrl;
             return imageUrl;
         }
@@ -3230,7 +3269,7 @@ function loadEpisodeDetailPage() {
     contentEl.innerHTML = `
         <div class="episode-detail">
             <div class="episode-detail-header">
-                <img src="${currentPodcast.image_url || getPlaceholderImage()}" alt="${escapeHtml(currentPodcast.title || '')}" class="episode-detail-artwork" onerror="this.src='${getPlaceholderImage()}'">
+                <img src="${sanitizeImageUrl(currentPodcast.image_url) || getPlaceholderImage()}" alt="${escapeHtml(currentPodcast.title || '')}" class="episode-detail-artwork" onerror="this.src='${getPlaceholderImage()}'">
                 <div class="episode-detail-info">
                     <h2>${escapeHtml(displayedEpisode.title || 'Untitled Episode')}</h2>
                     <p class="episode-detail-podcast" onclick="openEpisodes('${currentPodcast.id}')">${escapeHtml(currentPodcast.title || 'Unknown Podcast')}</p>
@@ -3287,6 +3326,12 @@ function getHistory() {
 
 // Load all episodes for search
 async function loadAllEpisodes() {
+    // EMERGENCY MODE: Disable fetchAllEpisodes to halt egress
+    if (typeof EMERGENCY_EGRESS_HALT !== 'undefined' && EMERGENCY_EGRESS_HALT) {
+        console.warn('[EGRESS HALT] fetchAllEpisodes disabled - using empty array');
+        allEpisodes = [];
+        return;
+    }
     try {
         const episodes = await apiService.fetchAllEpisodes();
         // Enrich with podcast info
@@ -4099,7 +4144,7 @@ async function loadEpisodesPage() {
                     allEpisodes.push({
                         ...episode,
                         podcast_title: currentPodcast.title || 'Unknown Podcast',
-                        podcast_image: currentPodcast.image_url
+                        podcast_image: sanitizeImageUrl(currentPodcast.image_url)
                     });
                 }
             });
@@ -4239,7 +4284,7 @@ async function loadEpisodesPage() {
                 return `
                     <div class="episode-item ${isCompleted ? 'episode-completed' : ''} ${isCurrentEpisode ? 'episode-playing' : ''}">
                         <div class="episode-item-image">
-                            <img src="${currentPodcast.image_url || getPlaceholderImage()}" 
+                            <img src="${sanitizeImageUrl(currentPodcast.image_url) || getPlaceholderImage()}" 
                                  alt="${escapeHtml(currentPodcast.title || '')}" 
                                  class="episode-list-artwork"
                                  onerror="this.src='${getPlaceholderImage()}'">
@@ -4305,13 +4350,13 @@ function loadPlayerPage() {
     const currentTime = audioPlayer?.currentTime || 0;
     const duration = audioPlayer?.duration || 0;
     
-    const artworkUrl = currentPodcast?.image_url || getPlaceholderImage();
+    const artworkUrl = sanitizeImageUrl(currentPodcast?.image_url) || getPlaceholderImage();
     contentEl.innerHTML = `
         <div class="player-page-episode" style="background: linear-gradient(135deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.1) 100%), url('${artworkUrl}') center/cover no-repeat;">
             <div class="player-page-backdrop"></div>
             <div class="player-page-content-wrapper">
                 <div class="player-page-artwork-container">
-                    ${currentPodcast?.image_url ? `<img src="${artworkUrl}" alt="${escapeHtml(podcastTitle)}" class="player-page-artwork" onerror="this.src='${getPlaceholderImage()}'">` : ''}
+                    ${artworkUrl !== getPlaceholderImage() ? `<img src="${artworkUrl}" alt="${escapeHtml(podcastTitle)}" class="player-page-artwork" onerror="this.src='${getPlaceholderImage()}'">` : ''}
                 </div>
                 <div class="player-page-info">
                     <h2>${escapeHtml(currentEpisode.title || 'Untitled Episode')}</h2>
@@ -5033,8 +5078,8 @@ function updatePlayerBar() {
     
     // Update artwork
     const imgEl = document.getElementById('player-bar-image');
-    if (imgEl && currentPodcast?.image_url) {
-        imgEl.src = currentPodcast.image_url;
+        if (imgEl && currentPodcast?.image_url) {
+        imgEl.src = sanitizeImageUrl(currentPodcast.image_url) || getPlaceholderImage();
         imgEl.style.display = 'block';
     }
 }

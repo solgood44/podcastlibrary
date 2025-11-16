@@ -116,7 +116,17 @@ class APIService {
   async fetchPodcasts() {
     const query = '?select=id,feed_url,title,author,image_url,genre,description&order=title.asc';
     const cacheKey = this._getCacheKey('/podcasts', {});
-    return await this._cachedRequest(`/podcasts${query}`, {}, cacheKey, this.cacheTTL.podcasts);
+    const podcasts = await this._cachedRequest(`/podcasts${query}`, {}, cacheKey, this.cacheTTL.podcasts);
+    // EMERGENCY MODE: Sanitize Supabase Storage image URLs
+    if (typeof EMERGENCY_EGRESS_HALT !== 'undefined' && EMERGENCY_EGRESS_HALT) {
+      return podcasts.map(podcast => {
+        if (podcast.image_url && (podcast.image_url.includes('/storage/v1/object/public/') || podcast.image_url.includes('supabase.co/storage'))) {
+          podcast.image_url = null; // Will use placeholder
+        }
+        return podcast;
+      });
+    }
+    return podcasts;
   }
 
   async fetchEpisodes(podcastId, limit = 50, offset = 0) {
@@ -147,7 +157,17 @@ class APIService {
   async fetchSounds() {
     const query = '?select=id,title,description,audio_url,image_url,duration_seconds,category,is_premium&order=title.asc';
     const cacheKey = this._getCacheKey('/sounds', {});
-    return await this._cachedRequest(`/sounds${query}`, {}, cacheKey, this.cacheTTL.sounds);
+    const sounds = await this._cachedRequest(`/sounds${query}`, {}, cacheKey, this.cacheTTL.sounds);
+    // EMERGENCY MODE: Sanitize Supabase Storage image URLs
+    if (typeof EMERGENCY_EGRESS_HALT !== 'undefined' && EMERGENCY_EGRESS_HALT) {
+      return sounds.map(sound => {
+        if (sound.image_url && (sound.image_url.includes('/storage/v1/object/public/') || sound.image_url.includes('supabase.co/storage'))) {
+          sound.image_url = null; // Will use placeholder
+        }
+        return sound;
+      });
+    }
+    return sounds;
   }
 }
 
