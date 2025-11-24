@@ -54,10 +54,14 @@ export async function getServerSideProps({ res }) {
     const podcasts = await fetchAllPodcasts();
     const authors = await fetchAllAuthors();
 
-    // Validate podcasts: filter out invalid ones
+    // Validate podcasts: filter out invalid ones and private podcasts
     // Create a map of slug -> podcast for quick validation
     const podcastSlugMap = new Map();
     podcasts.forEach(podcast => {
+      // Skip private podcasts - they should not be indexed
+      if (podcast.is_private) {
+        return;
+      }
       if (podcast.title) {
         const slug = generateSlug(podcast.title);
         if (slug) {
@@ -69,7 +73,7 @@ export async function getServerSideProps({ res }) {
       }
     });
 
-    // Only include podcasts that have valid slugs and can be found
+    // Only include podcasts that have valid slugs, are not private, and can be found
     const validPodcasts = Array.from(podcastSlugMap.values());
 
     // Validate authors: ensure they exist and have podcasts
@@ -77,9 +81,10 @@ export async function getServerSideProps({ res }) {
     const validAuthors = [];
     const authorPodcastCount = new Map();
     
-    // Count podcasts per author
+    // Count podcasts per author (excluding private podcasts)
     podcasts.forEach(podcast => {
-      if (podcast.author) {
+      // Only count non-private podcasts for author pages
+      if (podcast.author && !podcast.is_private) {
         authorPodcastCount.set(podcast.author, (authorPodcastCount.get(podcast.author) || 0) + 1);
       }
     });

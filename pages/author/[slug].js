@@ -58,6 +58,7 @@ export default function AuthorPage({ authorName, podcasts, description, error })
         <meta name="title" content={`${authorName} - Author | Podcast Library`} />
         <meta name="description" content={authorDescription} />
         <meta name="keywords" content={`${authorName}, author, podcasts, episodes`} />
+        <meta name="robots" content="index, follow" />
         
         {/* Open Graph / Facebook */}
         <meta property="og:type" content="website" />
@@ -258,7 +259,18 @@ export async function getStaticProps({ params }) {
     }
 
     // Fetch podcasts by this author
-    const podcasts = await fetchPodcastsByAuthor(authorName);
+    const allPodcasts = await fetchPodcastsByAuthor(authorName);
+    
+    // Filter out private podcasts - they should not appear on author pages
+    const podcasts = allPodcasts.filter(podcast => !podcast.is_private);
+    
+    // If author has no public podcasts, return 404
+    if (podcasts.length === 0) {
+      console.log('Author has no public podcasts, returning 404 for slug:', params.slug);
+      return {
+        notFound: true
+      };
+    }
     
     // Fetch author description
     const description = await fetchAuthorDescription(authorName);
@@ -275,13 +287,9 @@ export async function getStaticProps({ params }) {
     };
   } catch (error) {
     console.error('Error fetching author data:', error);
+    // Return notFound instead of error props to prevent indexing of error pages
     return {
-      props: {
-        error: 'Failed to load author',
-        authorName: null,
-        podcasts: [],
-        description: null
-      }
+      notFound: true
     };
   }
 }

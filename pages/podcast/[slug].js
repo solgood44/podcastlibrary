@@ -66,6 +66,7 @@ export default function PodcastPage({ podcast, episodes, error }) {
         <meta name="title" content={`${podcast.title} | Podcast Library`} />
         <meta name="description" content={description} />
         <meta name="keywords" content={`${podcast.title}, ${genres}, podcast, episodes`} />
+        <meta name="robots" content="index, follow" />
         
         {/* Open Graph / Facebook */}
         <meta property="og:type" content="website" />
@@ -255,10 +256,13 @@ export async function getStaticPaths() {
     const { fetchAllPodcasts, generateSlug } = await import('../../lib/supabase');
     const podcasts = await fetchAllPodcasts();
 
-    // Generate paths for all podcasts
-    const paths = podcasts.map(podcast => ({
-      params: { slug: generateSlug(podcast.title || '') }
-    }));
+    // Generate paths for all podcasts (excluding private ones)
+    const paths = podcasts
+      .filter(podcast => !podcast.is_private) // Exclude private podcasts
+      .map(podcast => ({
+        params: { slug: generateSlug(podcast.title || '') }
+      }))
+      .filter(path => path.params.slug); // Filter out empty slugs
 
     // In development, return empty paths with blocking fallback
     // This allows on-demand generation during development
@@ -300,6 +304,14 @@ export async function getStaticProps({ params }) {
       };
     }
 
+    // If podcast is private, return 404 - private podcasts should not be indexed
+    if (podcast.is_private) {
+      console.log('Podcast is private, returning 404 for slug:', params.slug);
+      return {
+        notFound: true
+      };
+    }
+
     // Fetch recent episodes (limit to 50 for performance)
     const episodes = await fetchEpisodesByPodcastId(podcast.id);
 
@@ -314,12 +326,9 @@ export async function getStaticProps({ params }) {
     };
   } catch (error) {
     console.error('Error fetching podcast data:', error);
+    // Return notFound instead of error props to prevent indexing of error pages
     return {
-      props: {
-        error: 'Failed to load podcast',
-        podcast: null,
-        episodes: []
-      }
+      notFound: true
     };
   }
 }
