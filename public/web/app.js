@@ -5035,11 +5035,6 @@ function updatePlayPauseButton() {
     if (icon) {
         icon.textContent = isPlaying ? '⏸' : '▶';
     }
-    // Update mobile play button
-    const mobileIcon = document.getElementById('player-bar-play-icon');
-    if (mobileIcon) {
-        mobileIcon.textContent = isPlaying ? '⏸' : '▶';
-    }
     // Also update player page button if it exists
     const playerPageIcon = document.getElementById('play-icon-player-page');
     if (playerPageIcon) {

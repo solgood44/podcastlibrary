@@ -3074,16 +3074,18 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: 16px;
     max-width: 100%;
+    padding: 0 4px;
 }
 
 .player-bar-main {
     display: flex;
     align-items: center;
     gap: 12px;
-    flex: 1;
+    flex: 0 0 auto;
     min-width: 0;
+    max-width: 200px;
 }
 
 .player-bar-info {
@@ -3175,15 +3177,17 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     min-width: 0;
+    max-width: 100%;
 }
 
 .player-bar-controls {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 16px;
+    gap: 12px;
+    width: 100%;
 }
 
 .btn-skip-text {
@@ -3320,16 +3324,19 @@ body {
 .player-bar-progress-wrapper {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
+    width: 100%;
+    max-width: 100%;
 }
 
 .player-bar-time-left,
 .player-bar-time-right {
-    font-size: 12px;
-    color: var(--text-tertiary);
+    font-size: 11px;
+    color: var(--text-secondary);
     font-variant-numeric: tabular-nums;
     flex-shrink: 0;
-    min-width: 40px;
+    min-width: 45px;
+    font-weight: 500;
 }
 
 .player-bar-time-right {
@@ -3338,24 +3345,30 @@ body {
 
 .player-bar-progress {
     flex: 1;
-    height: 4px;
+    height: 6px;
     background: var(--bg-tertiary);
-    border-radius: 2px;
+    border-radius: 3px;
     cursor: pointer;
     position: relative;
     transition: height 0.2s;
+    min-width: 0;
 }
 
 .player-bar-progress:hover {
-    height: 5px;
+    height: 8px;
+}
+
+.player-bar-progress:active {
+    height: 8px;
 }
 
 .player-bar-progress-fill {
     height: 100%;
     background: var(--accent);
-    border-radius: 2px;
-    transition: width 0.1s;
+    border-radius: 3px;
+    transition: width 0.1s linear;
     pointer-events: none;
+    min-width: 2px;
 }
 
 .player-bar-right {
@@ -3744,20 +3757,42 @@ body {
     }
     
     .player-bar-center {
-        display: none; /* Hide center controls on mobile - use simplified layout */
+        display: flex; /* Show center controls on mobile with timeline */
+        flex: 1;
+        min-width: 0;
+        gap: 8px;
     }
     
-    .player-bar-right {
-        display: none; /* Hide right section on mobile */
+    .player-bar-controls {
+        display: flex; /* Show controls on mobile */
+        gap: 8px;
+    }
+    
+    .btn-skip-text-only {
+        padding: 8px 10px;
+        min-width: 44px;
+        font-size: 12px;
+    }
+    
+    .btn-play-pause-main {
+        width: 48px;
+        height: 48px;
+        font-size: 20px;
+    }
+    
+    .player-bar-progress-wrapper {
+        width: 100%;
+        gap: 6px;
     }
     
     .player-bar-timer {
         display: flex; /* Show timer on mobile */
+        flex-shrink: 0;
     }
     
     .player-bar-artwork {
-        width: 40px;
-        height: 40px;
+        width: 44px;
+        height: 44px;
         flex-shrink: 0;
     }
     
@@ -3769,16 +3804,14 @@ body {
         font-size: 11px;
     }
     
-    .player-bar-play-btn {
-        width: 40px;
-        height: 40px;
-        font-size: 16px;
+    .player-bar-main {
+        max-width: 140px;
     }
     
     /* Improve touch targets - minimum 44x44px for accessibility */
     button, .btn-menu, .sidebar-item, .podcast-list-item-content,
     .btn-skip-text-only, .btn-play-pause-main, .btn-sleep-timer-small,
-    .player-bar-play-btn, .sound-player-play-btn {
+    .sound-player-play-btn {
         min-height: 44px;
         min-width: 44px;
     }
@@ -3899,10 +3932,37 @@ body {
         font-size: 24px;
     }
     
-    .player-bar-play-btn {
-        width: 56px;
-        height: 56px;
-        font-size: 24px;
+    /* Improve mobile player bar layout */
+    .player-bar-content {
+        gap: 12px;
+        padding: 0 8px;
+    }
+    
+    .player-bar-main {
+        max-width: 160px;
+    }
+    
+    .player-bar-progress-wrapper {
+        gap: 8px;
+    }
+    
+    .player-bar-time-left,
+    .player-bar-time-right {
+        font-size: 10px;
+        min-width: 40px;
+    }
+    
+    .player-bar-progress {
+        height: 5px;
+    }
+    
+    .player-bar-progress:hover,
+    .player-bar-progress:active {
+        height: 6px;
+    }
+    
+    .player-bar-controls {
+        gap: 10px;
     }
 }
 
