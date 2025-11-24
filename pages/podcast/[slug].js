@@ -3,7 +3,7 @@ import Head from 'next/head';
 import { useEffect } from 'react';
 import { useRouter } from 'next/router';
 
-export default function PodcastPage({ podcast, episodes, error }) {
+export default function PodcastPage({ podcast, episodes, relatedPodcasts, error }) {
   const router = useRouter();
 
   useEffect(() => {
@@ -42,10 +42,22 @@ export default function PodcastPage({ podcast, episodes, error }) {
     );
   }
 
-  // Format description for display
-  const description = podcast.description 
-    ? podcast.description.replace(/<[^>]*>/g, '').substring(0, 300) 
-    : `Listen to ${podcast.title} on Podcast Library.`;
+  // Format description for SEO (150-160 chars optimal for search results)
+  const rawDescription = podcast.description 
+    ? podcast.description.replace(/<[^>]*>/g, '').trim()
+    : '';
+  
+  // Create SEO-optimized description (150-160 chars for meta, 300 for display)
+  const seoDescription = rawDescription
+    ? (rawDescription.length > 160 
+        ? rawDescription.substring(0, 157) + '...' 
+        : rawDescription)
+    : `Listen to ${podcast.title} - Browse episodes and stream on Podcast Library.`;
+  
+  // Full description for page display (up to 300 chars)
+  const displayDescription = rawDescription
+    ? rawDescription.substring(0, 300)
+    : seoDescription;
 
   // Get genres
   const genres = Array.isArray(podcast.genre) 
@@ -64,7 +76,7 @@ export default function PodcastPage({ podcast, episodes, error }) {
         {/* Primary Meta Tags */}
         <title>{podcast.title} | Podcast Library</title>
         <meta name="title" content={`${podcast.title} | Podcast Library`} />
-        <meta name="description" content={description} />
+        <meta name="description" content={seoDescription} />
         <meta name="keywords" content={`${podcast.title}, ${genres}, podcast, episodes`} />
         <meta name="robots" content="index, follow" />
         
@@ -72,14 +84,14 @@ export default function PodcastPage({ podcast, episodes, error }) {
         <meta property="og:type" content="website" />
         <meta property="og:url" content={`https://podcastlibrary.org/podcast/${generateSlug(podcast.title)}`} />
         <meta property="og:title" content={`${podcast.title} | Podcast Library`} />
-        <meta property="og:description" content={description} />
+        <meta property="og:description" content={seoDescription} />
         <meta property="og:image" content={ogImage} />
         
         {/* Twitter */}
         <meta property="twitter:card" content="summary_large_image" />
         <meta property="twitter:url" content={`https://podcastlibrary.org/podcast/${generateSlug(podcast.title)}`} />
         <meta property="twitter:title" content={`${podcast.title} | Podcast Library`} />
-        <meta property="twitter:description" content={description} />
+        <meta property="twitter:description" content={seoDescription} />
         <meta property="twitter:image" content={ogImage} />
         
         {/* Canonical URL */}
@@ -93,7 +105,7 @@ export default function PodcastPage({ podcast, episodes, error }) {
               '@context': 'https://schema.org',
               '@type': 'PodcastSeries',
               name: podcast.title,
-              description: description,
+              description: displayDescription,
               url: `https://podcastlibrary.org/podcast/${generateSlug(podcast.title)}`,
               image: podcast.image_url,
               genre: genres,
@@ -109,12 +121,51 @@ export default function PodcastPage({ podcast, episodes, error }) {
                   description: ep.description ? ep.description.replace(/<[^>]*>/g, '').substring(0, 200) : undefined,
                   datePublished: ep.pub_date,
                   duration: ep.duration_seconds ? `PT${ep.duration_seconds}S` : undefined,
+                  image: ep.image_url || podcast.image_url,
+                  partOfSeries: {
+                    '@type': 'PodcastSeries',
+                    name: podcast.title,
+                    url: `https://podcastlibrary.org/podcast/${generateSlug(podcast.title)}`
+                  },
                   audio: ep.audio_url ? {
                     '@type': 'AudioObject',
-                    contentUrl: ep.audio_url
+                    contentUrl: ep.audio_url,
+                    encodingFormat: 'audio/mpeg', // Most podcasts use MP3
+                    duration: ep.duration_seconds ? `PT${ep.duration_seconds}S` : undefined
                   } : undefined
                 }))
               })
+            })
+          }}
+        />
+        
+        {/* Breadcrumbs Structured Data */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'BreadcrumbList',
+              itemListElement: [
+                {
+                  '@type': 'ListItem',
+                  position: 1,
+                  name: 'Home',
+                  item: 'https://podcastlibrary.org'
+                },
+                {
+                  '@type': 'ListItem',
+                  position: 2,
+                  name: 'Podcasts',
+                  item: 'https://podcastlibrary.org/web/'
+                },
+                {
+                  '@type': 'ListItem',
+                  position: 3,
+                  name: podcast.title,
+                  item: `https://podcastlibrary.org/podcast/${generateSlug(podcast.title)}`
+                }
+              ]
             })
           }}
         />
@@ -131,8 +182,11 @@ export default function PodcastPage({ podcast, episodes, error }) {
           {podcast.image_url && (
             <img 
               src={podcast.image_url} 
-              alt={podcast.title}
+              alt={`${podcast.title} podcast artwork`}
               className="podcast-seo-artwork"
+              loading="lazy"
+              width="400"
+              height="400"
               onError={(e) => {
                 e.target.style.display = 'none';
               }}
@@ -163,14 +217,59 @@ export default function PodcastPage({ podcast, episodes, error }) {
         </div>
 
         {/* Description */}
-        {podcast.description && (
+        {displayDescription && (
           <div 
             className="podcast-seo-description"
             dangerouslySetInnerHTML={{ 
-              __html: podcast.description.replace(/\n/g, '<br>') 
+              __html: displayDescription.replace(/\n/g, '<br>') 
             }}
           />
         )}
+
+        {/* Additional Content for SEO - Podcast Details */}
+        <div className="podcast-seo-details">
+          <div className="podcast-seo-details-grid">
+            {genres && (
+              <div className="podcast-seo-detail-item">
+                <h3 className="podcast-seo-detail-label">Genre</h3>
+                <div className="podcast-seo-detail-value">
+                  {Array.isArray(genres) ? (
+                    genres.filter(g => g).map((genre, idx) => (
+                      <span key={idx}>
+                        <a href={`/genre/${generateSlug(genre.trim())}`} className="podcast-seo-genre-link">
+                          {genre.trim()}
+                        </a>
+                        {idx < genres.filter(g => g).length - 1 && ', '}
+                      </span>
+                    ))
+                  ) : (
+                    <a href={`/genre/${generateSlug(genres.trim())}`} className="podcast-seo-genre-link">
+                      {genres}
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            {episodeCount > 0 && (
+              <div className="podcast-seo-detail-item">
+                <h3 className="podcast-seo-detail-label">Total Episodes</h3>
+                <p className="podcast-seo-detail-value">{episodeCount.toLocaleString()}</p>
+              </div>
+            )}
+            
+            {podcast.author && (
+              <div className="podcast-seo-detail-item">
+                <h3 className="podcast-seo-detail-label">Host</h3>
+                <p className="podcast-seo-detail-value">
+                  <a href={`/author/${generateSlug(podcast.author)}`} className="podcast-seo-author-link">
+                    {podcast.author}
+                  </a>
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* Episodes List */}
         {episodes.length > 0 && (
@@ -221,6 +320,54 @@ export default function PodcastPage({ podcast, episodes, error }) {
                       Listen on Podcast Library →
                     </a>
                   )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Related Podcasts Section - Internal Linking for SEO */}
+        {relatedPodcasts && relatedPodcasts.length > 0 && (
+          <div className="podcast-seo-related-section">
+            <h2 className="podcast-seo-related-title">Similar Podcasts</h2>
+            <p className="podcast-seo-related-subtitle">
+              Discover more podcasts in {genres || 'this genre'}
+            </p>
+            <div className="podcast-seo-related-list">
+              {relatedPodcasts.map((related) => (
+                <div key={related.id} className="podcast-seo-related-card">
+                  {related.image_url && (
+                    <a href={`/podcast/${generateSlug(related.title)}`}>
+                      <img 
+                        src={related.image_url} 
+                        alt={`${related.title} podcast artwork`}
+                        className="podcast-seo-related-image"
+                        loading="lazy"
+                        width="150"
+                        height="150"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                        }}
+                      />
+                    </a>
+                  )}
+                  <div className="podcast-seo-related-content">
+                    <h3 className="podcast-seo-related-card-title">
+                      <a href={`/podcast/${generateSlug(related.title)}`}>
+                        {related.title}
+                      </a>
+                    </h3>
+                    {related.author && (
+                      <p className="podcast-seo-related-author">
+                        By <a href={`/author/${generateSlug(related.author)}`}>{related.author}</a>
+                      </p>
+                    )}
+                    {related.description && (
+                      <p className="podcast-seo-related-description">
+                        {related.description.replace(/<[^>]*>/g, '').substring(0, 150)}...
+                      </p>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -292,7 +439,11 @@ export async function getStaticPaths() {
 export async function getStaticProps({ params }) {
   try {
     console.log('Fetching podcast with slug:', params.slug);
-    const { fetchPodcastBySlug, fetchEpisodesByPodcastId } = await import('../../lib/supabase');
+    const { 
+      fetchPodcastBySlug, 
+      fetchEpisodesByPodcastId, 
+      fetchRelatedPodcastsByGenre 
+    } = await import('../../lib/supabase');
     const podcast = await fetchPodcastBySlug(params.slug);
 
     console.log('Found podcast:', podcast ? podcast.title : 'NOT FOUND');
@@ -314,11 +465,20 @@ export async function getStaticProps({ params }) {
 
     // Fetch recent episodes (limit to 50 for performance)
     const episodes = await fetchEpisodesByPodcastId(podcast.id);
+    
+    // Fetch related podcasts by genre for internal linking
+    const genres = Array.isArray(podcast.genre) 
+      ? podcast.genre.filter(g => g) 
+      : podcast.genre 
+        ? [podcast.genre] 
+        : [];
+    const relatedPodcasts = await fetchRelatedPodcastsByGenre(podcast.id, genres, 6);
 
     return {
       props: {
         podcast,
-        episodes: episodes || []
+        episodes: episodes || [],
+        relatedPodcasts: relatedPodcasts || []
       },
       // Revalidate every 6 hours (21600 seconds)
       // This reduces database queries while still keeping content relatively fresh

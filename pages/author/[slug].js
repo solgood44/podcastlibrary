@@ -42,10 +42,22 @@ export default function AuthorPage({ authorName, podcasts, description, error })
     );
   }
 
-  // Format description for display
-  const authorDescription = description 
-    ? description.replace(/<[^>]*>/g, '').substring(0, 300) 
-    : `Explore podcasts by ${authorName} on Podcast Library.`;
+  // Format description for SEO (150-160 chars optimal for search results)
+  const rawDescription = description 
+    ? description.replace(/<[^>]*>/g, '').trim()
+    : '';
+  
+  // Create SEO-optimized description (150-160 chars for meta, 300 for display)
+  const seoDescription = rawDescription
+    ? (rawDescription.length > 160 
+        ? rawDescription.substring(0, 157) + '...' 
+        : rawDescription)
+    : `Explore podcasts by ${authorName} - Browse episodes and listen on Podcast Library.`;
+  
+  // Full description for page display (up to 300 chars)
+  const displayDescription = rawDescription
+    ? rawDescription.substring(0, 300)
+    : seoDescription;
 
   // Use generated OG image
   const ogImage = `https://podcastlibrary.org/api/og-author?name=${encodeURIComponent(authorName)}`;
@@ -56,7 +68,7 @@ export default function AuthorPage({ authorName, podcasts, description, error })
         {/* Primary Meta Tags */}
         <title>{authorName} - Author | Podcast Library</title>
         <meta name="title" content={`${authorName} - Author | Podcast Library`} />
-        <meta name="description" content={authorDescription} />
+        <meta name="description" content={seoDescription} />
         <meta name="keywords" content={`${authorName}, author, podcasts, episodes`} />
         <meta name="robots" content="index, follow" />
         
@@ -64,14 +76,14 @@ export default function AuthorPage({ authorName, podcasts, description, error })
         <meta property="og:type" content="website" />
         <meta property="og:url" content={`https://podcastlibrary.org/author/${generateSlug(authorName)}`} />
         <meta property="og:title" content={`${authorName} - Author | Podcast Library`} />
-        <meta property="og:description" content={authorDescription} />
+        <meta property="og:description" content={seoDescription} />
         <meta property="og:image" content={ogImage} />
         
         {/* Twitter */}
         <meta property="twitter:card" content="summary_large_image" />
         <meta property="twitter:url" content={`https://podcastlibrary.org/author/${generateSlug(authorName)}`} />
         <meta property="twitter:title" content={`${authorName} - Author | Podcast Library`} />
-        <meta property="twitter:description" content={authorDescription} />
+        <meta property="twitter:description" content={seoDescription} />
         <meta property="twitter:image" content={ogImage} />
         
         {/* Canonical URL */}
@@ -85,7 +97,7 @@ export default function AuthorPage({ authorName, podcasts, description, error })
               '@context': 'https://schema.org',
               '@type': 'Person',
               name: authorName,
-              description: authorDescription,
+              description: displayDescription,
               url: `https://podcastlibrary.org/author/${generateSlug(authorName)}`,
               ...(podcasts.length > 0 && {
                 knowsAbout: podcasts.map(p => ({
@@ -94,6 +106,37 @@ export default function AuthorPage({ authorName, podcasts, description, error })
                   url: `https://podcastlibrary.org/podcast/${generateSlug(p.title)}`
                 }))
               })
+            })
+          }}
+        />
+        
+        {/* Breadcrumbs Structured Data */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'BreadcrumbList',
+              itemListElement: [
+                {
+                  '@type': 'ListItem',
+                  position: 1,
+                  name: 'Home',
+                  item: 'https://podcastlibrary.org'
+                },
+                {
+                  '@type': 'ListItem',
+                  position: 2,
+                  name: 'Authors',
+                  item: 'https://podcastlibrary.org/web/'
+                },
+                {
+                  '@type': 'ListItem',
+                  position: 3,
+                  name: authorName,
+                  item: `https://podcastlibrary.org/author/${generateSlug(authorName)}`
+                }
+              ]
             })
           }}
         />
@@ -119,11 +162,11 @@ export default function AuthorPage({ authorName, podcasts, description, error })
         </div>
 
         {/* Description */}
-        {description && (
+        {displayDescription && (
           <div 
             className="podcast-seo-description"
             dangerouslySetInnerHTML={{ 
-              __html: description.replace(/\n/g, '<br>') 
+              __html: displayDescription.replace(/\n/g, '<br>') 
             }}
           />
         )}
@@ -141,8 +184,11 @@ export default function AuthorPage({ authorName, podcasts, description, error })
                   {podcast.image_url && (
                     <img 
                       src={podcast.image_url} 
-                      alt={podcast.title}
+                      alt={`${podcast.title} podcast artwork`}
                       className="podcast-seo-episode-image"
+                      loading="lazy"
+                      width="200"
+                      height="200"
                       onError={(e) => {
                         e.target.style.display = 'none';
                       }}

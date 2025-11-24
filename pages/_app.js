@@ -46,6 +46,25 @@ export default function App({ Component, pageProps }) {
         </>
       )}
       <SpeedInsights />
+      
+      {/* Organization Schema for SEO */}
+      <Script
+        id="organization-schema"
+        type="application/ld+json"
+        strategy="afterInteractive"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'Organization',
+            name: 'Podcast Library',
+            url: 'https://podcastlibrary.org',
+            logo: 'https://podcastlibrary.org/og-image.svg',
+            description: 'Discover and listen to thousands of podcasts from your favorite creators',
+            sameAs: [] // Add social media URLs here if available
+          })
+        }}
+      />
+      
       <Component {...pageProps} />
     </>
   );

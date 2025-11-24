@@ -1,11 +1,12 @@
 // Dynamic sitemap generation for SEO
-import { fetchAllPodcasts, fetchAllAuthors, generateSlug } from '../lib/supabase';
+import { fetchAllPodcasts, fetchAllAuthors, fetchAllGenres, generateSlug } from '../lib/supabase';
 
-function generateSiteMap(validPodcasts, validAuthors) {
+function generateSiteMap(validPodcasts, validAuthors, validGenres) {
   const baseUrl = 'https://podcastlibrary.org';
   
   return `<?xml version="1.0" encoding="UTF-8"?>
-   <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+   <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+           xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
      <url>
        <loc>${baseUrl}</loc>
        <changefreq>daily</changefreq>
@@ -15,12 +16,20 @@ function generateSiteMap(validPodcasts, validAuthors) {
        .map(podcast => {
          const slug = generateSlug(podcast.title || '');
          if (!slug) return ''; // Skip if no valid slug
+         const imageTag = podcast.image_url 
+           ? `<image:image>
+           <image:loc>${podcast.image_url}</image:loc>
+           <image:title>${(podcast.title || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</image:title>
+           <image:caption>${(podcast.title || '')} podcast artwork</image:caption>
+         </image:image>`
+           : '';
          return `
        <url>
            <loc>${baseUrl}/podcast/${slug}</loc>
            <changefreq>weekly</changefreq>
            <priority>0.8</priority>
            <lastmod>${podcast.last_refreshed || new Date().toISOString()}</lastmod>
+           ${imageTag}
        </url>
      `;
        })
@@ -40,6 +49,20 @@ function generateSiteMap(validPodcasts, validAuthors) {
        })
        .filter(Boolean)
        .join('')}
+     ${validGenres
+       .map(genre => {
+         const slug = generateSlug(genre || '');
+         if (!slug) return ''; // Skip if no valid slug
+         return `
+       <url>
+           <loc>${baseUrl}/genre/${slug}</loc>
+           <changefreq>weekly</changefreq>
+           <priority>0.6</priority>
+       </url>
+     `;
+       })
+       .filter(Boolean)
+       .join('')}
    </urlset>
  `;
 }
@@ -50,9 +73,10 @@ function SiteMap() {
 
 export async function getServerSideProps({ res }) {
   try {
-    // Fetch podcasts and authors
+    // Fetch podcasts, authors, and genres
     const podcasts = await fetchAllPodcasts();
     const authors = await fetchAllAuthors();
+    const genres = await fetchAllGenres();
 
     // Validate podcasts: filter out invalid ones and private podcasts
     // Create a map of slug -> podcast for quick validation
@@ -103,8 +127,27 @@ export async function getServerSideProps({ res }) {
       }
     }
 
-    // Generate the XML sitemap with only validated podcasts and authors
-    const sitemap = generateSiteMap(validPodcasts, validAuthors);
+    // Validate genres - only include genres with podcasts
+    const genrePodcastCount = new Map();
+    podcasts.forEach(podcast => {
+      if (podcast.is_private) return;
+      const podcastGenres = Array.isArray(podcast.genre)
+        ? podcast.genre.filter(g => g)
+        : podcast.genre
+          ? [podcast.genre]
+          : [];
+      podcastGenres.forEach(g => {
+        genrePodcastCount.set(g.trim(), (genrePodcastCount.get(g.trim()) || 0) + 1);
+      });
+    });
+    
+    const validGenres = genres.filter(g => {
+      const count = genrePodcastCount.get(g.trim()) || 0;
+      return count > 0; // Only include genres with at least one podcast
+    });
+
+    // Generate the XML sitemap with validated podcasts, authors, and genres
+    const sitemap = generateSiteMap(validPodcasts, validAuthors, validGenres);
 
     res.setHeader('Content-Type', 'text/xml');
     // Cache sitemap for 24 hours
