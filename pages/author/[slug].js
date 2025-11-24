@@ -327,9 +327,9 @@ export async function getStaticProps({ params }) {
         podcasts: podcasts || [],
         description: description || null
       },
-      // Revalidate every 6 hours (21600 seconds)
-      // This reduces database queries while still keeping content relatively fresh
-      revalidate: 21600
+      // OPTIMIZED: Revalidate every 12 hours (43200 seconds)
+      // Author pages don't change frequently, so longer revalidation reduces DB queries
+      revalidate: 43200
     };
   } catch (error) {
     console.error('Error fetching author data:', error);

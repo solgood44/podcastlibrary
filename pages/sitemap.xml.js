@@ -150,8 +150,9 @@ export async function getServerSideProps({ res }) {
     const sitemap = generateSiteMap(validPodcasts, validAuthors, validGenres);
 
     res.setHeader('Content-Type', 'text/xml');
-    // Cache sitemap for 24 hours
-    res.setHeader('Cache-Control', 'public, s-maxage=86400, stale-while-revalidate');
+    // OPTIMIZED: Cache sitemap for 24 hours with stale-while-revalidate for 7 days
+    // This reduces database queries while keeping sitemap relatively fresh
+    res.setHeader('Cache-Control', 'public, s-maxage=86400, stale-while-revalidate=604800, max-age=86400');
     res.write(sitemap);
     res.end();
 

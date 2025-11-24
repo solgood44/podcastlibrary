@@ -750,8 +750,8 @@ async function loadPodcasts() {
         if (podcasts.length === 0) {
             emptyEl.classList.remove('hidden');
         } else {
-            // Reload episodes now that podcasts are loaded
-            await loadAllEpisodes();
+            // OPTIMIZED: Don't load all episodes on initial page load
+            // Episodes will be loaded lazily when needed (search, all-episodes page, etc.)
             // Make sure container and controls are visible
             if (controlsEl) controlsEl.classList.remove('hidden');
             if (containerEl) containerEl.classList.remove('hidden');
@@ -3324,14 +3324,32 @@ function getHistory() {
     }
 }
 
-// Load all episodes for search
+// Load all episodes for search (lazy-loaded only when needed)
+let episodesLoading = false;
+let episodesLoaded = false;
 async function loadAllEpisodes() {
+    // If already loaded, return immediately
+    if (episodesLoaded && allEpisodes.length > 0) {
+        return;
+    }
+    
+    // If already loading, wait for it
+    if (episodesLoading) {
+        while (episodesLoading) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        return;
+    }
+    
     // EMERGENCY MODE: Disable fetchAllEpisodes to halt egress
     if (typeof EMERGENCY_EGRESS_HALT !== 'undefined' && EMERGENCY_EGRESS_HALT) {
         console.warn('[EGRESS HALT] fetchAllEpisodes disabled - using empty array');
         allEpisodes = [];
+        episodesLoaded = true;
         return;
     }
+    
+    episodesLoading = true;
     try {
         const episodes = await apiService.fetchAllEpisodes();
         // Enrich with podcast info
@@ -3340,12 +3358,17 @@ async function loadAllEpisodes() {
             return { ...ep, podcast_title: podcast?.title || 'Unknown Podcast', podcast_image: podcast?.image_url };
         });
         
+        episodesLoaded = true;
+        
         // Re-extract categories to include "Daily" if any podcast now has 200+ episodes
         extractCategories();
         extractAuthors();
         renderSidebar();
     } catch (error) {
         console.error('Error loading all episodes:', error);
+        episodesLoaded = false; // Allow retry on error
+    } finally {
+        episodesLoading = false;
     }
 }
 
@@ -3796,8 +3819,8 @@ function applyEpisodesDurationFilter() {
     loadAllEpisodesPage();
 }
 
-// Load all episodes page
-function loadAllEpisodesPage() {
+// Load all episodes page (lazy-loads episodes if needed)
+async function loadAllEpisodesPage() {
     const listEl = document.getElementById('all-episodes-list');
     const controlsEl = document.getElementById('episodes-controls');
     
@@ -3806,7 +3829,12 @@ function loadAllEpisodesPage() {
     // Show controls
     if (controlsEl) controlsEl.classList.remove('hidden');
     
-    listEl.innerHTML = '';
+    listEl.innerHTML = '<div class="empty"><p>Loading episodes...</p></div>';
+    
+    // OPTIMIZED: Lazy-load episodes only when viewing all-episodes page
+    if (!episodesLoaded) {
+        await loadAllEpisodes();
+    }
     
     setTimeout(() => {
         if (allEpisodes.length === 0) {
@@ -4497,7 +4525,7 @@ function handleSearchFocus() {
 }
 
 // Search functionality
-function handleSearch(query) {
+async function handleSearch(query) {
     const resultsEl = document.getElementById('search-results');
     const titleEl = document.getElementById('search-page-title');
     if (!resultsEl) return;
@@ -4512,6 +4540,12 @@ function handleSearch(query) {
     const searchTerm = query.toLowerCase();
     
     if (searchMode === 'episodes') {
+        // OPTIMIZED: Lazy-load episodes only when searching
+        if (!episodesLoaded) {
+            resultsEl.innerHTML = '<div class="empty"><p>Loading episodes...</p></div>';
+            await loadAllEpisodes();
+        }
+        
         // Search episodes
         const matches = allEpisodes.filter(ep => 
             (ep.title || '').toLowerCase().includes(searchTerm) ||

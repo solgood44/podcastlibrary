@@ -287,7 +287,9 @@ export async function getStaticProps({ params }) {
         genre,
         podcasts: podcasts || []
       },
-      revalidate: 21600 // Revalidate every 6 hours
+      // OPTIMIZED: Revalidate every 12 hours (43200 seconds)
+      // Genre pages don't change frequently, so longer revalidation reduces DB queries
+      revalidate: 43200
     };
   } catch (error) {
     console.error('Error fetching genre data:', error);
