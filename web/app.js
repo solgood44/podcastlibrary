@@ -821,29 +821,24 @@ function renderHistory() {
     const history = getHistory();
     
     if (historyEl) {
-        // Count items that would actually be displayed on the history page
-        // This matches exactly what loadHistoryPage() shows - items with valid episode AND podcast
-        let displayableCount = 0;
+        // Count unique podcasts in history (not episodes)
+        // The user wants to see how many different podcasts they've listened to
+        const uniquePodcastIds = new Set();
+        
         history.forEach(item => {
             if (item && typeof item === 'object') {
-                // For episodes: only count if we can find BOTH the episode AND podcast
-                // This matches the history page filter: if (!episode || !podcast) return '';
-                if (item.episodeId) {
-                    const episode = allEpisodes.find(e => e.id === item.episodeId);
+                // Count unique podcasts by podcastId
+                if (item.podcastId) {
+                    // Only count if we can verify the podcast exists
                     const podcast = podcasts.find(p => p.id === item.podcastId);
-                    if (episode && podcast) {
-                        displayableCount++;
+                    if (podcast) {
+                        uniquePodcastIds.add(item.podcastId);
                     }
-                } 
-                // For sounds: count if soundId exists (sounds don't need podcast validation)
-                else if (item.soundId) {
-                    displayableCount++;
                 }
-                // For podcasts only (no episodeId): these aren't shown on history page
-                // The history page only shows items with episodeId, so don't count these
             }
         });
-        historyEl.textContent = String(displayableCount);
+        
+        historyEl.textContent = String(uniquePodcastIds.size);
     }
 }
 
@@ -4604,17 +4599,181 @@ function handleSearchInput(value) {
 
 // Handle search focus
 function handleSearchFocus() {
-    // Only navigate to search if there's a value, otherwise show all items
-    const topSearchInput = document.getElementById('top-search-input');
-    if (topSearchInput && topSearchInput.value && topSearchInput.value.trim() !== '') {
-        navigateTo('search');
-    } else {
-        // Show all items based on current mode
-        if (searchMode === 'podcasts') {
-            navigateTo('grid');
-        } else {
-            navigateTo('all-episodes');
+    // Open search modal when clicking on top search bar
+    openSearchModal();
+}
+
+// Open search modal (Spotlight-like)
+function openSearchModal() {
+    const modal = document.getElementById('search-modal');
+    const input = document.getElementById('search-modal-input');
+    if (modal) {
+        modal.classList.remove('hidden');
+        // Sync search mode with main search
+        setSearchModeModal(searchMode);
+        // Focus input after a brief delay to ensure modal is visible
+        setTimeout(() => {
+            if (input) {
+                input.focus();
+                // Copy value from top search if it exists
+                const topInput = document.getElementById('top-search-input');
+                if (topInput && topInput.value) {
+                    input.value = topInput.value;
+                    handleSearchModalInput(topInput.value);
+                }
+            }
+        }, 50);
+        // Prevent body scroll when modal is open
+        document.body.style.overflow = 'hidden';
+    }
+}
+
+// Close search modal
+function closeSearchModal() {
+    const modal = document.getElementById('search-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+        // Restore body scroll
+        document.body.style.overflow = '';
+        // Clear input
+        const input = document.getElementById('search-modal-input');
+        if (input) {
+            input.value = '';
         }
+        const results = document.getElementById('search-modal-results');
+        if (results) {
+            results.innerHTML = '<div class="search-modal-empty"><p>Start typing to search...</p></div>';
+        }
+    }
+}
+
+
+// Set search mode in modal
+function setSearchModeModal(mode) {
+    searchMode = mode;
+    const episodesBtn = document.getElementById('search-mode-episodes-modal');
+    const podcastsBtn = document.getElementById('search-mode-podcasts-modal');
+    
+    if (episodesBtn) episodesBtn.classList.toggle('active', mode === 'episodes');
+    if (podcastsBtn) podcastsBtn.classList.toggle('active', mode === 'podcasts');
+    
+    // Also update main search mode buttons
+    setSearchMode(mode);
+    
+    // Update placeholder
+    const input = document.getElementById('search-modal-input');
+    if (input) {
+        if (mode === 'episodes') {
+            input.placeholder = 'Search episodes...';
+        } else if (mode === 'podcasts') {
+            input.placeholder = 'Search podcasts...';
+        }
+    }
+    
+    // Re-run search if there's a value
+    if (input && input.value) {
+        handleSearchModalInput(input.value);
+    }
+}
+
+// Handle search input in modal
+function handleSearchModalInput(value) {
+    const resultsEl = document.getElementById('search-modal-results');
+    if (!resultsEl) return;
+    
+    if (!value || value.trim() === '') {
+        resultsEl.innerHTML = '<div class="search-modal-empty"><p>Start typing to search...</p></div>';
+        return;
+    }
+    
+    // Use the existing handleSearch function but display in modal
+    handleSearchModal(value);
+}
+
+// Search functionality for modal
+async function handleSearchModal(query) {
+    const resultsEl = document.getElementById('search-modal-results');
+    if (!resultsEl) return;
+    
+    const searchTerm = query.toLowerCase();
+    
+    if (searchMode === 'episodes') {
+        // OPTIMIZED: Lazy-load episodes only when searching
+        if (!episodesLoaded) {
+            resultsEl.innerHTML = '<div class="search-modal-empty"><p>Loading episodes...</p></div>';
+            await loadAllEpisodes();
+        }
+        
+        // Search episodes
+        const matches = allEpisodes.filter(ep => 
+            (ep.title || '').toLowerCase().includes(searchTerm) ||
+            (ep.description || '').toLowerCase().includes(searchTerm)
+        );
+        
+        if (matches.length === 0) {
+            resultsEl.innerHTML = '<div class="search-modal-empty"><p>No episodes found</p></div>';
+            return;
+        }
+        
+        // Display results in modal format
+        resultsEl.innerHTML = matches.slice(0, 10).map(episode => {
+            const podcast = podcasts.find(p => p.id === episode.podcast_id);
+            const podcastTitle = podcast ? podcast.title : 'Unknown Podcast';
+            return `
+                <div class="search-result-item" onclick="closeSearchModal(); openEpisodeDetail('${episode.id}', '${episode.podcast_id || ''}')">
+                    <div class="search-result-main">
+                        <div class="search-result-image">
+                            <img src="${podcast && podcast.image_url ? sanitizeImageUrl(podcast.image_url) : getPlaceholderImage()}" 
+                                 alt="${escapeHtml(podcastTitle)}"
+                                 onerror="this.src='${getPlaceholderImage()}'">
+                        </div>
+                        <div class="search-result-info">
+                            <div class="search-result-title">${escapeHtml(episode.title || 'Untitled Episode')}</div>
+                            <div class="search-result-meta">
+                                <span>${escapeHtml(podcastTitle)}</span>
+                                ${episode.pub_date ? `<span>• ${formatDate(episode.pub_date)}</span>` : ''}
+                                ${episode.duration_seconds ? `<span>• ${formatDuration(episode.duration_seconds)}</span>` : ''}
+                            </div>
+                            ${episode.description ? `<div class="search-result-description">${escapeHtml(episode.description.replace(/<[^>]*>/g, '').substring(0, 150))}...</div>` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    } else if (searchMode === 'podcasts') {
+        const matches = podcasts.filter(podcast => 
+            (podcast.title || '').toLowerCase().includes(searchTerm) ||
+            (podcast.author || '').toLowerCase().includes(searchTerm) ||
+            (podcast.description || '').toLowerCase().includes(searchTerm)
+        );
+        
+        if (matches.length === 0) {
+            resultsEl.innerHTML = '<div class="search-modal-empty"><p>No podcasts found</p></div>';
+            return;
+        }
+        
+        // Display results in modal format
+        resultsEl.innerHTML = matches.slice(0, 10).map(podcast => {
+            const cleanedAuthor = podcast.author ? cleanAuthorText(podcast.author) : '';
+            return `
+                <div class="search-result-item podcast-result" onclick="closeSearchModal(); openEpisodes('${podcast.id}')">
+                    <div class="search-result-main">
+                        <div class="search-result-image">
+                            <img src="${sanitizeImageUrl(podcast.image_url) || getPlaceholderImage()}" 
+                                 alt="${escapeHtml(podcast.title || 'Podcast')}"
+                                 onerror="this.src='${getPlaceholderImage()}'">
+                        </div>
+                        <div class="search-result-info">
+                            <div class="search-result-title">${escapeHtml(podcast.title || 'Untitled Podcast')}</div>
+                            <div class="search-result-meta">
+                                ${cleanedAuthor && !shouldHideAuthor(cleanedAuthor) ? `<span>${escapeHtml(cleanedAuthor)}</span>` : ''}
+                            </div>
+                            ${podcast.description ? `<div class="search-result-description">${escapeHtml(podcast.description.replace(/<[^>]*>/g, '').substring(0, 150))}...</div>` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
     }
 }
 
@@ -6194,5 +6353,13 @@ document.addEventListener('keydown', (e) => {
     } else if (e.key === 'ArrowRight' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         skipForward();
+    } else if (e.key === 'Escape') {
+        // Close search modal if open
+        const modal = document.getElementById('search-modal');
+        if (modal && !modal.classList.contains('hidden')) {
+            closeSearchModal();
+            e.preventDefault();
+            e.stopPropagation();
+        }
     }
 });

@@ -61,7 +61,7 @@
         </div>
         
         <div class="sidebar-section">
-            <div class="sidebar-item" onclick="navigateTo('grid')">
+            <div class="sidebar-item" onclick="openSearchModal()">
                 <span class="sidebar-item-icon">🔍</span>
                 <span class="sidebar-item-title">Search</span>
             </div>
@@ -153,7 +153,7 @@
                 placeholder="Search..." 
                 class="top-search-input"
                 oninput="handleSearchInput(this.value)"
-                onfocus="handleSearchFocus()"
+                onfocus="openSearchModal()"
             >
         </div>
         <div id="auth-button-container" class="auth-button-container">
@@ -542,6 +542,64 @@
             </div>
         </div>
         <audio id="audio-player" preload="none"></audio>
+    </div>
+
+    <!-- Search Modal (Spotlight-like) -->
+    <div id="search-modal" class="search-modal hidden">
+        <div class="search-modal-overlay" onclick="closeSearchModal()"></div>
+        <div class="search-modal-content">
+            <div class="search-modal-header">
+                <div class="search-mode-toggle-modal">
+                    <button id="search-mode-episodes-modal" class="search-mode-btn active" onclick="setSearchModeModal('episodes')">Episodes</button>
+                    <button id="search-mode-podcasts-modal" class="search-mode-btn" onclick="setSearchModeModal('podcasts')">Podcasts</button>
+                </div>
+                <button class="search-modal-close" onclick="closeSearchModal()">✕</button>
+            </div>
+            <div class="search-modal-input-wrapper">
+                <input 
+                    type="text" 
+                    id="search-modal-input" 
+                    placeholder="Search..." 
+                    class="search-modal-input"
+                    oninput="handleSearchModalInput(this.value)"
+                    autocomplete="off"
+                >
+            </div>
+            <div id="search-modal-results" class="search-modal-results">
+                <div class="search-modal-empty">
+                    <p>Start typing to search...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search Modal (Spotlight-like) -->
+    <div id="search-modal" class="search-modal hidden">
+        <div class="search-modal-overlay" onclick="closeSearchModal()"></div>
+        <div class="search-modal-content">
+            <div class="search-modal-header">
+                <div class="search-mode-toggle-modal">
+                    <button id="search-mode-episodes-modal" class="search-mode-btn active" onclick="setSearchModeModal('episodes')">Episodes</button>
+                    <button id="search-mode-podcasts-modal" class="search-mode-btn" onclick="setSearchModeModal('podcasts')">Podcasts</button>
+                </div>
+                <button class="search-modal-close" onclick="closeSearchModal()">✕</button>
+            </div>
+            <div class="search-modal-input-wrapper">
+                <input 
+                    type="text" 
+                    id="search-modal-input" 
+                    placeholder="Search..." 
+                    class="search-modal-input"
+                    oninput="handleSearchModalInput(this.value)"
+                    autocomplete="off"
+                >
+            </div>
+            <div id="search-modal-results" class="search-modal-results">
+                <div class="search-modal-empty">
+                    <p>Start typing to search...</p>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Simple Sound Player (for looping nature sounds) -->
