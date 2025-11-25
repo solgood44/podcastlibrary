@@ -1875,25 +1875,28 @@ body {
 
 /* Episodes Full Page */
 .episodes-full-page {
-    background: var(--bg-card);
-    border-radius: 16px;
-    overflow-y: auto;
+    background: transparent;
+    border-radius: 0;
+    overflow-y: visible;
     min-height: 400px;
-    max-height: calc(100vh - 250px);
-    border: 1px solid var(--border);
+    max-height: none;
+    border: none;
+    width: 100%;
+    max-width: none;
 }
 
 /* Premium compact header layout */
 .episodes-page-header-compact {
     width: 100%;
-    padding: 24px;
+    padding: 32px 0 24px 0;
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
     gap: 24px;
-    background: linear-gradient(180deg, rgba(0, 0, 0, 0.1) 0%, transparent 100%);
+    background: transparent;
     border-bottom: 1px solid var(--border);
     position: relative;
+    margin-bottom: 32px;
 }
 
 .episodes-header-left {
@@ -2158,6 +2161,7 @@ body {
     display: block;
     position: relative;
     border-bottom: none;
+    max-width: none;
 }
 
 .episodes-page-description-full {
@@ -2254,33 +2258,56 @@ body {
     z-index: 1;
     display: block !important;
     visibility: visible !important;
+    width: 100%;
+    max-width: none;
 }
 
 
-/* Podcast Page Sections - Seamless dark background */
+/* Podcast Page Sections - Seamless dark background, full width */
 .podcast-description-section {
-    background: var(--bg-card);
-    border-radius: 16px;
-    padding: 24px;
-    margin-bottom: 24px;
-    border: 1px solid var(--border);
+    background: transparent;
+    border-radius: 0;
+    padding: 32px 0;
+    margin-bottom: 0;
+    border: none;
+    width: 100%;
+    max-width: none;
 }
 
 .podcast-episodes-section {
-    background: var(--bg-card);
-    border-radius: 16px;
+    background: transparent;
+    border-radius: 0;
     padding: 0;
-    margin-bottom: 24px;
-    border: 1px solid var(--border);
-    overflow: hidden;
+    margin-bottom: 0;
+    border: none;
+    overflow: visible;
+    width: 100%;
+    max-width: none;
 }
 
 .podcast-suggested-section {
-    background: var(--bg-card);
-    border-radius: 16px;
-    padding: 24px;
-    margin-bottom: 24px;
-    border: 1px solid var(--border);
+    background: transparent;
+    border-radius: 0;
+    padding: 32px 0;
+    margin-bottom: 0;
+    border: none;
+    width: 100%;
+    max-width: none;
+}
+
+/* Add padding when player is visible */
+body.player-bar-visible .podcast-description-section,
+body.player-bar-visible .podcast-episodes-section,
+body.player-bar-visible .podcast-suggested-section {
+    padding-bottom: 100px;
+}
+
+body.player-bar-visible .episodes-full-page {
+    padding-bottom: 100px;
+}
+
+body.player-bar-visible .episodes-list-content-compact {
+    padding-bottom: 0; /* Already handled by parent */
 }
 
 /* Suggested Podcasts Section */
@@ -4200,20 +4227,25 @@ body {
     
     /* Podcast page sections mobile styles */
     .podcast-description-section {
-        padding: 20px;
-        margin-bottom: 20px;
-        border-radius: 12px;
+        padding: 24px 0;
+        margin-bottom: 0;
+        border-radius: 0;
     }
     
     .podcast-episodes-section {
-        margin-bottom: 20px;
-        border-radius: 12px;
+        margin-bottom: 0;
+        border-radius: 0;
     }
     
     .podcast-suggested-section {
-        padding: 20px;
-        margin-bottom: 20px;
-        border-radius: 12px;
+        padding: 24px 0;
+        margin-bottom: 0;
+        border-radius: 0;
+    }
+    
+    .episodes-page-header-compact {
+        padding: 24px 0 20px 0;
+        margin-bottom: 24px;
     }
     
     /* Suggested podcasts mobile styles */
