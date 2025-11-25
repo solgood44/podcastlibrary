@@ -50,6 +50,7 @@ const FAVORITES_KEY = 'podcast_favorites';
 const PODCAST_SORT_PREFERENCES_KEY = 'podcast_sort_preferences';
 const QUEUE_KEY = 'episode_queue';
 const AUTO_PLAY_KEY = 'auto_play_enabled';
+const ONBOARDING_KEY = 'onboarding_completed';
 const MAX_HISTORY = 50;
 
 // Queue management
@@ -3187,7 +3188,20 @@ function clearHistory() {
     }
 }
 
-// Load history page
+// Remove episode from continue listening (marks as completed)
+function removeFromContinueListening(episodeId) {
+    // Mark episode as completed (100% progress)
+    saveEpisodeProgress(episodeId, 100);
+    // Optionally remove from history if user wants
+    // For now, just mark as completed so it won't show in continue listening
+}
+
+// Dismiss onboarding
+function dismissOnboarding() {
+    localStorage.setItem(ONBOARDING_KEY, 'true');
+}
+
+// Load history page (merged with continue listening - shows in-progress first)
 function loadHistoryPage() {
     const loadingEl = document.getElementById('history-loading');
     const listEl = document.getElementById('history-list');
@@ -3197,53 +3211,129 @@ function loadHistoryPage() {
     
     setTimeout(() => {
         const history = getHistory();
+        const progress = JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}');
         loadingEl.classList.add('hidden');
         
         if (history.length === 0) {
-            listEl.innerHTML = '<div class="empty"><p>No listening history</p></div>';
+            listEl.innerHTML = '<div class="empty"><p>No listening history</p><p class="subtitle">Start playing episodes to build your history</p></div>';
             return;
         }
         
-        // History is already sorted by most recent (newest first)
-        listEl.innerHTML = history.map(item => {
+        // Separate into in-progress and completed
+        const inProgress = [];
+        const completed = [];
+        
+        history.forEach(item => {
+            if (!item.episodeId) return; // Skip podcast-only history items
+            
             const episode = allEpisodes.find(e => e.id === item.episodeId);
             const podcast = podcasts.find(p => p.id === item.podcastId);
-            if (!episode || !podcast) return '';
+            if (!episode || !podcast) return;
             
-            const progress = getEpisodeProgress(episode.id);
-            const isCompleted = progress >= 95; // Consider 95%+ as completed
-            const progressBar = `<div class="progress-bar"><div class="progress-fill" style="width: ${progress}%"></div></div>`;
-            const isFavorite = isEpisodeFavorited(episode.id);
-            const isCurrentEpisode = currentEpisode && currentEpisode.id === episode.id;
-            const isEpisodePlaying = isCurrentEpisode && isPlaying;
-            return `
-                <div class="episode-item ${isCompleted ? 'episode-completed' : ''} ${isCurrentEpisode ? 'episode-playing' : ''}">
-                    <div class="episode-item-image">
-                        <img src="${podcast.image_url || getPlaceholderImage()}" 
-                             alt="${escapeHtml(podcast.title || '')}" 
-                             class="episode-list-artwork"
-                             onerror="this.src='${getPlaceholderImage()}'">
-                    </div>
-                    <button class="btn-episode-play ${isEpisodePlaying ? 'playing' : ''}" onclick="event.stopPropagation(); ${isEpisodePlaying ? 'togglePlayPause()' : `playEpisode(${JSON.stringify(episode).replace(/"/g, '&quot;')})`}" title="${isEpisodePlaying ? 'Pause' : 'Play'}">
-                        <span class="episode-play-icon" data-episode-id="${episode.id}">${isEpisodePlaying ? '⏸' : '▶'}</span>
-                    </button>
-                    <div class="episode-item-main" onclick="openEpisodeDetail('${episode.id}', '${podcast.id}')">
-                        <div class="episode-title">${escapeHtml(episode.title || 'Untitled Episode')}</div>
-                        <div class="episode-meta">
-                            <span onclick="event.stopPropagation(); openEpisodes('${podcast.id}')" style="cursor: pointer; text-decoration: underline;">${escapeHtml(podcast.title || 'Unknown Podcast')}</span>
-                            ${episode.pub_date ? `<span>• ${formatDate(episode.pub_date)}</span>` : ''}
-                            ${episode.duration_seconds ? `<span>• ${formatDuration(episode.duration_seconds)}</span>` : ''}
-                            <span>• ${formatDate(item.timestamp)}</span>
-                            ${progress > 0 ? `<span class="episode-progress-text">${Math.round(progress)}%</span>` : ''}
+            const epProgress = getEpisodeProgress(episode.id);
+            const isCompleted = epProgress >= 95;
+            
+            const episodeData = {
+                episode,
+                podcast,
+                progress: epProgress,
+                timestamp: item.timestamp,
+                isCompleted
+            };
+            
+            if (isCompleted) {
+                completed.push(episodeData);
+            } else {
+                inProgress.push(episodeData);
+            }
+        });
+        
+        // Sort: in-progress by most recent, completed by most recent
+        inProgress.sort((a, b) => b.timestamp - a.timestamp);
+        completed.sort((a, b) => b.timestamp - a.timestamp);
+        
+        let html = '';
+        
+        // Show in-progress section
+        if (inProgress.length > 0) {
+            html += '<div class="history-section"><h3 class="history-section-title">Continue Listening</h3>';
+            html += inProgress.map(({ episode, podcast, progress: epProgress }) => {
+                const isCurrentEpisode = currentEpisode && currentEpisode.id === episode.id;
+                const isEpisodePlaying = isCurrentEpisode && isPlaying;
+                const isFavorite = isEpisodeFavorited(episode.id);
+                const progressBar = `<div class="progress-bar"><div class="progress-fill" style="width: ${epProgress}%"></div></div>`;
+                
+                return `
+                    <div class="episode-item episode-in-progress ${isCurrentEpisode ? 'episode-playing' : ''}">
+                        <div class="episode-item-image">
+                            <img src="${podcast.image_url || getPlaceholderImage()}" 
+                                 alt="${escapeHtml(podcast.title || '')}" 
+                                 class="episode-list-artwork"
+                                 onerror="this.src='${getPlaceholderImage()}'">
                         </div>
-                        ${progressBar}
+                        <button class="btn-episode-play ${isEpisodePlaying ? 'playing' : ''}" onclick="event.stopPropagation(); ${isEpisodePlaying ? 'togglePlayPause()' : `playEpisode(${JSON.stringify(episode).replace(/"/g, '&quot;')})`}" title="${isEpisodePlaying ? 'Pause' : 'Play'}">
+                            <span class="episode-play-icon" data-episode-id="${episode.id}">${isEpisodePlaying ? '⏸' : '▶'}</span>
+                        </button>
+                        <div class="episode-item-main" onclick="openEpisodeDetail('${episode.id}', '${podcast.id}')">
+                            <div class="episode-title">${escapeHtml(episode.title || 'Untitled Episode')}</div>
+                            <div class="episode-meta">
+                                <span onclick="event.stopPropagation(); openEpisodes('${podcast.id}')" style="cursor: pointer; text-decoration: underline;">${escapeHtml(podcast.title || 'Unknown Podcast')}</span>
+                                ${episode.pub_date ? `<span>• ${formatDate(episode.pub_date)}</span>` : ''}
+                                ${episode.duration_seconds ? `<span>• ${formatDuration(episode.duration_seconds)}</span>` : ''}
+                                <span class="episode-progress-text">${Math.round(epProgress)}%</span>
+                            </div>
+                            ${progressBar}
+                        </div>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <button class="btn-remove-history" onclick="event.stopPropagation(); removeFromContinueListening('${episode.id}'); loadHistoryPage();" title="Mark as completed">✕</button>
+                            <button class="btn-favorite ${isFavorite ? 'favorited' : ''}" onclick="event.stopPropagation(); toggleEpisodeFavorite('${episode.id}', '${podcast.id}')" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+                                ${isFavorite ? '❤️' : '🤍'}
+                            </button>
+                        </div>
                     </div>
-                    <button class="btn-favorite ${isFavorite ? 'favorited' : ''}" onclick="event.stopPropagation(); toggleEpisodeFavorite('${episode.id}', '${podcast.id}')" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
-                        ${isFavorite ? '❤️' : '🤍'}
-                    </button>
-                </div>
-            `;
-        }).filter(Boolean).join('');
+                `;
+            }).join('');
+            html += '</div>';
+        }
+        
+        // Show completed section
+        if (completed.length > 0) {
+            html += '<div class="history-section"><h3 class="history-section-title">Completed</h3>';
+            html += completed.map(({ episode, podcast, timestamp }) => {
+                const isCurrentEpisode = currentEpisode && currentEpisode.id === episode.id;
+                const isEpisodePlaying = isCurrentEpisode && isPlaying;
+                const isFavorite = isEpisodeFavorited(episode.id);
+                
+                return `
+                    <div class="episode-item episode-completed ${isCurrentEpisode ? 'episode-playing' : ''}">
+                        <div class="episode-item-image">
+                            <img src="${podcast.image_url || getPlaceholderImage()}" 
+                                 alt="${escapeHtml(podcast.title || '')}" 
+                                 class="episode-list-artwork"
+                                 onerror="this.src='${getPlaceholderImage()}'">
+                        </div>
+                        <button class="btn-episode-play ${isEpisodePlaying ? 'playing' : ''}" onclick="event.stopPropagation(); ${isEpisodePlaying ? 'togglePlayPause()' : `playEpisode(${JSON.stringify(episode).replace(/"/g, '&quot;')})`}" title="${isEpisodePlaying ? 'Pause' : 'Play'}">
+                            <span class="episode-play-icon" data-episode-id="${episode.id}">${isEpisodePlaying ? '⏸' : '▶'}</span>
+                        </button>
+                        <div class="episode-item-main" onclick="openEpisodeDetail('${episode.id}', '${podcast.id}')">
+                            <div class="episode-title">${escapeHtml(episode.title || 'Untitled Episode')}</div>
+                            <div class="episode-meta">
+                                <span onclick="event.stopPropagation(); openEpisodes('${podcast.id}')" style="cursor: pointer; text-decoration: underline;">${escapeHtml(podcast.title || 'Unknown Podcast')}</span>
+                                ${episode.pub_date ? `<span>• ${formatDate(episode.pub_date)}</span>` : ''}
+                                ${episode.duration_seconds ? `<span>• ${formatDuration(episode.duration_seconds)}</span>` : ''}
+                                <span>• ${formatDate(timestamp)}</span>
+                            </div>
+                        </div>
+                        <button class="btn-favorite ${isFavorite ? 'favorited' : ''}" onclick="event.stopPropagation(); toggleEpisodeFavorite('${episode.id}', '${podcast.id}')" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+                            ${isFavorite ? '❤️' : '🤍'}
+                        </button>
+                    </div>
+                `;
+            }).join('');
+            html += '</div>';
+        }
+        
+        listEl.innerHTML = html || '<div class="empty"><p>No listening history</p></div>';
     }, 300);
 }
 
@@ -4096,7 +4186,49 @@ async function renderPersonalizedHomepage() {
     
     let html = '';
     
-    // Continue Listening Section
+    // Check if first-time visitor (no history, no favorites)
+    const history = getHistory();
+    const favorites = getFavorites();
+    const hasActivity = history.length > 0 || favorites.podcasts.length > 0 || favorites.episodes.length > 0;
+    const onboardingCompleted = localStorage.getItem(ONBOARDING_KEY) === 'true';
+    
+    // Show onboarding for first-time visitors
+    if (!hasActivity && !onboardingCompleted) {
+        html += `
+            <div class="homepage-onboarding">
+                <div class="onboarding-content">
+                    <h2>Welcome to Podcast Library! 🎧</h2>
+                    <p>Discover and listen to thousands of podcasts. Here's how to get started:</p>
+                    <div class="onboarding-steps">
+                        <div class="onboarding-step">
+                            <div class="onboarding-step-icon">🔍</div>
+                            <div class="onboarding-step-content">
+                                <h3>Search</h3>
+                                <p>Use the search bar to find podcasts you love</p>
+                            </div>
+                        </div>
+                        <div class="onboarding-step">
+                            <div class="onboarding-step-icon">⭐</div>
+                            <div class="onboarding-step-content">
+                                <h3>Favorite</h3>
+                                <p>Click the heart icon to save your favorite podcasts</p>
+                            </div>
+                        </div>
+                        <div class="onboarding-step">
+                            <div class="onboarding-step-icon">▶️</div>
+                            <div class="onboarding-step-content">
+                                <h3>Listen</h3>
+                                <p>Play episodes and we'll track your progress automatically</p>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn-onboarding-dismiss" onclick="dismissOnboarding(); renderPersonalizedHomepage();">Got it!</button>
+                </div>
+            </div>
+        `;
+    }
+    
+    // Continue Listening Section (merged with history - shows in-progress items)
     const continueEpisodes = getContinueListeningEpisodes(8);
     if (continueEpisodes.length > 0) {
         html += `
@@ -4112,6 +4244,11 @@ async function renderPersonalizedHomepage() {
                         const episodeInQueue = isInQueue(episode.id);
                         return `
                             <div class="homepage-episode-card ${isCurrentEpisode ? 'episode-playing' : ''}">
+                                <button class="btn-remove-continue" 
+                                        onclick="event.stopPropagation(); removeFromContinueListening('${episode.id}'); renderPersonalizedHomepage();" 
+                                        title="Remove from continue listening">
+                                    ✕
+                                </button>
                                 <div class="homepage-episode-image" onclick="playEpisode(${JSON.stringify(episode).replace(/"/g, '&quot;')})">
                                     <img src="${podcast.image_url || getPlaceholderImage()}" 
                                          alt="${escapeHtml(podcast.title || '')}" 

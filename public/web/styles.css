@@ -1045,6 +1045,167 @@ body {
     color: var(--text-primary);
 }
 
+/* Onboarding */
+.homepage-onboarding {
+    background: linear-gradient(135deg, rgba(29, 185, 84, 0.1) 0%, rgba(29, 185, 84, 0.05) 100%);
+    border: 1px solid rgba(29, 185, 84, 0.2);
+    border-radius: 16px;
+    padding: 32px;
+    margin-bottom: 48px;
+    text-align: center;
+}
+
+.onboarding-content h2 {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    color: var(--text-primary);
+}
+
+.onboarding-content > p {
+    font-size: 16px;
+    color: var(--text-secondary);
+    margin-bottom: 32px;
+}
+
+.onboarding-steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 24px;
+    margin-bottom: 32px;
+    text-align: left;
+}
+
+.onboarding-step {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+}
+
+.onboarding-step-icon {
+    font-size: 32px;
+    flex-shrink: 0;
+}
+
+.onboarding-step-content h3 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--text-primary);
+}
+
+.onboarding-step-content p {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.btn-onboarding-dismiss {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 32px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-onboarding-dismiss:hover {
+    background: var(--accent-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(29, 185, 84, 0.3);
+}
+
+/* Remove buttons */
+.btn-remove-continue {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    border: none;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    z-index: 10;
+    color: var(--text-primary);
+    font-size: 16px;
+    font-weight: 600;
+    opacity: 0;
+}
+
+.homepage-episode-card:hover .btn-remove-continue {
+    opacity: 1;
+}
+
+.btn-remove-continue:hover {
+    background: rgba(248, 81, 73, 0.9);
+    transform: scale(1.1);
+}
+
+.btn-remove-history {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: var(--text-secondary);
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.btn-remove-history:hover {
+    background: rgba(248, 81, 73, 0.2);
+    border-color: var(--error);
+    color: var(--error);
+    transform: scale(1.1);
+}
+
+/* History sections */
+.history-section {
+    margin-bottom: 32px;
+}
+
+.history-section-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+}
+
+.episode-item.episode-in-progress {
+    border-left: 3px solid var(--accent);
+}
+
+@media (max-width: 768px) {
+    .homepage-onboarding {
+        padding: 24px 16px;
+    }
+    
+    .onboarding-steps {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+    
+    .onboarding-content h2 {
+        font-size: 24px;
+    }
+}
+
 .podcast-card {
     background: var(--bg-card);
     border-radius: 12px;
