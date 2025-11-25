@@ -3467,6 +3467,57 @@ function cleanAuthorText(author) {
     return cleaned;
 }
 
+// Get related podcasts by genre (client-side filtering from existing podcasts array)
+function getRelatedPodcastsByGenre(currentPodcastId, genres, limit = 6) {
+    if (!genres || !podcasts || podcasts.length === 0) {
+        console.log('[Suggested Pods] No genres or podcasts available', { genres, podcastCount: podcasts?.length });
+        return [];
+    }
+    
+    // Normalize genres to array
+    const genreArray = Array.isArray(genres) 
+        ? genres.filter(g => g).map(g => String(g).trim().toLowerCase())
+        : genres 
+            ? [String(genres).trim().toLowerCase()]
+            : [];
+    
+    if (genreArray.length === 0) {
+        console.log('[Suggested Pods] No valid genres after normalization');
+        return [];
+    }
+    
+    console.log('[Suggested Pods] Looking for podcasts with genres:', genreArray);
+    
+    // Filter podcasts by genre match, excluding current podcast
+    const related = podcasts
+        .filter(p => {
+            // Exclude current podcast and private podcasts
+            if (String(p.id) === String(currentPodcastId)) {
+                return false;
+            }
+            if (p.is_private) {
+                return false;
+            }
+            
+            const pGenres = Array.isArray(p.genre)
+                ? p.genre.filter(g => g).map(g => String(g).trim().toLowerCase())
+                : p.genre
+                    ? [String(p.genre).trim().toLowerCase()]
+                    : [];
+            
+            // Check if any genre matches
+            const hasMatch = pGenres.some(g => genreArray.includes(g));
+            if (hasMatch) {
+                console.log('[Suggested Pods] Found match:', p.title, 'with genres:', pGenres);
+            }
+            return hasMatch;
+        })
+        .slice(0, limit);
+    
+    console.log('[Suggested Pods] Found', related.length, 'related podcasts');
+    return related;
+}
+
 // Filter podcasts by episode duration
 function filterPodcastsByDuration(podcastsToFilter) {
     if (durationFilter === 'all') {
@@ -4339,7 +4390,44 @@ async function loadEpisodesPage() {
             // Hide the separate controls since we moved them to header
             if (controlsEl) controlsEl.classList.add('hidden');
             
-            listEl.innerHTML = headerHTML + descriptionHTML + `<div class="episodes-list-content-compact">${episodesHTML}</div>`;
+            // Get suggested podcasts based on genre
+            const suggestedPodcasts = getRelatedPodcastsByGenre(currentPodcast.id, latestPodcast.genre, 6);
+            let suggestedHTML = '';
+            if (suggestedPodcasts && suggestedPodcasts.length > 0) {
+                suggestedHTML = `
+                    <div class="suggested-podcasts-section">
+                        <h2 class="suggested-podcasts-title">You might also like</h2>
+                        <div class="suggested-podcasts-grid">
+                            ${suggestedPodcasts.map(podcast => {
+                                const isFavorite = isPodcastFavorited(podcast.id);
+                                const cleanedAuthor = podcast.author ? cleanAuthorText(podcast.author) : '';
+                                return `
+                                    <div class="suggested-podcast-card">
+                                        <div class="suggested-podcast-content" onclick="openEpisodes('${podcast.id}')">
+                                            <img 
+                                                src="${sanitizeImageUrl(podcast.image_url) || getPlaceholderImage()}" 
+                                                alt="${escapeHtml(podcast.title || 'Podcast')}"
+                                                class="suggested-podcast-image"
+                                                onerror="this.src='${getPlaceholderImage()}'"
+                                            >
+                                            <div class="suggested-podcast-info">
+                                                <div class="suggested-podcast-title">${escapeHtml(podcast.title || 'Untitled Podcast')}</div>
+                                                ${cleanedAuthor && !shouldHideAuthor(cleanedAuthor) ? `<div class="suggested-podcast-author">${escapeHtml(cleanedAuthor)}</div>` : ''}
+                                            </div>
+                                        </div>
+                                        <button class="btn-podcast-favorite-suggested ${isFavorite ? 'favorited' : ''}" onclick="event.stopPropagation(); togglePodcastFavorite('${podcast.id}');" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+                                            ${isFavorite ? '❤️' : '🤍'}
+                                        </button>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Ensure episodes are always visible - place them after description
+            listEl.innerHTML = headerHTML + descriptionHTML + `<div class="episodes-list-content-compact">${episodesHTML}</div>` + suggestedHTML;
             
             // Sync the inline sort select with the hidden one
             const inlineSelect = document.getElementById('podcast-episodes-sort-select-inline');
@@ -4827,14 +4915,14 @@ window.toggleDescription = function(button) {
     const isExpanded = !full.classList.contains('hidden');
     
     if (isExpanded) {
-        // Collapse
+        // Collapse - show preview, hide full
         full.classList.add('hidden');
         preview.style.display = 'block';
         preview.style.visibility = 'visible';
         toggleText.textContent = 'See more';
         toggleIcon.textContent = '▼';
     } else {
-        // Expand
+        // Expand - show full, hide preview
         full.classList.remove('hidden');
         full.style.display = 'block';
         full.style.visibility = 'visible';
@@ -4842,6 +4930,16 @@ window.toggleDescription = function(button) {
         preview.style.visibility = 'hidden';
         toggleText.textContent = 'See less';
         toggleIcon.textContent = '▲';
+    }
+    
+    // Ensure episodes list is always visible
+    const episodesList = container.closest('#episodes-list');
+    if (episodesList) {
+        const episodesContent = episodesList.querySelector('.episodes-list-content-compact');
+        if (episodesContent) {
+            episodesContent.style.display = 'block';
+            episodesContent.style.visibility = 'visible';
+        }
     }
 };
 
