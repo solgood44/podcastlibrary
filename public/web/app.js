@@ -42,6 +42,8 @@ let soundIsActuallyPlaying = false; // Track if sound is actually playing (to fi
 let sleepTimerInterval = null; // Interval for sleep timer countdown
 let sleepTimerEndTime = null; // Timestamp when sleep timer will end
 let sleepTimerMinutes = 0; // Current sleep timer duration in minutes
+let playbackSpeed = 1.0; // Playback speed (0.5x, 1x, 1.25x, 1.5x, 2x)
+let volume = 1.0; // Volume (0.0 to 1.0)
 
 // Progress tracking key for localStorage
 const PROGRESS_KEY = 'podcast_progress';
@@ -51,6 +53,8 @@ const PODCAST_SORT_PREFERENCES_KEY = 'podcast_sort_preferences';
 const QUEUE_KEY = 'episode_queue';
 const AUTO_PLAY_KEY = 'auto_play_enabled';
 const ONBOARDING_KEY = 'onboarding_completed';
+const PLAYBACK_SPEED_KEY = 'playback_speed';
+const VOLUME_KEY = 'volume';
 const MAX_HISTORY = 50;
 
 // Queue management
@@ -255,7 +259,23 @@ document.addEventListener('DOMContentLoaded', () => {
     restorePodcastSortPreferences(); // Restore podcast sort preferences
     restoreQueue(); // Restore episode queue
     restoreAutoPlaySetting(); // Restore auto-play setting
+    restorePlaybackSettings(); // Restore playback speed and volume
     renderSidebar();
+    
+    // Close menus when clicking outside
+    document.addEventListener('click', (e) => {
+        const speedMenu = document.getElementById('playback-speed-menu');
+        const volumeControl = document.getElementById('volume-control');
+        const speedBtn = document.getElementById('playback-speed-btn');
+        const volumeBtn = document.getElementById('volume-btn');
+        
+        if (speedMenu && !speedMenu.contains(e.target) && !speedBtn?.contains(e.target)) {
+            closePlaybackSpeedMenu();
+        }
+        if (volumeControl && !volumeControl.contains(e.target) && !volumeBtn?.contains(e.target)) {
+            closeVolumeControl();
+        }
+    });
     
     // Handle window resize to manage sidebar state
     window.addEventListener('resize', handleResize);
@@ -3679,6 +3699,127 @@ function restoreAutoPlaySetting() {
     }
 }
 
+// Restore playback settings (speed and volume)
+function restorePlaybackSettings() {
+    try {
+        const storedSpeed = localStorage.getItem(PLAYBACK_SPEED_KEY);
+        if (storedSpeed) {
+            playbackSpeed = parseFloat(storedSpeed);
+        }
+        const storedVolume = localStorage.getItem(VOLUME_KEY);
+        if (storedVolume) {
+            volume = parseFloat(storedVolume);
+        }
+        // Apply to audio player if it exists
+        if (audioPlayer) {
+            audioPlayer.playbackRate = playbackSpeed;
+            audioPlayer.volume = volume;
+        }
+        updatePlaybackSpeedUI();
+        updateVolumeUI();
+    } catch (e) {
+        console.error('Error restoring playback settings:', e);
+    }
+}
+
+// Set playback speed
+function setPlaybackSpeed(speed) {
+    playbackSpeed = speed;
+    if (audioPlayer) {
+        audioPlayer.playbackRate = speed;
+    }
+    localStorage.setItem(PLAYBACK_SPEED_KEY, String(speed));
+    updatePlaybackSpeedUI();
+    closePlaybackSpeedMenu();
+}
+
+// Update playback speed UI
+function updatePlaybackSpeedUI() {
+    const speedText = document.getElementById('playback-speed-text');
+    if (speedText) {
+        speedText.textContent = `${playbackSpeed}x`;
+    }
+    // Update active state in menu
+    const menu = document.getElementById('playback-speed-menu');
+    if (menu) {
+        menu.querySelectorAll('.player-control-option').forEach(btn => {
+            btn.classList.remove('active');
+            const speed = parseFloat(btn.textContent.replace('x', ''));
+            if (speed === playbackSpeed) {
+                btn.classList.add('active');
+            }
+        });
+    }
+}
+
+// Toggle playback speed menu
+function togglePlaybackSpeedMenu() {
+    const menu = document.getElementById('playback-speed-menu');
+    if (menu) {
+        menu.classList.toggle('hidden');
+        // Close other menus
+        closeVolumeControl();
+        closeSleepTimerMenu();
+    }
+}
+
+// Close playback speed menu
+function closePlaybackSpeedMenu() {
+    const menu = document.getElementById('playback-speed-menu');
+    if (menu) {
+        menu.classList.add('hidden');
+    }
+}
+
+// Set volume
+function setVolume(vol) {
+    volume = Math.max(0, Math.min(1, vol)); // Clamp between 0 and 1
+    if (audioPlayer) {
+        audioPlayer.volume = volume;
+    }
+    localStorage.setItem(VOLUME_KEY, String(volume));
+    updateVolumeUI();
+}
+
+// Update volume UI
+function updateVolumeUI() {
+    const volumeIcon = document.getElementById('volume-icon');
+    const volumeSlider = document.getElementById('volume-slider');
+    
+    if (volumeIcon) {
+        if (volume === 0) {
+            volumeIcon.textContent = '🔇';
+        } else if (volume < 0.5) {
+            volumeIcon.textContent = '🔉';
+        } else {
+            volumeIcon.textContent = '🔊';
+        }
+    }
+    
+    if (volumeSlider) {
+        volumeSlider.value = Math.round(volume * 100);
+    }
+}
+
+// Toggle volume control
+function toggleVolumeControl() {
+    const control = document.getElementById('volume-control');
+    if (control) {
+        control.classList.toggle('hidden');
+        // Close other menus
+        closePlaybackSpeedMenu();
+        closeSleepTimerMenu();
+    }
+}
+
+// Close volume control
+function closeVolumeControl() {
+    const control = document.getElementById('volume-control');
+    if (control) {
+        control.classList.add('hidden');
+    }
+}
+
 // Toggle auto-play
 function toggleAutoPlay() {
     autoPlayEnabled = !autoPlayEnabled;
@@ -6184,6 +6325,10 @@ function seekToPosition(event) {
 function setupAudioPlayer() {
     if (!audioPlayer) return;
     
+    // Set initial playback speed and volume
+    audioPlayer.playbackRate = playbackSpeed;
+    audioPlayer.volume = volume;
+    
     audioPlayer.addEventListener('play', () => {
         isPlaying = true;
         updatePlayPauseButton();
@@ -6199,6 +6344,9 @@ function setupAudioPlayer() {
     audioPlayer.addEventListener('loadedmetadata', () => {
         const duration = formatTime(audioPlayer.duration);
         document.getElementById('duration-bar').textContent = duration;
+        // Ensure playback speed and volume are set
+        audioPlayer.playbackRate = playbackSpeed;
+        audioPlayer.volume = volume;
         if (currentPage === 'player') {
             loadPlayerPage();
         }
@@ -7128,22 +7276,56 @@ function debouncedSync() {
 
 // Handle keyboard shortcuts
 document.addEventListener('keydown', (e) => {
-    if (e.key === ' ' && currentEpisode && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+    // Don't trigger shortcuts when typing in inputs
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        // Allow Cmd/Ctrl+K for search even in inputs
+        if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+            e.preventDefault();
+            openSearchModal();
+        }
+        return;
+    }
+    
+    // Space: Play/Pause
+    if (e.key === ' ' && currentEpisode) {
         e.preventDefault();
         togglePlayPause();
-    } else if (e.key === 'ArrowLeft' && (e.metaKey || e.ctrlKey)) {
+    }
+    // Arrow Left: Skip backward 10s
+    else if (e.key === 'ArrowLeft' && currentEpisode) {
         e.preventDefault();
         skipBackward();
-    } else if (e.key === 'ArrowRight' && (e.metaKey || e.ctrlKey)) {
+    }
+    // Arrow Right: Skip forward 30s
+    else if (e.key === 'ArrowRight' && currentEpisode) {
         e.preventDefault();
         skipForward();
-    } else if (e.key === 'Escape') {
-        // Close search modal if open
+    }
+    // Cmd/Ctrl+K: Open search
+    else if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        openSearchModal();
+    }
+    // Cmd/Ctrl+Arrow Up: Increase volume
+    else if ((e.metaKey || e.ctrlKey) && e.key === 'ArrowUp' && currentEpisode) {
+        e.preventDefault();
+        setVolume(Math.min(1, volume + 0.1));
+    }
+    // Cmd/Ctrl+Arrow Down: Decrease volume
+    else if ((e.metaKey || e.ctrlKey) && e.key === 'ArrowDown' && currentEpisode) {
+        e.preventDefault();
+        setVolume(Math.max(0, volume - 0.1));
+    }
+    // Escape: Close modals/menus
+    else if (e.key === 'Escape') {
         const modal = document.getElementById('search-modal');
         if (modal && !modal.classList.contains('hidden')) {
             closeSearchModal();
             e.preventDefault();
             e.stopPropagation();
         }
+        closePlaybackSpeedMenu();
+        closeVolumeControl();
+        closeSleepTimerMenu();
     }
 });
