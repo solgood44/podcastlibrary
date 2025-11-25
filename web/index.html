@@ -61,31 +61,37 @@
         </div>
         
         <div class="sidebar-section">
-            <div class="sidebar-item" onclick="openSearchModal()">
-                <span class="sidebar-item-icon">🔍</span>
-                <span class="sidebar-item-title">Search</span>
+            <div class="sidebar-item sidebar-item-home" onclick="navigateTo('grid')" id="sidebar-item-home">
+                <span class="sidebar-item-icon">🏠</span>
+                <span class="sidebar-item-title">Home</span>
             </div>
-            <div class="sidebar-item" onclick="navigateTo('history')">
-                <span class="sidebar-item-icon">🕒</span>
-                <span class="sidebar-item-title">History</span>
-                <span id="sidebar-history-count" class="sidebar-item-count">0</span>
+            <div class="sidebar-item" onclick="navigateTo('grid', 'library')" id="sidebar-item-library">
+                <span class="sidebar-item-icon">📚</span>
+                <span class="sidebar-item-title">Library</span>
             </div>
-            <div class="sidebar-item" onclick="navigateTo('favorites')">
-                <span class="sidebar-item-icon">⭐</span>
-                <span class="sidebar-item-title">Favorites</span>
-                <span id="sidebar-favorites-count" class="sidebar-item-count">0</span>
+            <div class="sidebar-item" onclick="navigateTo('history')" id="sidebar-item-continue">
+                <span class="sidebar-item-icon">▶️</span>
+                <span class="sidebar-item-title">Continue Listening</span>
+                <span id="sidebar-continue-count" class="sidebar-item-count">0</span>
             </div>
-            <div class="sidebar-item" onclick="navigateTo('queue')">
+            <div class="sidebar-item" onclick="navigateTo('queue')" id="sidebar-item-queue">
                 <span class="sidebar-item-icon">📋</span>
                 <span class="sidebar-item-title">Queue</span>
                 <span id="sidebar-queue-count" class="sidebar-item-count">0</span>
             </div>
-            <!-- Sounds menu item removed temporarily -->
-            <!-- <div class="sidebar-item" onclick="navigateTo('sounds')">
-                <span class="sidebar-item-icon">🌊</span>
-                <span class="sidebar-item-title">Sounds</span>
-            </div> -->
-            <div class="sidebar-item" onclick="navigateTo('authors')">
+            <div class="sidebar-item" onclick="navigateTo('favorites')" id="sidebar-item-favorites">
+                <span class="sidebar-item-icon">⭐</span>
+                <span class="sidebar-item-title">Favorites</span>
+                <span id="sidebar-favorites-count" class="sidebar-item-count">0</span>
+            </div>
+        </div>
+        
+        <div class="sidebar-section">
+            <div class="sidebar-item" onclick="openSearchModal()">
+                <span class="sidebar-item-icon">🔍</span>
+                <span class="sidebar-item-title">Search</span>
+            </div>
+            <div class="sidebar-item" onclick="navigateTo('authors')" id="sidebar-item-authors">
                 <span class="sidebar-item-icon">✍️</span>
                 <span class="sidebar-item-title">Authors</span>
                 <span id="sidebar-authors-count" class="sidebar-item-count">0</span>
@@ -318,11 +324,11 @@
             </div>
         </div>
 
-        <!-- History Page -->
+        <!-- History Page (Continue Listening) -->
         <div id="page-history" class="page hidden">
             <div class="page-header">
-                <h1>Listening History</h1>
-                <button class="btn-clear-history-header" onclick="clearHistory(); navigateTo('history')" title="Clear history">Clear History</button>
+                <h1>Continue Listening</h1>
+                <button class="btn-clear-history-header" onclick="clearHistory(); navigateTo('history')" title="Clear history">Clear All</button>
             </div>
             <div id="history-loading" class="loading hidden">
                 <div class="spinner"></div>

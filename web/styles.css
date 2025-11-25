@@ -1045,6 +1045,98 @@ body {
     color: var(--text-primary);
 }
 
+/* Context Menu */
+.episode-context-menu {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 4px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    min-width: 200px;
+    z-index: 1000;
+}
+
+.context-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.2s;
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.context-menu-item:hover {
+    background: var(--bg-hover);
+}
+
+.context-menu-icon {
+    font-size: 16px;
+    width: 20px;
+    text-align: center;
+}
+
+/* Episode Detail Queue Button */
+.btn-queue-episode-detail {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 16px;
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-queue-episode-detail:hover {
+    background: var(--bg-hover);
+    border-color: var(--accent);
+}
+
+.btn-queue-episode-detail.in-queue {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+}
+
+.btn-queue-episode-detail.in-queue:hover {
+    background: var(--accent-hover);
+}
+
+/* Make queue buttons more subtle on homepage */
+.homepage-episode-actions .btn-queue-small {
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+
+.homepage-episode-card:hover .homepage-episode-actions .btn-queue-small {
+    opacity: 1;
+}
+
+/* Queue indicator (subtle checkmark) */
+.episode-queue-indicator {
+    color: var(--accent);
+    font-size: 14px;
+    font-weight: 600;
+    opacity: 0.8;
+}
+
+.homepage-episode-queue-badge {
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 600;
+    opacity: 0.9;
+    padding: 2px 6px;
+    background: rgba(29, 185, 84, 0.1);
+    border-radius: 4px;
+}
+
 /* Onboarding */
 .homepage-onboarding {
     background: linear-gradient(135deg, rgba(29, 185, 84, 0.1) 0%, rgba(29, 185, 84, 0.05) 100%);
