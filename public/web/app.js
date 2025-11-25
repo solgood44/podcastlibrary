@@ -4426,8 +4426,14 @@ async function loadEpisodesPage() {
                 `;
             }
             
-            // Ensure episodes are always visible - place them after description
-            listEl.innerHTML = headerHTML + descriptionHTML + `<div class="episodes-list-content-compact">${episodesHTML}</div>` + suggestedHTML;
+            // Structure: Header, Description Section, Episodes Section, Suggested Section
+            // Each in separate divs with seamless dark background
+            listEl.innerHTML = headerHTML + 
+                (descriptionHTML ? `<div class="podcast-description-section">${descriptionHTML}</div>` : '') +
+                `<div class="podcast-episodes-section">
+                    <div class="episodes-list-content-compact">${episodesHTML}</div>
+                </div>` +
+                (suggestedHTML ? `<div class="podcast-suggested-section">${suggestedHTML}</div>` : '');
             
             // Sync the inline sort select with the hidden one
             const inlineSelect = document.getElementById('podcast-episodes-sort-select-inline');
