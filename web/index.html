@@ -75,6 +75,11 @@
                 <span class="sidebar-item-title">Favorites</span>
                 <span id="sidebar-favorites-count" class="sidebar-item-count">0</span>
             </div>
+            <div class="sidebar-item" onclick="navigateTo('queue')">
+                <span class="sidebar-item-icon">📋</span>
+                <span class="sidebar-item-title">Queue</span>
+                <span id="sidebar-queue-count" class="sidebar-item-count">0</span>
+            </div>
             <!-- Sounds menu item removed temporarily -->
             <!-- <div class="sidebar-item" onclick="navigateTo('sounds')">
                 <span class="sidebar-item-icon">🌊</span>
@@ -324,6 +329,19 @@
                 <p>Loading history...</p>
             </div>
             <div id="history-list" class="episodes-full-page"></div>
+        </div>
+
+        <!-- Queue Page -->
+        <div id="page-queue" class="page hidden">
+            <div class="page-header">
+                <h1>Up Next</h1>
+                <button class="btn-clear-history-header" onclick="clearQueue(); loadQueuePage();" title="Clear queue">Clear Queue</button>
+            </div>
+            <div id="queue-loading" class="loading hidden">
+                <div class="spinner"></div>
+                <p>Loading queue...</p>
+            </div>
+            <div id="queue-list" class="episodes-full-page"></div>
         </div>
 
         <!-- Authors Page -->
