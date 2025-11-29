@@ -1,30 +1,9 @@
 import { fetchAuthorBySlug, fetchPodcastsByAuthor, fetchAuthorDescription, generateSlug } from '../../lib/supabase';
 import Head from 'next/head';
-import { useEffect } from 'react';
-import { useRouter } from 'next/router';
 
 export default function AuthorPage({ authorName, podcasts, description, error }) {
-  const router = useRouter();
-
-  useEffect(() => {
-    // Redirect real users to SPA (keep SEO page for bots)
-    // Check if it's a bot/crawler by looking at user agent
-    if (typeof window !== 'undefined' && authorName && !error) {
-      const userAgent = navigator.userAgent.toLowerCase();
-      const isBot = /bot|crawler|spider|crawling|googlebot|bingbot|slurp|duckduckbot|baiduspider|yandexbot|sogou|exabot|facebot|ia_archiver/i.test(userAgent);
-      
-      // Only redirect if it's NOT a bot
-      if (!isBot) {
-        // Redirect to SPA version, preserving the URL
-        const slug = generateSlug(authorName || '');
-        if (slug) {
-          // Store the path in sessionStorage so SPA can route correctly
-          sessionStorage.setItem('pendingRoute', `/author/${slug}`);
-          window.location.replace(`/web/`);
-        }
-      }
-    }
-  }, [authorName, error, router]);
+  // NOTE: Client-side redirects removed - middleware.js handles redirects server-side
+  // This prevents Google from seeing redirects and improves indexing
 
   if (error || !authorName) {
     return (
@@ -169,6 +148,21 @@ export default function AuthorPage({ authorName, podcasts, description, error })
               __html: displayDescription.replace(/\n/g, '<br>') 
             }}
           />
+        )}
+
+        {/* Additional SEO Content - About Section */}
+        {podcasts.length > 0 && (
+          <div className="podcast-seo-about">
+            <h2 className="podcast-seo-section-title">About {authorName}</h2>
+            <p className="podcast-seo-about-text">
+              {authorName} is a podcast creator {podcasts.length > 0 && `with ${podcasts.length} ${podcasts.length === 1 ? 'podcast' : 'podcasts'} available`} on Podcast Library. 
+              {displayDescription ? (
+                <>Explore their work and discover episodes from {authorName}'s shows.</>
+              ) : (
+                <>Browse their podcast collection, listen to episodes, and discover more content from this creator.</>
+              )}
+            </p>
+          </div>
         )}
 
         {/* Podcasts List */}

@@ -698,10 +698,18 @@ function updatePageTitle(page) {
     document.title = title;
     
     // Update meta tags for social sharing
+    // NOTE: We don't set canonical tags here - the SPA has noindex, nofollow
+    // and canonical tags should only be on the Next.js SEO pages
     updateMetaTag('og:title', title);
     updateMetaTag('og:description', description);
     updateMetaTag('og:image', image);
-    updateMetaTag('og:url', url);
+    // Only set og:url for the base SPA, not for individual pages to avoid canonical conflicts
+    if (page === 'grid' || page === 'authors' || page === 'favorites' || page === 'history' || page === 'search') {
+        updateMetaTag('og:url', 'https://podcastlibrary.org/web/');
+    } else {
+        // For podcast/author pages, don't set og:url to avoid canonical conflicts
+        // The Next.js pages handle canonical tags
+    }
     updateMetaTag('twitter:title', title);
     updateMetaTag('twitter:description', description);
     updateMetaTag('twitter:image', image);

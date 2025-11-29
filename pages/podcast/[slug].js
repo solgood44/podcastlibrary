@@ -1,30 +1,9 @@
 import { fetchPodcastBySlug, fetchEpisodesByPodcastId, generateSlug } from '../../lib/supabase';
 import Head from 'next/head';
-import { useEffect } from 'react';
-import { useRouter } from 'next/router';
 
 export default function PodcastPage({ podcast, episodes, relatedPodcasts, error }) {
-  const router = useRouter();
-
-  useEffect(() => {
-    // Redirect real users to SPA (keep SEO page for bots)
-    // Check if it's a bot/crawler by looking at user agent
-    if (typeof window !== 'undefined' && podcast && !error) {
-      const userAgent = navigator.userAgent.toLowerCase();
-      const isBot = /bot|crawler|spider|crawling|googlebot|bingbot|slurp|duckduckbot|baiduspider|yandexbot|sogou|exabot|facebot|ia_archiver/i.test(userAgent);
-      
-      // Only redirect if it's NOT a bot
-      if (!isBot) {
-        // Redirect to SPA version, preserving the URL
-        const slug = generateSlug(podcast.title || '');
-        if (slug) {
-          // Store the path in sessionStorage so SPA can route correctly
-          sessionStorage.setItem('pendingRoute', `/podcast/${slug}`);
-          window.location.replace(`/web/`);
-        }
-      }
-    }
-  }, [podcast, error, router]);
+  // NOTE: Client-side redirects removed - middleware.js handles redirects server-side
+  // This prevents Google from seeing redirects and improves indexing
 
   if (error || !podcast) {
     return (
@@ -225,6 +204,27 @@ export default function PodcastPage({ podcast, episodes, relatedPodcasts, error 
             }}
           />
         )}
+
+        {/* Additional SEO Content - About Section */}
+        <div className="podcast-seo-about">
+          <h2 className="podcast-seo-section-title">About {podcast.title}</h2>
+          {displayDescription ? (
+            <p className="podcast-seo-about-text">
+              {podcast.title} is a {genres ? `${genres.split(',')[0].trim()} ` : ''}podcast that offers engaging content for listeners. 
+              {episodeCount > 0 && ` With ${episodeCount.toLocaleString()} ${episodeCount === 1 ? 'episode' : 'episodes'} available, `}
+              {podcast.author && `hosted by ${podcast.author}, `}
+              this podcast provides regular updates and fresh content. 
+              {episodeCount > 0 && `Listen to the latest episodes and explore the full archive on Podcast Library.`}
+            </p>
+          ) : (
+            <p className="podcast-seo-about-text">
+              {podcast.title} is a {genres ? `${genres.split(',')[0].trim()} ` : ''}podcast 
+              {podcast.author && `hosted by ${podcast.author}`} 
+              {episodeCount > 0 && ` with ${episodeCount.toLocaleString()} ${episodeCount === 1 ? 'episode' : 'episodes'} available`}. 
+              Listen to episodes, browse the archive, and discover more content on Podcast Library.
+            </p>
+          )}
+        </div>
 
         {/* Additional Content for SEO - Podcast Details */}
         <div className="podcast-seo-details">

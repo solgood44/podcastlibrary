@@ -1,23 +1,9 @@
 import { fetchPodcastsByGenre, fetchAllGenres, generateSlug } from '../../lib/supabase';
 import Head from 'next/head';
-import { useEffect } from 'react';
-import { useRouter } from 'next/router';
 
 export default function GenrePage({ genre, podcasts, error }) {
-  const router = useRouter();
-
-  useEffect(() => {
-    // Redirect real users to SPA (keep SEO page for bots)
-    if (typeof window !== 'undefined' && genre && !error) {
-      const userAgent = navigator.userAgent.toLowerCase();
-      const isBot = /bot|crawler|spider|crawling|googlebot|bingbot|slurp|duckduckbot|baiduspider|yandexbot|sogou|exabot|facebot|ia_archiver/i.test(userAgent);
-      
-      if (!isBot) {
-        sessionStorage.setItem('pendingRoute', `/genre/${generateSlug(genre)}`);
-        window.location.replace(`/web/`);
-      }
-    }
-  }, [genre, error, router]);
+  // NOTE: Client-side redirects removed - middleware.js handles redirects server-side
+  // This prevents Google from seeing redirects and improves indexing
 
   if (error || !genre) {
     return (

@@ -28,10 +28,20 @@ export function middleware(request) {
     }
   }
 
+  // For genre routes, redirect real users to SPA, keep for bots
+  if (pathname.startsWith('/genre/')) {
+    // Only redirect if NOT a bot
+    if (!isBot) {
+      const redirectUrl = new URL('/web/', request.url);
+      redirectUrl.searchParams.set('_route', pathname);
+      return NextResponse.redirect(redirectUrl);
+    }
+  }
+
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ['/podcast/:path*', '/author/:path*'],
+  matcher: ['/podcast/:path*', '/author/:path*', '/genre/:path*'],
 };
 
