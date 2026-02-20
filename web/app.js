@@ -16,7 +16,7 @@ let currentAuthor = null; // Currently viewed author
 let authorsSortMode = 'count-desc'; // 'count-desc' or 'name-asc' for authors page
 let authorsViewMode = 'list'; // 'grid' or 'list' for authors page
 let authorDescriptions = {}; // Cache for author descriptions (will be loaded from API later)
-let searchMode = 'episodes'; // 'episodes' or 'podcasts'
+let searchMode = 'podcasts'; // default to home (category rows); 'episodes' still used in search modal
 let viewMode = 'grid'; // 'grid' or 'list'
 let sortMode = 'title-asc'; // 'title-asc', 'title-desc'
 let durationFilter = 'all'; // 'all', 'under10', '10-30', '30-60', '60plus'
@@ -444,8 +444,8 @@ function toggleSidebar() {
 
 // Simple routing
 function setupRouting() {
-    // Set initial page to home (grid)
-    navigateTo('grid');
+    // Land on Library (category rows + Browse All) as the home screen
+    navigateTo('grid', 'library');
     
     // Handle browser back/forward navigation
     window.addEventListener('popstate', (event) => {
@@ -479,9 +479,9 @@ function setupRouting() {
             }
         }
         
-        // Handle /web/ root path - go to home
+        // Handle /web/ root path - go to Library (home screen)
         if (path === '/web/' || path === '/web' || path === '/') {
-            navigateTo('grid');
+            navigateTo('grid', 'library');
             currentPodcast = null;
             return;
         }
@@ -502,8 +502,8 @@ function navigateTo(page, param = null) {
                         page === 'category' ? `Category: ${param || ''}` :
                         page === 'authors' ? 'Authors' :
                         page === 'author' ? `Author: ${param || ''}` :
-                        page === 'history' ? 'History' :
-                        page === 'queue' ? 'Queue' :
+        page === 'recent' ? 'Recently Listened To' :
+        page === 'history' || page === 'queue' ? 'Recently Listened To' :
                         page === 'favorites' ? 'Favorites' :
                         page === 'sounds' ? 'Sounds' :
                         page === 'sound' ? 'Sound Detail' :
@@ -526,15 +526,11 @@ function navigateTo(page, param = null) {
     
     // Load page-specific content
     if (page === 'grid') {
-        // Check if this is "Library" (from sidebar) or "Home" (default)
-        const isLibrary = param === 'library';
-        
-        // Update URL if not already on /web/
+        // Library is the home page: category rows + Browse All grid for both Home and Library
         if (window.location.pathname !== '/web/' && window.location.pathname !== '/web') {
             window.history.pushState({ page: 'grid', param }, '', '/web/');
         }
         currentPodcast = null; // Clear current podcast when going to grid
-        // Set search mode to podcasts when viewing grid
         if (searchMode !== 'podcasts') {
             setSearchMode('podcasts');
         }
@@ -544,22 +540,16 @@ function navigateTo(page, param = null) {
         if (podcasts.length > 0) {
             if (controlsEl) controlsEl.classList.remove('hidden');
             if (containerEl) containerEl.classList.remove('hidden');
-            // Update sort select to match current sort mode
             const sortSelect = document.getElementById('sort-select');
             if (sortSelect) {
                 sortSelect.value = sortMode;
             }
-            // Update duration filter to match current filter
             const durationFilterSelect = document.getElementById('duration-filter');
             if (durationFilterSelect) {
                 durationFilterSelect.value = durationFilter;
             }
-            // Show personalized homepage or library based on navigation
-            if (isLibrary) {
-                renderPodcasts(podcasts);
-            } else {
-                renderPersonalizedHomepage();
-            }
+            // Always show Library view (category rows + Browse All) as the home page
+            renderLibraryWithCategoryRows();
         } else if (podcasts.length === 0 && allEpisodes.length === 0) {
             // If no podcasts loaded yet, trigger load
             loadPodcasts();
@@ -598,10 +588,8 @@ function navigateTo(page, param = null) {
         loadAuthorsPage();
     } else if (page === 'author' && param) {
         showAuthorPage(param);
-    } else if (page === 'history') {
-        loadHistoryPage();
-    } else if (page === 'queue') {
-        loadQueuePage();
+    } else if (page === 'recent' || page === 'history' || page === 'queue') {
+        loadRecentlyListenedPage();
     } else if (page === 'favorites') {
         loadFavoritesPage();
     } else if (page === 'sounds') {
@@ -625,6 +613,7 @@ function navigateTo(page, param = null) {
 }
 
 function showPage(page) {
+    if (page === 'history' || page === 'queue') page = 'recent';
     currentPage = page;
     document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
     const pageEl = document.getElementById(`page-${page}`);
@@ -686,8 +675,8 @@ function updatePageTitle(page) {
     } else if (page === 'sound' && currentSound) {
         title = `${currentSound.title || 'Nature Sound'} - ${baseTitle}`;
         description = currentSound.description || `Listen to ${currentSound.title || 'this nature sound'}`;
-    } else if (page === 'history') {
-        title = `History - ${baseTitle}`;
+    } else if (page === 'recent' || page === 'history') {
+        title = `Recently Listened To - ${baseTitle}`;
         description = 'Your recently played episodes';
     } else if (page === 'search') {
         title = `Search - ${baseTitle}`;
@@ -698,13 +687,13 @@ function updatePageTitle(page) {
     document.title = title;
     
     // Update meta tags for social sharing
-    // NOTE: We don't set canonical tags here - the SPA has noindex, nofollow
+    // NOTE: Canonical tags are handled by Next.js pages (podcast/[slug], author/[slug], etc.)
     // and canonical tags should only be on the Next.js SEO pages
     updateMetaTag('og:title', title);
     updateMetaTag('og:description', description);
     updateMetaTag('og:image', image);
     // Only set og:url for the base SPA, not for individual pages to avoid canonical conflicts
-    if (page === 'grid' || page === 'authors' || page === 'favorites' || page === 'history' || page === 'search') {
+    if (page === 'grid' || page === 'authors' || page === 'favorites' || page === 'recent' || page === 'history' || page === 'search') {
         updateMetaTag('og:url', 'https://podcastlibrary.org/web/');
     } else {
         // For podcast/author pages, don't set og:url to avoid canonical conflicts
@@ -802,11 +791,14 @@ async function loadPodcasts() {
             emptyEl.classList.remove('hidden');
         } else {
             // OPTIMIZED: Don't load all episodes on initial page load
-            // Episodes will be loaded lazily when needed (search, all-episodes page, etc.)
-            // Make sure container and controls are visible
             if (controlsEl) controlsEl.classList.remove('hidden');
             if (containerEl) containerEl.classList.remove('hidden');
-            renderPodcasts(podcasts);
+            // If we're on the grid (Library) page, show category rows + Browse All; otherwise just update grid
+            if (currentPage === 'grid') {
+                renderLibraryWithCategoryRows();
+            } else {
+                renderPodcasts(podcasts);
+            }
             updatePodcastCount();
             renderSidebar(); // Update sidebar with categories
         }
@@ -860,9 +852,8 @@ function extractAuthors() {
 
 // Render sidebar
 function renderSidebar() {
-    renderContinueListeningCount();
+    renderRecentlyListenedCount();
     renderFavorites();
-    renderQueue();
     renderAuthorsCount();
     renderCategories();
     updateActiveSidebarItem(currentPage);
@@ -878,11 +869,9 @@ function updateActiveSidebarItem(page = currentPage, pageParam = null) {
     // Determine which sidebar item should be active
     let activeId = null;
     if (page === 'grid') {
-        activeId = (pageParam === 'library') ? 'sidebar-item-library' : 'sidebar-item-home';
-    } else if (page === 'history') {
-        activeId = 'sidebar-item-continue';
-    } else if (page === 'queue') {
-        activeId = 'sidebar-item-queue';
+        activeId = 'sidebar-item-library';
+    } else if (page === 'recent' || page === 'history' || page === 'queue') {
+        activeId = 'sidebar-item-recent';
     } else if (page === 'favorites') {
         activeId = 'sidebar-item-favorites';
     } else if (page === 'authors' || page === 'author') {
@@ -897,19 +886,13 @@ function updateActiveSidebarItem(page = currentPage, pageParam = null) {
     }
 }
 
-// Render continue listening count (replaces history count)
-function renderContinueListeningCount() {
-    const continueEl = document.getElementById('sidebar-continue-count');
-    if (continueEl) {
-        const continueEpisodes = getContinueListeningEpisodes(100); // Get all, not just 8
-        continueEl.textContent = String(continueEpisodes.length);
+// Render recently listened count in sidebar
+function renderRecentlyListenedCount() {
+    const recentEl = document.getElementById('sidebar-recent-count');
+    if (recentEl) {
+        const recent = getRecentlyListenedEpisodes(500);
+        recentEl.textContent = String(recent.length);
     }
-}
-
-// Render history in sidebar (deprecated - replaced by renderContinueListeningCount)
-// Keeping for backwards compatibility but not used
-function renderHistory() {
-    // This is now handled by renderContinueListeningCount
 }
 
 // Render favorites in sidebar
@@ -923,108 +906,63 @@ function renderFavorites() {
     }
 }
 
-// Render queue in sidebar
-function renderQueue() {
-    const queueEl = document.getElementById('sidebar-queue-count');
-    if (queueEl) {
-        queueEl.textContent = String(episodeQueue.length);
-    }
-}
-
-// Load queue page
-function loadQueuePage() {
-    const loadingEl = document.getElementById('queue-loading');
-    const listEl = document.getElementById('queue-list');
-    
-    if (!listEl) return;
-    
+// Load recently listened to page (replaces Continue Listening + Queue pages)
+function loadRecentlyListenedPage() {
+    const loadingEl = document.getElementById('recent-loading');
+    const listEl = document.getElementById('recent-list');
+    if (!loadingEl || !listEl) return;
     loadingEl.classList.remove('hidden');
     listEl.innerHTML = '';
-    
     setTimeout(() => {
+        const recent = getRecentlyListenedEpisodes(100);
         loadingEl.classList.add('hidden');
-        
-        if (episodeQueue.length === 0) {
-            listEl.innerHTML = '<div class="empty"><p>Your queue is empty</p><p class="subtitle">Add episodes to your queue to listen to them next</p></div>';
+        if (recent.length === 0) {
+            listEl.innerHTML = '<div class="empty"><p>Nothing here yet</p><p class="subtitle">Play episodes to see them in Recently Listened To</p></div>';
             return;
         }
-        
-        // Load episodes if needed
-        Promise.all(episodeQueue.map(async (item) => {
-            let episode = allEpisodes.find(e => e.id === item.episodeId);
-            
-            // If not found, try to load from cache or fetch
-            if (!episode && episodesCache[item.podcastId]) {
-                episode = episodesCache[item.podcastId].find(e => e.id === item.episodeId);
-            }
-            
-            // If still not found, try to fetch
-            if (!episode && item.podcastId) {
-                try {
-                    await loadEpisodesForPodcast(item.podcastId);
-                    if (episodesCache[item.podcastId]) {
-                        episode = episodesCache[item.podcastId].find(e => e.id === item.episodeId);
-                    }
-                } catch (e) {
-                    console.error('Error loading episode:', e);
-                }
-            }
-            
-            const podcast = podcasts.find(p => p.id === item.podcastId);
-            return { episode, podcast, queueItem: item };
-        })).then(items => {
-            const validItems = items.filter(item => item.episode && item.podcast);
-            
-            if (validItems.length === 0) {
-                listEl.innerHTML = '<div class="empty"><p>No valid episodes in queue</p></div>';
-                return;
-            }
-            
-            listEl.innerHTML = validItems.map(({ episode, podcast }) => {
-                const progress = getEpisodeProgress(episode.id);
-                const isCompleted = progress >= 95;
-                const progressBar = `<div class="progress-bar"><div class="progress-fill" style="width: ${progress}%"></div></div>`;
-                const isFavorite = isEpisodeFavorited(episode.id);
-                const isCurrentEpisode = currentEpisode && currentEpisode.id === episode.id;
-                const isEpisodePlaying = isCurrentEpisode && isPlaying;
-                const episodeInQueue = isInQueue(episode.id);
-                
-                return `
-                    <div class="episode-item ${isCompleted ? 'episode-completed' : ''} ${isCurrentEpisode ? 'episode-playing' : ''}" 
-                         oncontextmenu="event.preventDefault(); showEpisodeContextMenu(event, '${episode.id}', '${podcast.id}');">
-                        <div class="episode-item-image">
-                            <img src="${podcast.image_url || getPlaceholderImage()}" 
-                                 alt="${escapeHtml(podcast.title || '')}" 
-                                 class="episode-list-artwork"
-                                 onerror="this.src='${getPlaceholderImage()}'">
-                        </div>
-                        <button class="btn-episode-play ${isEpisodePlaying ? 'playing' : ''}" onclick="event.stopPropagation(); ${isEpisodePlaying ? 'togglePlayPause()' : `playEpisode(${JSON.stringify(episode).replace(/"/g, '&quot;')})`}" title="${isEpisodePlaying ? 'Pause' : 'Play'}">
-                            <span class="episode-play-icon" data-episode-id="${episode.id}">${isEpisodePlaying ? '⏸' : '▶'}</span>
-                        </button>
-                        <div class="episode-item-main" onclick="openEpisodeDetail('${episode.id}', '${podcast.id}')">
-                            <div class="episode-title">${escapeHtml(episode.title || 'Untitled Episode')}</div>
-                            <div class="episode-meta">
-                                <span onclick="event.stopPropagation(); openEpisodes('${podcast.id}')" style="cursor: pointer; text-decoration: underline;">${escapeHtml(podcast.title || 'Unknown Podcast')}</span>
-                                ${episode.pub_date ? `<span>• ${formatDate(episode.pub_date)}</span>` : ''}
-                                ${episode.duration_seconds ? `<span>• ${formatDuration(episode.duration_seconds)}</span>` : ''}
-                                ${progress > 0 ? `<span class="episode-progress-text">${Math.round(progress)}%</span>` : ''}
-                            </div>
-                            ${progressBar}
-                        </div>
-                        <div style="display: flex; gap: 8px; align-items: center;">
-                            <button class="btn-queue-small in-queue" 
-                                    onclick="event.stopPropagation(); removeFromQueue('${episode.id}'); loadQueuePage(); renderSidebar();" 
-                                    title="Remove from queue">
-                                ✕
-                            </button>
-                            <button class="btn-favorite ${isFavorite ? 'favorited' : ''}" onclick="event.stopPropagation(); toggleEpisodeFavorite('${episode.id}', '${podcast.id}')" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
-                                ${isFavorite ? '❤️' : '🤍'}
-                            </button>
-                        </div>
+        const html = recent.map(({ episode, podcast, progress: epProgress }) => {
+            const isCurrentEpisode = currentEpisode && currentEpisode.id === episode.id;
+            const isEpisodePlaying = isCurrentEpisode && isPlaying;
+            const isFavorite = isEpisodeFavorited(episode.id);
+            const episodeInQueue = isInQueue(episode.id);
+            const progressBar = `<div class="progress-bar"><div class="progress-fill" style="width: ${epProgress}%"></div></div>`;
+            return `
+                <div class="episode-item episode-in-progress ${isCurrentEpisode ? 'episode-playing' : ''}" 
+                     oncontextmenu="event.preventDefault(); showEpisodeContextMenu(event, '${episode.id}', '${podcast.id}');">
+                    <div class="episode-item-image">
+                        <img src="${podcast.image_url || getPlaceholderImage()}" 
+                             alt="${escapeHtml(podcast.title || '')}" 
+                             class="episode-list-artwork"
+                             onerror="this.src='${getPlaceholderImage()}'">
                     </div>
-                `;
-            }).filter(Boolean).join('');
-        });
+                    <button class="btn-episode-play ${isEpisodePlaying ? 'playing' : ''}" onclick="event.stopPropagation(); ${isEpisodePlaying ? 'togglePlayPause()' : `playEpisode(${JSON.stringify(episode).replace(/"/g, '&quot;')})`}" title="${isEpisodePlaying ? 'Pause' : 'Play'}">
+                        <span class="episode-play-icon" data-episode-id="${episode.id}">${isEpisodePlaying ? '⏸' : '▶'}</span>
+                    </button>
+                    <div class="episode-item-main" onclick="openEpisodeDetail('${episode.id}', '${podcast.id}')">
+                        <div class="episode-title">${escapeHtml(episode.title || 'Untitled Episode')}</div>
+                        <div class="episode-meta">
+                            <span onclick="event.stopPropagation(); openEpisodes('${podcast.id}')" style="cursor: pointer; text-decoration: underline;">${escapeHtml(podcast.title || 'Unknown Podcast')}</span>
+                            ${episode.pub_date ? `<span>• ${formatDate(episode.pub_date)}</span>` : ''}
+                            ${episode.duration_seconds ? `<span>• ${formatDuration(episode.duration_seconds)}</span>` : ''}
+                            <span class="episode-progress-text">${Math.round(epProgress)}%</span>
+                        </div>
+                        ${progressBar}
+                    </div>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <button class="btn-queue-small ${episodeInQueue ? 'in-queue' : ''}" 
+                                onclick="event.stopPropagation(); ${episodeInQueue ? `removeFromQueue('${episode.id}')` : `addToQueue('${episode.id}', '${podcast.id}')`}; loadRecentlyListenedPage(); renderSidebar();" 
+                                title="${episodeInQueue ? 'Remove from queue' : 'Add to queue'}">
+                            ${episodeInQueue ? '✓' : '+'}
+                        </button>
+                        <button class="btn-remove-history" onclick="event.stopPropagation(); removeFromContinueListening('${episode.id}'); loadRecentlyListenedPage(); renderSidebar();" title="Remove from list">✕</button>
+                        <button class="btn-favorite ${isFavorite ? 'favorited' : ''}" onclick="event.stopPropagation(); toggleEpisodeFavorite('${episode.id}', '${podcast.id}')" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+                            ${isFavorite ? '❤️' : '🤍'}
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        listEl.innerHTML = html;
     }, 300);
 }
 
@@ -1224,7 +1162,7 @@ function toggleEpisodeFavorite(episodeId, podcastId) {
     } else if (currentPage === 'episode' && displayedEpisode) {
         loadEpisodeDetailPage();
     } else if (currentPage === 'history') {
-        loadHistoryPage();
+        loadRecentlyListenedPage();
     }
     
     renderSidebar();
@@ -2615,12 +2553,14 @@ function loadFavoritesPage() {
                 html += `
                     <div class="podcast-card">
                         <div class="podcast-card-content" onclick="openEpisodes('${podcast.id}')">
-                            <img 
-                                src="${sanitizeImageUrl(podcast.image_url) || getPlaceholderImage()}" 
-                                alt="${escapeHtml(podcast.title || 'Podcast')}"
-                                class="podcast-image"
-                                onerror="this.src='${getPlaceholderImage()}'"
-                            >
+                            <div class="podcast-image-wrap">
+                                <img 
+                                    src="${sanitizeImageUrl(podcast.image_url) || getPlaceholderImage()}" 
+                                    alt="${escapeHtml(podcast.title || 'Podcast')}"
+                                    class="podcast-image"
+                                    onerror="this.src='${getPlaceholderImage()}'"
+                                >
+                            </div>
                             <div class="podcast-info">
                                 <div class="podcast-title">${escapeHtml(podcast.title || 'Untitled Podcast')}</div>
                                 ${(() => {
@@ -2784,6 +2724,157 @@ function getCategoryCount(category) {
         }
         return p.genre && p.genre.trim() === category;
     }).length;
+}
+
+// Categories sorted by popularity (most podcasts first)
+function getCategoriesByPopularity() {
+    return [...categories].sort((a, b) => getCategoryCount(b) - getCategoryCount(a));
+}
+
+// Get podcasts for a category (same logic as showCategoryPage)
+function getPodcastsForCategory(categoryName, limit = 50) {
+    let list;
+    if (categoryName === 'Daily') {
+        list = podcasts.filter(p => isDailyPodcast(p.id));
+    } else {
+        list = podcasts.filter(p => {
+            if (p.genre && Array.isArray(p.genre)) {
+                return p.genre.some(g => g && g.trim() === categoryName);
+            }
+            return p.genre && p.genre.trim() === categoryName;
+        });
+    }
+    return list.slice(0, limit);
+}
+
+// Simple string hash for seeded ordering (deterministic per day)
+function hashString(str) {
+    let h = 0;
+    const s = String(str);
+    for (let i = 0; i < s.length; i++) {
+        h = ((h << 5) - h) + s.charCodeAt(i);
+        h = h & h;
+    }
+    return h;
+}
+
+// Daily seed: same order all day, new order next day (YYYYMMDD)
+function getDailySeed() {
+    return new Date().toISOString().slice(0, 10).replace(/-/g, '');
+}
+
+// Shuffle array deterministically by daily seed (so it feels fresh each day)
+function shuffleWithDailySeed(arr) {
+    const seed = getDailySeed();
+    return [...arr].sort((a, b) => {
+        const ha = hashString((a.id || a) + seed);
+        const hb = hashString((b.id || b) + seed);
+        return ha - hb;
+    });
+}
+
+// Scroll a category row left/right (called from arrow buttons)
+function scrollCategoryRow(button, direction) {
+    const row = button.closest('.homepage-category-row');
+    if (!row) return;
+    const inner = row.querySelector('.homepage-category-row-inner');
+    if (!inner) return;
+    const cardWidth = 200;
+    const scrollAmount = cardWidth * (direction > 0 ? 1 : -1);
+    inner.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+}
+
+// Build HTML for all category rows (popular first). If no categories, one "All Podcasts" row.
+// Uses daily shuffle so order feels fresh each day; limits duplicates across rows.
+function getCategoryRowsHtml() {
+    let html = '';
+    const categoriesByPopularity = getCategoriesByPopularity();
+    const rowsToShow = categoriesByPopularity.length > 0
+        ? categoriesByPopularity
+        : ['All Podcasts'];
+    const PER_ROW = 20;
+    const shownCount = new Map(); // podcast id -> times already shown on this page
+    rowsToShow.forEach(categoryName => {
+        let categoryPodcasts = categoryName === 'All Podcasts'
+            ? podcasts.slice(0, 80)
+            : getPodcastsForCategory(categoryName, 80);
+        if (categoryPodcasts.length === 0) return;
+        categoryPodcasts = shuffleWithDailySeed(categoryPodcasts);
+        categoryPodcasts.sort((a, b) => (shownCount.get(a.id) || 0) - (shownCount.get(b.id) || 0));
+        const rowPodcasts = categoryPodcasts.slice(0, PER_ROW);
+        rowPodcasts.forEach(p => shownCount.set(p.id, (shownCount.get(p.id) || 0) + 1));
+        const emoji = categoryName === 'All Podcasts' ? '🎙️' : getCategoryEmoji(categoryName);
+        const categoryEscaped = escapeHtml(categoryName);
+        const categoryAttr = String(categoryName).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const titleContent = categoryName === 'All Podcasts'
+            ? `${emoji} ${categoryEscaped}`
+            : `<a href="#" class="homepage-category-title-link" data-category="${categoryAttr}" onclick="event.preventDefault(); showCategory(this.getAttribute('data-category')); return false;">${emoji} ${categoryEscaped}</a>`;
+        html += `
+            <div class="homepage-category-row">
+                <div class="homepage-section-header homepage-category-row-header">
+                    <h2 class="homepage-section-title">${titleContent}</h2>
+                    <div class="homepage-row-nav-wrap">
+                        <button type="button" class="homepage-row-nav homepage-row-nav-prev" onclick="scrollCategoryRow(this, -1)" aria-label="Scroll left">‹</button>
+                        <button type="button" class="homepage-row-nav homepage-row-nav-next" onclick="scrollCategoryRow(this, 1)" aria-label="Scroll right">›</button>
+                    </div>
+                </div>
+                <div class="homepage-category-row-inner">
+                    ${rowPodcasts.map(podcast => {
+                        const isFavorite = isPodcastFavorited(podcast.id);
+                        return `
+                            <div class="podcast-card podcast-card-in-row">
+                                <div class="podcast-card-content" onclick="openEpisodes('${podcast.id}')">
+                                    <div class="podcast-image-wrap">
+                                        <img 
+                                            src="${podcast.image_url || getPlaceholderImage()}" 
+                                            alt="${escapeHtml(podcast.title || 'Podcast')}"
+                                            class="podcast-image"
+                                            onerror="this.src='${getPlaceholderImage()}'"
+                                        >
+                                    </div>
+                                    <div class="podcast-info">
+                                        <div class="podcast-title">${escapeHtml(podcast.title || 'Untitled Podcast')}</div>
+                                        ${(() => {
+                                            const cleanedAuthor = podcast.author ? cleanAuthorText(podcast.author) : '';
+                                            if (cleanedAuthor && !shouldHideAuthor(cleanedAuthor)) {
+                                                return `<div class="podcast-author">${escapeHtml(cleanedAuthor)}</div>`;
+                                            }
+                                            return '';
+                                        })()}
+                                    </div>
+                                </div>
+                                <button class="btn-podcast-favorite ${isFavorite ? 'favorited' : ''}" onclick="event.stopPropagation(); togglePodcastFavorite('${podcast.id}');" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+                                    ${isFavorite ? '❤️' : '🤍'}
+                                </button>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        `;
+    });
+    return html;
+}
+
+// Library view: category rows at top, then full sortable grid below
+function renderLibraryWithCategoryRows() {
+    const containerEl = document.getElementById('podcast-container');
+    if (!containerEl) return;
+    if (categories.length === 0) {
+        extractCategories();
+    }
+    let html = getCategoryRowsHtml();
+    html += `
+        <div class="homepage-section">
+            <div class="homepage-section-header">
+                <h2 class="homepage-section-title">Browse All</h2>
+            </div>
+            <div id="podcast-grid" class="podcast-grid"></div>
+            <div id="podcast-list" class="podcast-list hidden"></div>
+        </div>
+    `;
+    containerEl.innerHTML = html;
+    renderPodcasts(podcasts);
 }
 
 // Show category page
@@ -3246,7 +3337,7 @@ function clearHistory() {
             syncToServer();
         }
         if (currentPage === 'history') {
-            loadHistoryPage();
+            loadRecentlyListenedPage();
         }
     }
 }
@@ -3262,79 +3353,6 @@ function removeFromContinueListening(episodeId) {
 // Dismiss onboarding
 function dismissOnboarding() {
     localStorage.setItem(ONBOARDING_KEY, 'true');
-}
-
-// Load history page (merged with continue listening - shows in-progress first)
-function loadHistoryPage() {
-    const loadingEl = document.getElementById('history-loading');
-    const listEl = document.getElementById('history-list');
-    
-    loadingEl.classList.remove('hidden');
-    listEl.innerHTML = '';
-    
-    setTimeout(() => {
-        const history = getHistory();
-        const progress = JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}');
-        loadingEl.classList.add('hidden');
-        
-        // Only show in-progress episodes (this is "Continue Listening" page)
-        const continueEpisodes = getContinueListeningEpisodes(100); // Get all
-        
-        if (continueEpisodes.length === 0) {
-            listEl.innerHTML = '<div class="empty"><p>Nothing to continue</p><p class="subtitle">Start playing episodes to see them here</p></div>';
-            return;
-        }
-        
-        // Sort by most recent
-        continueEpisodes.sort((a, b) => b.timestamp - a.timestamp);
-        
-        let html = '';
-        html += continueEpisodes.map(({ episode, podcast, progress: epProgress }) => {
-                const isCurrentEpisode = currentEpisode && currentEpisode.id === episode.id;
-                const isEpisodePlaying = isCurrentEpisode && isPlaying;
-                const isFavorite = isEpisodeFavorited(episode.id);
-                const episodeInQueue = isInQueue(episode.id);
-                const progressBar = `<div class="progress-bar"><div class="progress-fill" style="width: ${epProgress}%"></div></div>`;
-                
-                return `
-                    <div class="episode-item episode-in-progress ${isCurrentEpisode ? 'episode-playing' : ''}" 
-                         oncontextmenu="event.preventDefault(); showEpisodeContextMenu(event, '${episode.id}', '${podcast.id}');">
-                        <div class="episode-item-image">
-                            <img src="${podcast.image_url || getPlaceholderImage()}" 
-                                 alt="${escapeHtml(podcast.title || '')}" 
-                                 class="episode-list-artwork"
-                                 onerror="this.src='${getPlaceholderImage()}'">
-                        </div>
-                        <button class="btn-episode-play ${isEpisodePlaying ? 'playing' : ''}" onclick="event.stopPropagation(); ${isEpisodePlaying ? 'togglePlayPause()' : `playEpisode(${JSON.stringify(episode).replace(/"/g, '&quot;')})`}" title="${isEpisodePlaying ? 'Pause' : 'Play'}">
-                            <span class="episode-play-icon" data-episode-id="${episode.id}">${isEpisodePlaying ? '⏸' : '▶'}</span>
-                        </button>
-                        <div class="episode-item-main" onclick="openEpisodeDetail('${episode.id}', '${podcast.id}')">
-                            <div class="episode-title">${escapeHtml(episode.title || 'Untitled Episode')}</div>
-                            <div class="episode-meta">
-                                <span onclick="event.stopPropagation(); openEpisodes('${podcast.id}')" style="cursor: pointer; text-decoration: underline;">${escapeHtml(podcast.title || 'Unknown Podcast')}</span>
-                                ${episode.pub_date ? `<span>• ${formatDate(episode.pub_date)}</span>` : ''}
-                                ${episode.duration_seconds ? `<span>• ${formatDuration(episode.duration_seconds)}</span>` : ''}
-                                <span class="episode-progress-text">${Math.round(epProgress)}%</span>
-                            </div>
-                            ${progressBar}
-                        </div>
-                        <div style="display: flex; gap: 8px; align-items: center;">
-                            <button class="btn-queue-small ${episodeInQueue ? 'in-queue' : ''}" 
-                                    onclick="event.stopPropagation(); ${episodeInQueue ? `removeFromQueue('${episode.id}')` : `addToQueue('${episode.id}', '${podcast.id}')`}; loadHistoryPage(); renderSidebar();" 
-                                    title="${episodeInQueue ? 'Remove from queue' : 'Add to queue'}">
-                                ${episodeInQueue ? '✓' : '+'}
-                            </button>
-                            <button class="btn-remove-history" onclick="event.stopPropagation(); removeFromContinueListening('${episode.id}'); loadHistoryPage();" title="Mark as completed">✕</button>
-                            <button class="btn-favorite ${isFavorite ? 'favorited' : ''}" onclick="event.stopPropagation(); toggleEpisodeFavorite('${episode.id}', '${podcast.id}')" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
-                                ${isFavorite ? '❤️' : '🤍'}
-                            </button>
-                        </div>
-                    </div>
-                `;
-        }).join('');
-        
-        listEl.innerHTML = html;
-    }, 300);
 }
 
 // Open episode detail page
@@ -3885,16 +3903,13 @@ function getContinueListeningEpisodes(limit = 10) {
     const history = getHistory();
     const progress = JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}');
     
-    // Get episodes from history that have progress but aren't completed
     const continueEpisodes = history
         .filter(item => item.episodeId && progress[item.episodeId] && progress[item.episodeId].progress < 95)
         .map(item => {
             const episode = allEpisodes.find(e => e.id === item.episodeId);
             if (!episode) return null;
-            
             const podcast = podcasts.find(p => p.id === item.podcastId);
             if (!podcast) return null;
-            
             return {
                 episode,
                 podcast,
@@ -3903,10 +3918,34 @@ function getContinueListeningEpisodes(limit = 10) {
             };
         })
         .filter(Boolean)
-        .sort((a, b) => b.timestamp - a.timestamp) // Most recent first
+        .sort((a, b) => b.timestamp - a.timestamp)
         .slice(0, limit);
-    
     return continueEpisodes;
+}
+
+// Get recently listened episodes (all history, most recent first; includes progress)
+function getRecentlyListenedEpisodes(limit = 50) {
+    const history = getHistory();
+    const progress = JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}');
+    const items = history
+        .filter(item => item.episodeId)
+        .map(item => {
+            const episode = allEpisodes.find(e => e.id === item.episodeId);
+            if (!episode) return null;
+            const podcast = podcasts.find(p => p.id === item.podcastId);
+            if (!podcast) return null;
+            const epProgress = progress[item.episodeId] ? progress[item.episodeId].progress : 0;
+            return {
+                episode,
+                podcast,
+                progress: epProgress,
+                timestamp: item.timestamp
+            };
+        })
+        .filter(Boolean)
+        .sort((a, b) => b.timestamp - a.timestamp)
+        .slice(0, limit);
+    return items;
 }
 
 // ========== RECOMMENDATIONS ==========
@@ -4366,10 +4405,14 @@ function updatePodcastCount() {
 }
 
 // Render podcast grid
-// Render personalized homepage with continue listening, recommendations, etc.
+// Render personalized homepage with continue listening, category rows, etc.
 async function renderPersonalizedHomepage() {
     const containerEl = document.getElementById('podcast-container');
     if (!containerEl) return;
+    
+    if (categories.length === 0) {
+        extractCategories();
+    }
     
     // Load episodes if needed for continue listening
     if (!episodesLoaded && allEpisodes.length === 0) {
@@ -4420,17 +4463,17 @@ async function renderPersonalizedHomepage() {
         `;
     }
     
-    // Continue Listening Section (merged with history - shows in-progress items)
-    const continueEpisodes = getContinueListeningEpisodes(8);
-    if (continueEpisodes.length > 0) {
+    // Recently Listened To Section
+    const recentEpisodes = getRecentlyListenedEpisodes(8);
+    if (recentEpisodes.length > 0) {
         html += `
             <div class="homepage-section">
                 <div class="homepage-section-header">
-                    <h2 class="homepage-section-title">Continue Listening</h2>
-                    <a href="#" onclick="navigateTo('history'); return false;" class="homepage-section-link">See All</a>
+                    <h2 class="homepage-section-title">Recently Listened To</h2>
+                    <a href="#" onclick="navigateTo('recent'); return false;" class="homepage-section-link">See All</a>
                 </div>
                 <div class="homepage-episodes-grid">
-                    ${continueEpisodes.map(({ episode, podcast, progress }) => {
+                    ${recentEpisodes.map(({ episode, podcast, progress }) => {
                         const isCurrentEpisode = currentEpisode && currentEpisode.id === episode.id;
                         const isEpisodePlaying = isCurrentEpisode && isPlaying;
                         const episodeInQueue = isInQueue(episode.id);
@@ -4515,89 +4558,8 @@ async function renderPersonalizedHomepage() {
         `;
     }
     
-    // Recommendations Section
-    const recommendations = getRecommendations(12);
-    if (recommendations.length > 0) {
-        html += `
-            <div class="homepage-section">
-                <div class="homepage-section-header">
-                    <h2 class="homepage-section-title">Recommended for You</h2>
-                </div>
-                <div class="podcast-grid">
-                    ${recommendations.map(podcast => {
-                        const isFavorite = isPodcastFavorited(podcast.id);
-                        return `
-                            <div class="podcast-card">
-                                <div class="podcast-card-content" onclick="openEpisodes('${podcast.id}')">
-                                    <img 
-                                        src="${podcast.image_url || getPlaceholderImage()}" 
-                                        alt="${escapeHtml(podcast.title || 'Podcast')}"
-                                        class="podcast-image"
-                                        onerror="this.src='${getPlaceholderImage()}'"
-                                    >
-                                    <div class="podcast-info">
-                                        <div class="podcast-title">${escapeHtml(podcast.title || 'Untitled Podcast')}</div>
-                                        ${(() => {
-                                            const cleanedAuthor = podcast.author ? cleanAuthorText(podcast.author) : '';
-                                            if (cleanedAuthor && !shouldHideAuthor(cleanedAuthor)) {
-                                                return `<div class="podcast-author">${escapeHtml(cleanedAuthor)}</div>`;
-                                            }
-                                            return '';
-                                        })()}
-                                    </div>
-                                </div>
-                                <button class="btn-podcast-favorite ${isFavorite ? 'favorited' : ''}" onclick="event.stopPropagation(); togglePodcastFavorite('${podcast.id}');" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
-                                    ${isFavorite ? '❤️' : '🤍'}
-                                </button>
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-            </div>
-        `;
-    }
-    
-    // Trending Podcasts
-    const trending = getTrendingPodcasts(12);
-    if (trending.length > 0) {
-        html += `
-            <div class="homepage-section">
-                <div class="homepage-section-header">
-                    <h2 class="homepage-section-title">Trending Now</h2>
-                </div>
-                <div class="podcast-grid">
-                    ${trending.map(podcast => {
-                        const isFavorite = isPodcastFavorited(podcast.id);
-                        return `
-                            <div class="podcast-card">
-                                <div class="podcast-card-content" onclick="openEpisodes('${podcast.id}')">
-                                    <img 
-                                        src="${podcast.image_url || getPlaceholderImage()}" 
-                                        alt="${escapeHtml(podcast.title || 'Podcast')}"
-                                        class="podcast-image"
-                                        onerror="this.src='${getPlaceholderImage()}'"
-                                    >
-                                    <div class="podcast-info">
-                                        <div class="podcast-title">${escapeHtml(podcast.title || 'Untitled Podcast')}</div>
-                                        ${(() => {
-                                            const cleanedAuthor = podcast.author ? cleanAuthorText(podcast.author) : '';
-                                            if (cleanedAuthor && !shouldHideAuthor(cleanedAuthor)) {
-                                                return `<div class="podcast-author">${escapeHtml(cleanedAuthor)}</div>`;
-                                            }
-                                            return '';
-                                        })()}
-                                    </div>
-                                </div>
-                                <button class="btn-podcast-favorite ${isFavorite ? 'favorited' : ''}" onclick="event.stopPropagation(); togglePodcastFavorite('${podcast.id}');" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
-                                    ${isFavorite ? '❤️' : '🤍'}
-                                </button>
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-            </div>
-        `;
-    }
+    // Category rows: popular categories first, each row scrollable with arrows
+    html += getCategoryRowsHtml();
     
     // All Podcasts (fallback if no personalized content)
     if (html === '') {
@@ -4623,6 +4585,7 @@ async function renderPersonalizedHomepage() {
         <div class="homepage-section">
             <div class="homepage-section-header">
                 <h2 class="homepage-section-title">Browse All Podcasts</h2>
+                <a href="#" onclick="navigateTo('grid', 'library'); return false;" class="homepage-section-link">See all</a>
             </div>
         </div>
     `;
@@ -4661,12 +4624,14 @@ function renderPodcasts(podcastsToRender = podcasts, containerEl = null) {
         return `
         <div class="podcast-card">
             <div class="podcast-card-content" onclick="openEpisodes('${podcast.id}')">
-                <img 
-                    src="${podcast.image_url || getPlaceholderImage()}" 
-                    alt="${escapeHtml(podcast.title || 'Podcast')}"
-                    class="podcast-image"
-                    onerror="this.src='${getPlaceholderImage()}'"
-                >
+                <div class="podcast-image-wrap">
+                    <img 
+                        src="${podcast.image_url || getPlaceholderImage()}" 
+                        alt="${escapeHtml(podcast.title || 'Podcast')}"
+                        class="podcast-image"
+                        onerror="this.src='${getPlaceholderImage()}'"
+                    >
+                </div>
                 <div class="podcast-info">
                     <div class="podcast-title">${escapeHtml(podcast.title || 'Untitled Podcast')}</div>
                     ${(() => {
@@ -6020,7 +5985,7 @@ function playEpisode(episode) {
     // Note: updatePlayPauseButton() will handle the in-place updates, so we don't need to reload
     // Only reload if we're on a different page that shows episodes
     if (currentPage === 'history') {
-        loadHistoryPage();
+        loadRecentlyListenedPage();
     } else if (currentPage === 'all-episodes') {
         loadAllEpisodesPage();
     }
@@ -7303,7 +7268,7 @@ async function syncFromServer() {
             if (currentPage === 'favorites') {
                 loadFavoritesPage();
             } else if (currentPage === 'history') {
-                loadHistoryPage();
+                loadRecentlyListenedPage();
             }
         }
         

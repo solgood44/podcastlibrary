@@ -33,6 +33,9 @@ else:
 FORCE_REFRESH = os.environ.get("FORCE_REFRESH", "false").lower() == "true"
 # DELETE_MISSING: If true, deletes podcasts from database that are not in the CSV
 DELETE_MISSING = os.environ.get("DELETE_MISSING", "true").lower() == "true"
+# ONLY_DAILY_FEEDS: If true, only process feeds that have a "daily" column set (1, true, yes, daily).
+# Add a column "daily" to feeds.csv and set it for feeds you want to refresh when using this.
+ONLY_DAILY_FEEDS = os.environ.get("ONLY_DAILY_FEEDS", "false").lower() == "true"
 
 sb: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -339,13 +342,15 @@ def fetch_and_process(feed_url: str, etag: str | None, last_modified: str | None
 # --- Main -----------------------------------------------------------------
 
 def read_csv_feeds(path: str):
-    """Read feeds from CSV, optionally with genre override.
-    Returns list of tuples: (feed_url, genre_override or None)
+    """Read feeds from CSV, optionally with genre override and daily flag.
+    Returns list of tuples: (feed_url, genre_override or None, is_daily: bool).
+    is_daily is True when the row has a 'daily' column set to 1, true, yes, or daily.
     """
     feeds = []
+    daily_candidates = ["daily", "Daily", "DAILY", "frequency", "Frequency"]
+    daily_truthy = {"1", "true", "yes", "daily", "day"}
     with open(path, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
-        # Accepts headers like: SOURCE RSS FEED, feed_url, url, etc.
         url_candidates = [
             "SOURCE RSS FEED", "feed_url", "url", "rss", "RSS",
         ]
@@ -355,22 +360,25 @@ def read_csv_feeds(path: str):
         for row in reader:
             feed_url = None
             genre_override = None
-            
-            # Find feed URL
+            is_daily = False
+
             for c in url_candidates:
                 if c in row and row[c]:
                     feed_url = row[c].strip()
                     break
-            
-            # Find optional genre override
             for c in genre_candidates:
                 if c in row and row[c]:
                     genre_override = row[c].strip()
                     break
-            
+            for c in daily_candidates:
+                if c in row and row[c]:
+                    val = row[c].strip().lower()
+                    if val in daily_truthy:
+                        is_daily = True
+                    break
+
             if feed_url:
-                feeds.append((feed_url, genre_override))
-    
+                feeds.append((feed_url, genre_override, is_daily))
     return feeds
 
 
@@ -474,7 +482,14 @@ def delete_podcasts_not_in_csv(csv_feed_urls: set[str]):
 
 def run_once():
     console = Console()
-    feeds = read_csv_feeds(CSV_PATH)
+    all_feeds = read_csv_feeds(CSV_PATH)
+    feeds = all_feeds
+    if ONLY_DAILY_FEEDS:
+        feeds = [f for f in feeds if f[2]]
+        if not feeds:
+            console.print("[yellow]No feeds marked as daily in CSV (column 'daily' = 1, true, yes, or daily).[/yellow]")
+            return
+        console.print(f"[cyan]Only processing {len(feeds)} daily feeds (ONLY_DAILY_FEEDS=true)[/cyan]")
     # Process all feeds unless BATCH_SIZE is explicitly set
     if BATCH_SIZE and BATCH_SIZE > 0:
         feeds_to_process = feeds[:BATCH_SIZE]
@@ -482,7 +497,10 @@ def run_once():
         console.print(f"[yellow]   (To process all feeds, unset REFRESH_BATCH_SIZE or set it to 0/all)[/yellow]")
     else:
         feeds_to_process = feeds
-        console.print(f"[green]✓ Processing all {len(feeds)} feeds[/green]")
+        if not ONLY_DAILY_FEEDS:
+            console.print(f"[green]✓ Processing all {len(all_feeds)} feeds[/green]")
+    # Normalize to (feed_url, genre_override) for the loop
+    feeds_to_process = [(f[0], f[1]) for f in feeds_to_process]
     total_feeds = len(feeds_to_process)
     
     processed = 0
@@ -610,10 +628,10 @@ def run_once():
 
     # Delete podcasts not in CSV (if enabled)
     deleted_count = 0
-    if DELETE_MISSING and not (BATCH_SIZE and BATCH_SIZE > 0):
-        # Only delete missing if processing all feeds (not in batch mode)
+    if DELETE_MISSING and not (BATCH_SIZE and BATCH_SIZE > 0) and not ONLY_DAILY_FEEDS:
+        # Only delete missing when processing full CSV (not batch or daily-only mode)
         console.print(f"\n[yellow]Checking for podcasts to delete...[/yellow]")
-        csv_feed_urls = {feed_url for feed_url, _ in feeds}
+        csv_feed_urls = {f[0] for f in all_feeds}
         deleted_count = delete_podcasts_not_in_csv(csv_feed_urls)
         if deleted_count > 0:
             console.print(f"[red]Deleted {deleted_count} podcast(s) not in CSV[/red]")

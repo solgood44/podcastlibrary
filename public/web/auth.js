@@ -6,6 +6,9 @@ class AuthService {
       this.supabaseUrl = SUPABASE_CONFIG.url;
       this.supabaseAnonKey = SUPABASE_CONFIG.anonKey;
       this._client = null; // Cache the client instance
+      this._cachedSession = null; // Cache the session
+      this._sessionCacheTime = null; // Track when session was cached
+      this._sessionCacheTimeout = 60000; // Cache for 60 seconds
     } else {
       console.error('Please configure your Supabase credentials in config.js');
     }
@@ -46,6 +49,13 @@ class AuthService {
       });
 
       if (error) throw error;
+      
+      // Cache session if user is automatically signed in
+      if (data.session) {
+        this._cachedSession = data.session;
+        this._sessionCacheTime = Date.now();
+      }
+      
       return { success: true, data };
     } catch (error) {
       console.error('Sign up error:', error);
@@ -65,6 +75,11 @@ class AuthService {
       });
 
       if (error) throw error;
+      
+      // Clear cached session and cache the new one
+      this._cachedSession = data.session;
+      this._sessionCacheTime = Date.now();
+      
       return { success: true, data };
     } catch (error) {
       console.error('Sign in error:', error);
@@ -80,6 +95,10 @@ class AuthService {
       
       const { error } = await client.auth.signOut();
       if (error) throw error;
+      
+      // Clear cached session
+      this._cachedSession = null;
+      this._sessionCacheTime = null;
       
       // Clear local storage sync flag
       localStorage.removeItem('user_sync_enabled');
@@ -145,19 +164,42 @@ class AuthService {
     }
   }
 
-  // Get current session
-  async getSession() {
+  // Get current session (with caching to reduce API calls)
+  async getSession(forceRefresh = false) {
     try {
       const client = this.getSupabaseClient();
       if (!client) return null;
       
+      // Return cached session if still valid and not forcing refresh
+      if (!forceRefresh && this._cachedSession && this._sessionCacheTime) {
+        const cacheAge = Date.now() - this._sessionCacheTime;
+        if (cacheAge < this._sessionCacheTimeout) {
+          return this._cachedSession;
+        }
+      }
+      
+      // Fetch fresh session
       const { data: { session }, error } = await client.auth.getSession();
       if (error) throw error;
+      
+      // Cache the session
+      this._cachedSession = session;
+      this._sessionCacheTime = Date.now();
+      
       return session;
     } catch (error) {
       console.error('Get session error:', error);
+      // Clear cache on error
+      this._cachedSession = null;
+      this._sessionCacheTime = null;
       return null;
     }
+  }
+  
+  // Clear session cache (call this when auth state changes)
+  clearSessionCache() {
+    this._cachedSession = null;
+    this._sessionCacheTime = null;
   }
 
   // Listen to auth state changes
@@ -166,6 +208,10 @@ class AuthService {
     if (!client) return null;
     
     return client.auth.onAuthStateChange((event, session) => {
+      // Update cached session when auth state changes
+      this._cachedSession = session;
+      this._sessionCacheTime = session ? Date.now() : null;
+      
       callback(event, session);
     });
   }

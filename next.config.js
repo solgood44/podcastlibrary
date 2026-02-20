@@ -2,6 +2,13 @@ const path = require('path');
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Redirects: /web and /web/ must serve the SPA (public/web/index.html)
+  async redirects() {
+    return [
+      { source: '/web', destination: '/web/index.html', permanent: false },
+      { source: '/web/', destination: '/web/index.html', permanent: false },
+    ];
+  },
   // Rewrites for dev mode (Vercel uses vercel.json in production)
   async rewrites() {
     return [
@@ -13,7 +20,7 @@ const nextConfig = {
       // Root redirects to web
       {
         source: '/',
-        destination: '/web/',
+        destination: '/web/index.html',
       },
     ];
   },

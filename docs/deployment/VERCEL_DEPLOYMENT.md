@@ -202,6 +202,7 @@ Check that `.github/workflows/update-feeds.yml` exists in your repo. It should a
 The workflow runs automatically every 6 hours. To change frequency:
 - Edit `.github/workflows/update-feeds.yml`
 - Change the cron schedule (see file for examples)
+- To only refresh “daily” feeds and keep runs light: add a `daily` column to `feeds.csv` and set `ONLY_DAILY_FEEDS: "true"` in the workflow env. See [CLEANUP_AND_RELIABILITY.md](../CLEANUP_AND_RELIABILITY.md).
 
 ---
 
