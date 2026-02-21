@@ -757,14 +757,20 @@ async function loadPodcasts() {
     const containerEl = document.getElementById('podcast-container');
     const controlsEl = document.getElementById('podcast-controls');
     
+    let timeoutId;
+    const safetyTimeout = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error('Loading is taking too long. The server may be slow or unreachable. Click Retry to try again.')), 10000);
+    });
+    
     try {
-        loadingEl.classList.remove('hidden');
-        errorEl.classList.add('hidden');
-        emptyEl.classList.add('hidden');
+        if (loadingEl) loadingEl.classList.remove('hidden');
+        if (errorEl) errorEl.classList.add('hidden');
+        if (emptyEl) emptyEl.classList.add('hidden');
         if (containerEl) containerEl.classList.add('hidden');
         if (controlsEl) controlsEl.classList.add('hidden');
         
-        podcasts = await apiService.fetchPodcasts();
+        podcasts = await Promise.race([apiService.fetchPodcasts(), safetyTimeout]);
+        clearTimeout(timeoutId);
         
         // Extract categories and authors
         extractCategories();
@@ -785,10 +791,10 @@ async function loadPodcasts() {
             // Continue without descriptions - they'll be loaded on-demand
         }
         
-        loadingEl.classList.add('hidden');
+        if (loadingEl) loadingEl.classList.add('hidden');
         
         if (podcasts.length === 0) {
-            emptyEl.classList.remove('hidden');
+            if (emptyEl) emptyEl.classList.remove('hidden');
         } else {
             // OPTIMIZED: Don't load all episodes on initial page load
             if (controlsEl) controlsEl.classList.remove('hidden');
@@ -803,10 +809,16 @@ async function loadPodcasts() {
             renderSidebar(); // Update sidebar with categories
         }
     } catch (error) {
+        clearTimeout(timeoutId);
         console.error('Error loading podcasts:', error);
-        loadingEl.classList.add('hidden');
-        errorEl.classList.remove('hidden');
-        document.getElementById('error-message').textContent = error.message || 'Failed to load podcasts. Check your Supabase configuration.';
+        if (loadingEl) loadingEl.classList.add('hidden');
+        if (errorEl) {
+            errorEl.classList.remove('hidden');
+            const msgEl = document.getElementById('error-message');
+            if (msgEl) msgEl.textContent = error.message || 'Failed to load podcasts. Check your Supabase configuration.';
+            const hintEl = document.getElementById('error-hint');
+            if (hintEl) hintEl.classList.remove('hidden');
+        }
     }
 }
 

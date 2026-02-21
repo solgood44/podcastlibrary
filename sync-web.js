@@ -20,6 +20,8 @@ const filesToSync = [
   'auth.js',
   'config.js',
   'analytics.js',
+  'favicon.svg',
+  'og-image.svg',
 ];
 
 // Ensure target directory exists

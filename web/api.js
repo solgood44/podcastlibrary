@@ -84,26 +84,36 @@ class APIService {
       ...options.headers
     };
 
+    const timeoutMs = options.timeout ?? 25000;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
     try {
-      const response = await fetch(url, { ...options, headers });
-      
+      const response = await fetch(url, { ...options, headers, signal: controller.signal });
+      clearTimeout(timeoutId);
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ 
+        const errorData = await response.json().catch(() => ({
           message: response.statusText,
           code: response.status === 404 ? 'NOT_FOUND' : 'UNKNOWN',
           hint: `Endpoint: ${endpoint}`
         }));
-        
-        // Provide more helpful error messages
+
         if (response.status === 404) {
           throw new Error(`Table not found: ${endpoint.split('?')[0]}. Please check if the table exists in Supabase and RLS policies allow access.`);
         }
-        
+
         throw new Error(errorData.message || errorData.hint || `HTTP error! status: ${response.status} - Endpoint: ${endpoint}`);
       }
-      
+
       return await response.json();
     } catch (error) {
+      clearTimeout(timeoutId);
+      if (error.name === 'AbortError') {
+        const timeoutErr = new Error('Request timed out. The server may be slow or unreachable. Try again.');
+        console.error('API request timed out:', endpoint);
+        throw timeoutErr;
+      }
       console.error('API request failed:', {
         endpoint,
         url,
@@ -116,7 +126,7 @@ class APIService {
   async fetchPodcasts() {
     const query = '?select=id,feed_url,title,author,image_url,genre,description&order=title.asc';
     const cacheKey = this._getCacheKey('/podcasts', {});
-    const podcasts = await this._cachedRequest(`/podcasts${query}`, {}, cacheKey, this.cacheTTL.podcasts);
+    const podcasts = await this._cachedRequest(`/podcasts${query}`, { timeout: 12000 }, cacheKey, this.cacheTTL.podcasts);
     // EMERGENCY MODE: Sanitize Supabase Storage image URLs
     if (typeof EMERGENCY_EGRESS_HALT !== 'undefined' && EMERGENCY_EGRESS_HALT) {
       return podcasts.map(podcast => {

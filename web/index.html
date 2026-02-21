@@ -161,6 +161,7 @@
             <div id="error" class="error hidden">
                 <h2>Error Loading Podcasts</h2>
                 <p id="error-message"></p>
+                <p id="error-hint" class="error-hint">If this keeps happening: check that your Supabase project is not paused (Dashboard → Project Settings), and open DevTools → Network to see whether the podcasts request fails or hangs.</p>
                 <button onclick="loadPodcasts()" class="btn-retry">Retry</button>
             </div>
             <div id="empty" class="empty hidden">
