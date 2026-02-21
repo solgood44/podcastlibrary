@@ -2,13 +2,10 @@ name: Update Podcast Feeds
 
 on:
   schedule:
-    # Run every 6 hours (UTC time)
-    # Adjust schedule as needed:
-    # - Every 4 hours: '0 */4 * * *'
-    # - Every 2 hours: '0 */2 * * *'
+    # Run every 12 hours (UTC): 00:00 and 12:00
+    # - Every 6 hours: '0 */6 * * *'
     # - Daily at 2 AM UTC: '0 2 * * *'
-    # - Every 30 minutes: '*/30 * * * *' (for very active feeds)
-    - cron: '0 */6 * * *'
+    - cron: '0 */12 * * *'
   workflow_dispatch: # Allow manual trigger from GitHub Actions tab
 
 jobs:
@@ -17,10 +14,10 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        uses: actions/checkout@v4
       
       - name: Set up Python
-        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       
@@ -45,16 +42,19 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           CSV_PATH: ./feeds.csv
+          # Only refresh "active" feeds (new or had episode in last 60 days); skip completed shows
+          REFRESH_ACTIVE_ONLY: "true"
+          REFRESH_ACTIVE_DAYS: "60"
           # Optional: Set REFRESH_BATCH_SIZE to limit feeds processed per run
           # REFRESH_BATCH_SIZE: 200
         run: |
           cd backend
-          echo "Starting feed ingestor..."
+          echo "Starting feed ingestor (active feeds only)..."
           python feed_ingestor.py || exit 1
       
       - name: Upload logs (on failure)
         if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@v4
         with:
           name: feed-update-logs
           path: backend/*.log

@@ -1,0 +1,52 @@
+# Weekly full refresh: process ALL feeds (including completed/inactive).
+# Use this to catch any "complete" shows that drop a new episode.
+# Runs once a week; the main update-feeds.yml runs every 6h for active feeds only.
+name: Update Podcast Feeds (Full)
+
+on:
+  schedule:
+    - cron: '0 3 * * 0'  # Sundays at 03:00 UTC
+  workflow_dispatch:
+
+jobs:
+  update-feeds-full:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify setup
+        run: |
+          cd backend
+          test -f feeds.csv && test -f feed_ingestor.py || exit 1
+          echo "✓ Full refresh will process all feeds"
+
+      - name: Run feed ingestor (full refresh)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          CSV_PATH: ./feeds.csv
+          REFRESH_ACTIVE_ONLY: "false"
+        run: |
+          cd backend
+          echo "Starting full feed refresh (all feeds)..."
+          python feed_ingestor.py || exit 1
+
+      - name: Upload logs (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: feed-full-logs
+          path: backend/*.log
+          if-no-files-found: ignore

@@ -147,7 +147,13 @@
             >
         </div>
         <div id="auth-button-container" class="auth-button-container">
-            <button id="auth-button" class="btn-auth" onclick="toggleAuthModal()">Sign Up</button>
+            <button id="auth-button" class="btn-auth" onclick="toggleAuthModal()">Save Progress</button>
+            <div id="account-dropdown" class="account-dropdown hidden">
+                <div class="account-dropdown-email" id="account-dropdown-email"></div>
+                <div class="account-dropdown-stats" id="account-dropdown-stats"></div>
+                <button type="button" class="account-dropdown-btn" onclick="closeAccountDropdown(); openCategoryPreferencesModal();">Customize Library</button>
+                <button type="button" class="account-dropdown-btn account-dropdown-signout" onclick="closeAccountDropdown(); handleSignOut();">Sign Out</button>
+            </div>
         </div>
     </header>
     <!-- Main Content Area -->
@@ -167,42 +173,8 @@
             <div id="empty" class="empty hidden">
                 <p>No podcasts available</p>
             </div>
-            <div id="podcast-controls" class="podcast-controls hidden">
-                <div class="controls-left">
-                    <div class="view-toggle">
-                        <button id="view-grid-btn" class="view-btn active" onclick="setViewMode('grid')" title="Grid View">
-                            <span>⊞</span>
-                        </button>
-                        <button id="view-list-btn" class="view-btn" onclick="setViewMode('list')" title="List View">
-                            <span>☰</span>
-                        </button>
-                    </div>
-                    <div class="sort-controls">
-                        <label for="sort-select" class="sort-label">Sort:</label>
-                        <select id="sort-select" class="sort-select" onchange="applySorting()">
-                            <option value="title-asc">A-Z</option>
-                            <option value="title-desc">Z-A</option>
-                            <option value="random">Random</option>
-                        </select>
-                    </div>
-                    <div class="filter-controls">
-                        <label for="duration-filter" class="filter-label">Episode Duration:</label>
-                        <select id="duration-filter" class="filter-select" onchange="applyDurationFilter()">
-                            <option value="all">All Durations</option>
-                            <option value="under10">Under 10 min</option>
-                            <option value="10-30">10-30 min</option>
-                            <option value="30-60">30-60 min</option>
-                            <option value="60plus">60+ min</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="controls-right">
-                    <div id="podcast-count" class="podcast-count"></div>
-                </div>
-            </div>
             <div id="podcast-container">
                 <div id="podcast-grid" class="podcast-grid"></div>
-                <div id="podcast-list" class="podcast-list hidden"></div>
             </div>
         </div>
 
@@ -259,6 +231,17 @@
             <div id="category-loading" class="loading hidden">
                 <div class="spinner"></div>
                 <p>Loading podcasts...</p>
+            </div>
+            <div id="category-controls" class="podcast-controls">
+                <div class="controls-left">
+                    <div class="sort-controls">
+                        <label for="category-sort-select" class="sort-label">Sort:</label>
+                        <select id="category-sort-select" class="sort-select" onchange="applyCategorySorting()">
+                            <option value="title-asc">A-Z</option>
+                            <option value="title-desc">Z-A</option>
+                        </select>
+                    </div>
+                </div>
             </div>
             <div id="category-grid" class="podcast-grid hidden"></div>
         </div>
@@ -660,7 +643,7 @@
         <div class="auth-modal-overlay" onclick="closeAuthModal()"></div>
         <div class="auth-modal-content">
             <div class="auth-modal-header">
-                <h2 id="auth-modal-title">Sign Up</h2>
+                <h2 id="auth-modal-title">Save Progress</h2>
                 <button class="btn-close-modal" onclick="closeAuthModal()">✕</button>
             </div>
             <div class="auth-modal-body">
@@ -681,8 +664,8 @@
                     </p>
                     <button class="btn-auth-primary" onclick="handleSignIn()">Sign In</button>
                     <p class="auth-switch-text">
-                        Don't have an account? 
-                        <a href="#" onclick="switchAuthMode('signup'); return false;">Sign up</a>
+                        Don't have an account?
+                        <a href="#" onclick="switchAuthMode('signup'); return false;">Save your progress</a>
                     </p>
                     <p class="auth-legal-links" style="margin-top: 1rem; font-size: 0.85rem; text-align: center; color: #666;">
                         By signing in, you agree to our 
@@ -694,12 +677,12 @@
 
                 <div id="auth-signup-form" class="auth-form">
                     <div class="auth-benefits" style="background: var(--bg-tertiary); padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
-                        <h3 style="margin: 0 0 0.75rem 0; font-size: 1rem; color: var(--text-primary);">Benefits of signing up:</h3>
+                        <h3 style="margin: 0 0 0.75rem 0; font-size: 1rem; color: var(--text-primary);">Why save your progress?</h3>
                         <ul style="margin: 0; padding-left: 1.25rem; color: var(--text-secondary); font-size: 0.9rem; line-height: 1.6;">
-                            <li>Sync favorites and history across all your devices</li>
-                            <li>Never lose your listening progress</li>
-                            <li>Access your data from anywhere</li>
-                            <li>Free and secure</li>
+                            <li>Remember where you left off on every podcast</li>
+                            <li>Keep your favorites and listening history</li>
+                            <li>Choose which categories appear on your Library</li>
+                            <li>Sync across devices — free and secure</li>
                         </ul>
                     </div>
                     <div class="auth-form-group">
@@ -714,9 +697,9 @@
                         <label for="signup-password-confirm">Confirm Password</label>
                         <input type="password" id="signup-password-confirm" class="auth-input" placeholder="••••••••">
                     </div>
-                    <button class="btn-auth-primary" onclick="handleSignUp()">Sign Up</button>
+                    <button class="btn-auth-primary" onclick="handleSignUp()">Save Progress</button>
                     <p class="auth-switch-text">
-                        Already have an account? 
+                        Already have an account?
                         <a href="#" onclick="switchAuthMode('signin'); return false;">Sign in</a>
                     </p>
                     <p class="auth-legal-links" style="margin-top: 1rem; font-size: 0.85rem; text-align: center; color: #666;">
@@ -759,7 +742,33 @@
                 <div id="auth-signedin" class="auth-signedin hidden">
                     <p>Signed in as <strong id="auth-user-email"></strong></p>
                     <p class="auth-sync-status" id="auth-sync-status">Syncing...</p>
+                    <p class="auth-signedin-note" style="font-size: 0.9rem; color: var(--text-secondary); margin: 0.75rem 0;">Your listening progress, favorites, and library preferences are saved and sync across devices.</p>
+                    <button type="button" class="btn-auth-primary" id="btn-customize-library" onclick="openCategoryPreferencesModal()">Customize Library</button>
                     <button class="btn-auth-secondary" onclick="handleSignOut()">Sign Out</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Category preferences modal (logged-in users) -->
+    <div id="category-preferences-modal" class="auth-modal hidden">
+        <div class="auth-modal-overlay" onclick="closeCategoryPreferencesModal()"></div>
+        <div class="auth-modal-content" style="max-width: 480px;">
+            <div class="auth-modal-header">
+                <h2>Customize Library</h2>
+                <button class="btn-close-modal" onclick="closeCategoryPreferencesModal()">✕</button>
+            </div>
+            <div class="auth-modal-body">
+                <p style="margin: 0 0 1rem 0; font-size: 0.9rem; color: var(--text-secondary);">Select which categories appear on your Library. Leave all checked to show everything.</p>
+                <div class="category-pref-actions" style="display: flex; gap: 1rem; margin-bottom: 0.75rem; font-size: 0.9rem;">
+                    <button type="button" class="btn-link" onclick="selectAllCategoryPreferences()">Select all</button>
+                    <button type="button" class="btn-link" onclick="deselectAllCategoryPreferences()">Deselect all</button>
+                </div>
+                <div id="category-preferences-list" class="category-preferences-list"></div>
+                <div id="category-pref-saved-msg" class="category-pref-saved-msg hidden">Saved ✓</div>
+                <div style="display: flex; gap: 10px; margin-top: 1.25rem;">
+                    <button type="button" class="btn-auth-primary" id="category-pref-save-btn" onclick="window.saveCategoryPreferences()">Save</button>
+                    <button type="button" class="btn-auth-secondary" onclick="closeCategoryPreferencesModal()">Cancel</button>
                 </div>
             </div>
         </div>

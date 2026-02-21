@@ -50,12 +50,16 @@ const PROGRESS_KEY = 'podcast_progress';
 const HISTORY_KEY = 'episode_history';
 const FAVORITES_KEY = 'podcast_favorites';
 const PODCAST_SORT_PREFERENCES_KEY = 'podcast_sort_preferences';
+const USER_VISIBLE_CATEGORIES_KEY = 'user_visible_categories';
 const QUEUE_KEY = 'episode_queue';
 const AUTO_PLAY_KEY = 'auto_play_enabled';
 const ONBOARDING_KEY = 'onboarding_completed';
 const PLAYBACK_SPEED_KEY = 'playback_speed';
 const VOLUME_KEY = 'volume';
 const MAX_HISTORY = 50;
+
+// User-selected categories for Library (logged-in only). null = show all.
+let userVisibleCategories = null;
 
 // Queue management
 let episodeQueue = [];
@@ -240,8 +244,24 @@ function setupAudioPrefetching() {
     }, 500);
 }
 
+// Restore visible categories from localStorage (so Library respects saved preferences on load)
+function restoreUserVisibleCategories() {
+    try {
+        const stored = localStorage.getItem(USER_VISIBLE_CATEGORIES_KEY);
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            userVisibleCategories = Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
+        } else {
+            userVisibleCategories = null;
+        }
+    } catch (e) {
+        userVisibleCategories = null;
+    }
+}
+
 // Initialize app when DOM loads
 document.addEventListener('DOMContentLoaded', () => {
+    restoreUserVisibleCategories();
     audioPlayer = document.getElementById('audio-player');
     setupAudioPlayer();
     setupRouting();
@@ -535,20 +555,10 @@ function navigateTo(page, param = null) {
             setSearchMode('podcasts');
         }
         currentCategory = null; // Reset category when going home
-        const controlsEl = document.getElementById('podcast-controls');
         const containerEl = document.getElementById('podcast-container');
         if (podcasts.length > 0) {
-            if (controlsEl) controlsEl.classList.remove('hidden');
             if (containerEl) containerEl.classList.remove('hidden');
-            const sortSelect = document.getElementById('sort-select');
-            if (sortSelect) {
-                sortSelect.value = sortMode;
-            }
-            const durationFilterSelect = document.getElementById('duration-filter');
-            if (durationFilterSelect) {
-                durationFilterSelect.value = durationFilter;
-            }
-            // Always show Library view (category rows + Browse All) as the home page
+            // Library: Recently Listened To, Top 10 today, category rows, Browse All
             renderLibraryWithCategoryRows();
         } else if (podcasts.length === 0 && allEpisodes.length === 0) {
             // If no podcasts loaded yet, trigger load
@@ -2796,25 +2806,93 @@ function scrollCategoryRow(button, direction) {
     inner.scrollBy({ left: scrollAmount, behavior: 'smooth' });
 }
 
-// Build HTML for all category rows (popular first). If no categories, one "All Podcasts" row.
-// Uses daily shuffle so order feels fresh each day; limits duplicates across rows.
+// Build HTML for the Trending / Top 10 row (order rotates daily via daily seed)
+// When episode counts aren't loaded yet, show 10 podcasts from a daily shuffle so the row always appears
+function getTrendingRowHtml() {
+    let trending = getTrendingPodcasts(10);
+    if (trending.length === 0) {
+        trending = shuffleWithDailySeed([...podcasts]).slice(0, 10);
+    } else {
+        trending = shuffleWithDailySeed(trending).slice(0, 10);
+    }
+    if (trending.length === 0) return '';
+    const rowPodcasts = trending;
+    return `
+        <div class="homepage-category-row">
+            <div class="homepage-section-header homepage-category-row-header">
+                <h2 class="homepage-section-title">🔥 Top 10 today</h2>
+                <div class="homepage-row-nav-wrap">
+                    <button type="button" class="homepage-row-nav homepage-row-nav-prev" onclick="scrollCategoryRow(this, -1)" aria-label="Scroll left">‹</button>
+                    <button type="button" class="homepage-row-nav homepage-row-nav-next" onclick="scrollCategoryRow(this, 1)" aria-label="Scroll right">›</button>
+                </div>
+            </div>
+            <div class="homepage-category-row-inner">
+                ${rowPodcasts.map(podcast => {
+                    const isFavorite = isPodcastFavorited(podcast.id);
+                    return `
+                        <div class="podcast-card podcast-card-in-row">
+                            <div class="podcast-card-content" onclick="openEpisodes('${podcast.id}')">
+                                <div class="podcast-image-wrap">
+                                    <img 
+                                        src="${podcast.image_url || getPlaceholderImage()}" 
+                                        alt="${escapeHtml(podcast.title || 'Podcast')}"
+                                        class="podcast-image"
+                                        onerror="this.src='${getPlaceholderImage()}'"
+                                    >
+                                </div>
+                                <div class="podcast-info">
+                                    <div class="podcast-title">${escapeHtml(podcast.title || 'Untitled Podcast')}</div>
+                                    ${(() => {
+                                        const cleanedAuthor = podcast.author ? cleanAuthorText(podcast.author) : '';
+                                        if (cleanedAuthor && !shouldHideAuthor(cleanedAuthor)) {
+                                            return `<div class="podcast-author">${escapeHtml(cleanedAuthor)}</div>`;
+                                        }
+                                        return '';
+                                    })()}
+                                </div>
+                            </div>
+                            <button class="btn-podcast-favorite ${isFavorite ? 'favorited' : ''}" onclick="event.stopPropagation(); togglePodcastFavorite('${podcast.id}');" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+                                ${isFavorite ? '❤️' : '🤍'}
+                            </button>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        </div>
+    `;
+}
+
+// Build HTML for all category rows. Category order randomized daily; each podcast appears in at most one row.
+// Always use localStorage for visible categories so the library reflects the last saved preferences.
 function getCategoryRowsHtml() {
     let html = '';
-    const categoriesByPopularity = getCategoriesByPopularity();
+    let categoriesByPopularity = getCategoriesByPopularity();
+    let visibleCategories = userVisibleCategories;
+    try {
+        const stored = localStorage.getItem(USER_VISIBLE_CATEGORIES_KEY);
+        if (stored !== null) {
+            const parsed = JSON.parse(stored);
+            visibleCategories = Array.isArray(parsed) ? (parsed.length > 0 ? parsed : null) : null;
+        }
+    } catch (e) {}
+    if (visibleCategories && visibleCategories.length > 0) {
+        categoriesByPopularity = categoriesByPopularity.filter(c => visibleCategories.includes(c));
+    }
     const rowsToShow = categoriesByPopularity.length > 0
-        ? categoriesByPopularity
+        ? shuffleWithDailySeed([...categoriesByPopularity])
         : ['All Podcasts'];
     const PER_ROW = 20;
-    const shownCount = new Map(); // podcast id -> times already shown on this page
+    const shownInRows = new Set(); // podcast ids already placed in a previous row (no duplicates across rows)
+    const MIN_PODCASTS_PER_CATEGORY = 4;
     rowsToShow.forEach(categoryName => {
         let categoryPodcasts = categoryName === 'All Podcasts'
             ? podcasts.slice(0, 80)
             : getPodcastsForCategory(categoryName, 80);
-        if (categoryPodcasts.length === 0) return;
+        categoryPodcasts = categoryPodcasts.filter(p => !shownInRows.has(p.id));
+        if (categoryPodcasts.length < MIN_PODCASTS_PER_CATEGORY) return; // skip small categories
         categoryPodcasts = shuffleWithDailySeed(categoryPodcasts);
-        categoryPodcasts.sort((a, b) => (shownCount.get(a.id) || 0) - (shownCount.get(b.id) || 0));
         const rowPodcasts = categoryPodcasts.slice(0, PER_ROW);
-        rowPodcasts.forEach(p => shownCount.set(p.id, (shownCount.get(p.id) || 0) + 1));
+        rowPodcasts.forEach(p => shownInRows.add(p.id));
         const emoji = categoryName === 'All Podcasts' ? '🎙️' : getCategoryEmoji(categoryName);
         const categoryEscaped = escapeHtml(categoryName);
         const categoryAttr = String(categoryName).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -2868,21 +2946,76 @@ function getCategoryRowsHtml() {
     return html;
 }
 
-// Library view: category rows at top, then full sortable grid below
+// Recently Listened To section HTML for Library (same structure as personalized homepage)
+function getRecentlyListenedToSectionHtml() {
+    const recentEpisodes = getRecentlyListenedEpisodes(8);
+    if (recentEpisodes.length === 0) return '';
+    return `
+        <div class="homepage-section">
+            <div class="homepage-section-header">
+                <h2 class="homepage-section-title">Recently Listened To</h2>
+                <a href="#" onclick="navigateTo('recent'); return false;" class="homepage-section-link">See All</a>
+            </div>
+            <div class="homepage-episodes-grid">
+                ${recentEpisodes.map(({ episode, podcast, progress }) => {
+                    const isCurrentEpisode = currentEpisode && currentEpisode.id === episode.id;
+                    const isEpisodePlaying = isCurrentEpisode && isPlaying;
+                    const episodeInQueue = isInQueue(episode.id);
+                    return `
+                        <div class="homepage-episode-card ${isCurrentEpisode ? 'episode-playing' : ''}" 
+                             oncontextmenu="event.preventDefault(); showEpisodeContextMenu(event, '${episode.id}', '${podcast.id}');">
+                            <button class="btn-remove-continue" 
+                                    onclick="event.stopPropagation(); removeFromContinueListening('${episode.id}'); renderLibraryWithCategoryRows();" 
+                                    title="Mark as completed">
+                                ✕
+                            </button>
+                            <div class="homepage-episode-image" onclick="playEpisode(${JSON.stringify(episode).replace(/"/g, '&quot;')})">
+                                <img src="${podcast.image_url || getPlaceholderImage()}" 
+                                     alt="${escapeHtml(podcast.title || '')}" 
+                                     onerror="this.src='${getPlaceholderImage()}'">
+                                <div class="homepage-episode-overlay">
+                                    <button class="btn-episode-play-small ${isEpisodePlaying ? 'playing' : ''}" 
+                                            data-episode-id="${episode.id}" data-podcast-id="${podcast.id}"
+                                            onclick="event.stopPropagation(); ${isEpisodePlaying ? 'togglePlayPause()' : `playEpisode(${JSON.stringify(episode).replace(/"/g, '&quot;')})`}">
+                                        <span>${isEpisodePlaying ? '⏸' : '▶'}</span>
+                                    </button>
+                                </div>
+                                <div class="homepage-episode-progress-bar">
+                                    <div class="homepage-episode-progress-fill" style="width: ${progress}%"></div>
+                                </div>
+                            </div>
+                            <div class="homepage-episode-info">
+                                <div class="homepage-episode-title" onclick="openEpisodeDetail('${episode.id}', '${podcast.id}')">${escapeHtml(episode.title || 'Untitled Episode')}</div>
+                                <div class="homepage-episode-podcast" onclick="event.stopPropagation(); openEpisodes('${podcast.id}')">${escapeHtml(podcast.title || 'Unknown Podcast')}</div>
+                                <div class="homepage-episode-actions">
+                                    ${episodeInQueue ? '<span class="homepage-episode-queue-badge" title="In queue">✓</span>' : ''}
+                                    <span class="homepage-episode-progress-text">${Math.round(progress)}%</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        </div>
+    `;
+}
+
+// Library view: Recently Listened To (if any), then Top 10 today, then category rows, then full sortable grid
 function renderLibraryWithCategoryRows() {
     const containerEl = document.getElementById('podcast-container');
     if (!containerEl) return;
     if (categories.length === 0) {
         extractCategories();
     }
-    let html = getCategoryRowsHtml();
+    let html = getRecentlyListenedToSectionHtml();
+    html += getTrendingRowHtml();
+    html += getCategoryRowsHtml();
     html += `
         <div class="homepage-section">
             <div class="homepage-section-header">
                 <h2 class="homepage-section-title">Browse All</h2>
             </div>
             <div id="podcast-grid" class="podcast-grid"></div>
-            <div id="podcast-list" class="podcast-list hidden"></div>
         </div>
     `;
     containerEl.innerHTML = html;
@@ -2904,8 +3037,12 @@ function showCategoryPage(categoryName) {
     const loadingEl = document.getElementById('category-loading');
     const gridEl = document.getElementById('category-grid');
     const titleEl = document.getElementById('category-page-title');
+    const controlsEl = document.getElementById('category-controls');
+    const sortSelect = document.getElementById('category-sort-select');
     
     titleEl.textContent = categoryName;
+    if (controlsEl) controlsEl.classList.remove('hidden');
+    if (sortSelect) sortSelect.value = sortMode === 'title-desc' ? 'title-desc' : 'title-asc';
     loadingEl.classList.remove('hidden');
     gridEl.classList.add('hidden');
     
@@ -2932,6 +3069,27 @@ function showCategoryPage(categoryName) {
         }
         gridEl.classList.remove('hidden');
     }, 300);
+}
+
+// Sort category page (A-Z or Z-A); re-renders category grid
+function applyCategorySorting() {
+    const sortSelect = document.getElementById('category-sort-select');
+    if (sortSelect) sortMode = sortSelect.value;
+    if (!currentCategory) return;
+    const gridEl = document.getElementById('category-grid');
+    if (!gridEl) return;
+    let filteredPodcasts;
+    if (currentCategory === 'Daily') {
+        filteredPodcasts = podcasts.filter(p => isDailyPodcast(p.id));
+    } else {
+        filteredPodcasts = podcasts.filter(p => {
+            if (p.genre && Array.isArray(p.genre)) {
+                return p.genre.some(g => g && g.trim() === currentCategory);
+            }
+            return p.genre && p.genre.trim() === currentCategory;
+        });
+    }
+    renderPodcasts(filteredPodcasts, gridEl);
 }
 
 // Load authors page
@@ -4255,35 +4413,6 @@ function getRelatedPodcastsByGenre(currentPodcastId, genres, limit = 6) {
     return related;
 }
 
-// Filter podcasts by episode duration
-function filterPodcastsByDuration(podcastsToFilter) {
-    if (durationFilter === 'all') {
-        return podcastsToFilter;
-    }
-    
-    return podcastsToFilter.filter(podcast => {
-        const podcastEpisodes = allEpisodes.filter(ep => ep.podcast_id === podcast.id);
-        
-        // Check if any episode matches the duration filter
-        return podcastEpisodes.some(episode => {
-            const durationMinutes = (episode.duration_seconds || 0) / 60;
-            
-            switch (durationFilter) {
-                case 'under10':
-                    return durationMinutes > 0 && durationMinutes < 10;
-                case '10-30':
-                    return durationMinutes >= 10 && durationMinutes <= 30;
-                case '30-60':
-                    return durationMinutes > 30 && durationMinutes <= 60;
-                case '60plus':
-                    return durationMinutes > 60;
-                default:
-                    return true;
-            }
-        });
-    });
-}
-
 // Sort podcasts based on current sort mode
 function sortPodcasts(podcastsToSort) {
     const sorted = [...podcastsToSort];
@@ -4315,45 +4444,9 @@ function sortPodcasts(podcastsToSort) {
     return sorted;
 }
 
-// Apply duration filter
-function applyDurationFilter() {
-    const filterSelect = document.getElementById('duration-filter');
-    durationFilter = filterSelect.value;
-    
-    // Re-render with filtered podcasts
-    const currentPodcasts = currentCategory 
-        ? podcasts.filter(p => {
-            if (p.genre && Array.isArray(p.genre)) {
-                return p.genre.some(g => g && g.trim() === currentCategory);
-            }
-            return p.genre && p.genre.trim() === currentCategory;
-        })
-        : podcasts;
-    
-    renderPodcasts(currentPodcasts);
-}
-
-// Set view mode (grid or list)
+// Set view mode (grid only - list view removed)
 function setViewMode(mode) {
     viewMode = mode;
-    const gridBtn = document.getElementById('view-grid-btn');
-    const listBtn = document.getElementById('view-list-btn');
-    const gridEl = document.getElementById('podcast-grid');
-    const listEl = document.getElementById('podcast-list');
-    
-    if (mode === 'grid') {
-        gridBtn.classList.add('active');
-        listBtn.classList.remove('active');
-        gridEl.classList.remove('hidden');
-        listEl.classList.add('hidden');
-    } else {
-        listBtn.classList.add('active');
-        gridBtn.classList.remove('active');
-        gridEl.classList.add('hidden');
-        listEl.classList.remove('hidden');
-    }
-    
-    // Re-render with current view mode
     const currentPodcasts = currentCategory 
         ? podcasts.filter(p => {
             if (p.genre && Array.isArray(p.genre)) {
@@ -4362,14 +4455,13 @@ function setViewMode(mode) {
             return p.genre && p.genre.trim() === currentCategory;
         })
         : podcasts;
-    
     renderPodcasts(currentPodcasts);
 }
 
-// Apply sorting
+// Apply sorting (used by category and other views; Library has no sort control)
 function applySorting() {
     const sortSelect = document.getElementById('sort-select');
-    sortMode = sortSelect.value;
+    if (sortSelect) sortMode = sortSelect.value;
     
     // Re-render with sorted podcasts
     const currentPodcasts = currentCategory 
@@ -4503,6 +4595,7 @@ async function renderPersonalizedHomepage() {
                                          onerror="this.src='${getPlaceholderImage()}'">
                                     <div class="homepage-episode-overlay">
                                         <button class="btn-episode-play-small ${isEpisodePlaying ? 'playing' : ''}" 
+                                                data-episode-id="${episode.id}" data-podcast-id="${podcast.id}"
                                                 onclick="event.stopPropagation(); ${isEpisodePlaying ? 'togglePlayPause()' : `playEpisode(${JSON.stringify(episode).replace(/"/g, '&quot;')})`}">
                                             <span>${isEpisodePlaying ? '⏸' : '▶'}</span>
                                         </button>
@@ -4549,6 +4642,7 @@ async function renderPersonalizedHomepage() {
                                          onerror="this.src='${getPlaceholderImage()}'">
                                     <div class="homepage-episode-overlay">
                                         <button class="btn-episode-play-small ${isEpisodePlaying ? 'playing' : ''}" 
+                                                data-episode-id="${episode.id}" data-podcast-id="${podcast.id}"
                                                 onclick="event.stopPropagation(); ${isEpisodePlaying ? 'togglePlayPause()' : `playEpisode(${JSON.stringify(episode).replace(/"/g, '&quot;')})`}">
                                             <span>${isEpisodePlaying ? '⏸' : '▶'}</span>
                                         </button>
@@ -4604,28 +4698,21 @@ async function renderPersonalizedHomepage() {
     
     containerEl.innerHTML = html;
     
-    // Render all podcasts in the grid/list views (they're still available via controls)
+    // Render all podcasts in the grid if present (e.g. when navigating to Library)
     const gridEl = document.getElementById('podcast-grid');
-    const listEl = document.getElementById('podcast-list');
     if (gridEl) {
         renderPodcasts(podcasts, gridEl);
-    }
-    if (listEl) {
-        renderPodcasts(podcasts, listEl);
     }
 }
 
 function renderPodcasts(podcastsToRender = podcasts, containerEl = null) {
-    // Filter by duration first
-    const filteredPodcasts = filterPodcastsByDuration(podcastsToRender);
-    
-    // Sort the podcasts
-    const sortedPodcasts = sortPodcasts(filteredPodcasts);
+    // Sort the podcasts (duration filter removed)
+    const sortedPodcasts = sortPodcasts(podcastsToRender);
     
     // Update count
     updatePodcastCount();
     
-    // Render grid view
+    // Render grid view only
     const gridEl = containerEl || document.getElementById('podcast-grid');
     if (!gridEl) {
         console.error('podcast-grid element not found');
@@ -4664,46 +4751,6 @@ function renderPodcasts(podcastsToRender = podcasts, containerEl = null) {
         </div>
     `;
     }).join('');
-    
-    // Render list view
-    const listEl = document.getElementById('podcast-list');
-    if (listEl) {
-        listEl.innerHTML = sortedPodcasts.map(podcast => {
-            const isFavorite = isPodcastFavorited(podcast.id);
-            const cleanedAuthor = podcast.author ? cleanAuthorText(podcast.author) : '';
-            const showAuthor = cleanedAuthor && !shouldHideAuthor(cleanedAuthor);
-            return `
-            <div class="podcast-list-item">
-                <div class="podcast-list-item-content" onclick="openEpisodes('${podcast.id}')">
-                    <div class="podcast-list-image">
-                        <img 
-                            src="${podcast.image_url || getPlaceholderImage()}" 
-                            alt="${escapeHtml(podcast.title || 'Podcast')}"
-                            class="podcast-list-artwork"
-                            onerror="this.src='${getPlaceholderImage()}'"
-                        >
-                    </div>
-                    <div class="podcast-list-info">
-                        <div class="podcast-list-title">${escapeHtml(podcast.title || 'Untitled Podcast')}</div>
-                        ${(() => {
-                            // Don't show author link if we're on the author page
-                            if (currentAuthor) return '';
-                            const cleanedAuthor = podcast.author ? cleanAuthorText(podcast.author) : '';
-                            if (cleanedAuthor && !shouldHideAuthor(cleanedAuthor)) {
-                                const authorSlug = generateSlug(cleanedAuthor);
-                                return `<div class="podcast-list-meta" onclick="event.stopPropagation(); event.preventDefault(); showAuthor('${escapeHtml(cleanedAuthor)}'); return false;"><span><a href="/author/${authorSlug}" class="podcast-list-author-link" onclick="event.stopPropagation(); event.preventDefault(); showAuthor('${escapeHtml(cleanedAuthor)}'); return false;">${escapeHtml(cleanedAuthor)}</a></span></div>`;
-                            }
-                            return '';
-                        })()}
-                    </div>
-                </div>
-                <button class="btn-podcast-favorite-list ${isFavorite ? 'favorited' : ''}" onclick="event.stopPropagation(); togglePodcastFavorite('${podcast.id}');" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
-                    ${isFavorite ? '❤️' : '🤍'}
-                </button>
-            </div>
-        `;
-        }).join('');
-    }
 }
 
 // Filter episodes by duration
@@ -4960,6 +5007,11 @@ function getDefaultPodcastSortOrder(podcast, episodes = []) {
     return 'date-desc';
 }
 
+// Returns true if podcast is ordered content (book/audiobook) and should always show episodes 1,2,3...
+function isBookPodcast(podcast, episodes = []) {
+    return getDefaultPodcastSortOrder(podcast, episodes) === 'date-asc';
+}
+
 // Filter podcast episodes by duration
 function filterPodcastEpisodesByDuration(episodesToFilter) {
     if (podcastEpisodesDurationFilter === 'all') {
@@ -5145,7 +5197,7 @@ async function loadEpisodesPage() {
     const titleEl = document.getElementById('episodes-page-title');
     const controlsEl = document.getElementById('podcast-episodes-controls');
     
-    titleEl.textContent = currentPodcast.title || 'Episodes';
+    titleEl.textContent = 'Episodes';
     loadingEl.classList.remove('hidden');
     listEl.innerHTML = '';
     
@@ -5187,17 +5239,20 @@ async function loadEpisodesPage() {
             if (controlsEl) controlsEl.classList.add('hidden');
             listEl.innerHTML = '<div class="empty"><p>No episodes available</p></div>';
         } else {
-            // Set default sort order based on podcast characteristics (only if user hasn't set a preference)
             const podcastId = currentPodcast.id;
-            if (!podcastSortPreferences[podcastId]) {
-                // First time loading this podcast - use its default sort order
-                // Pass episodes to help detect chapter/part patterns
-                const defaultSort = getDefaultPodcastSortOrder(currentPodcast, episodes);
+            const defaultSort = getDefaultPodcastSortOrder(currentPodcast, episodes);
+            const isBook = isBookPodcast(currentPodcast, episodes);
+            
+            // Book podcasts: always chronological (1,2,3...); ignore saved preference
+            if (isBook) {
+                podcastEpisodesSortMode = 'date-asc';
+                delete podcastSortPreferences[podcastId];
+                savePodcastSortPreferences();
+            } else if (!podcastSortPreferences[podcastId]) {
                 podcastEpisodesSortMode = defaultSort;
                 podcastSortPreferences[podcastId] = defaultSort;
-                savePodcastSortPreferences(); // Save the default preference
+                savePodcastSortPreferences();
             } else {
-                // User has set a preference for this podcast - use it
                 podcastEpisodesSortMode = podcastSortPreferences[podcastId];
             }
             
@@ -5207,7 +5262,7 @@ async function loadEpisodesPage() {
             // Sort episodes (no duration filtering on podcast episodes page)
             const sortedEpisodes = sortPodcastEpisodes(episodes);
             
-            // Update sort select
+            // Update sort select (only visible for non-book podcasts)
             const sortSelect = document.getElementById('podcast-episodes-sort-select');
             if (sortSelect) sortSelect.value = podcastEpisodesSortMode;
             
@@ -5239,6 +5294,7 @@ async function loadEpisodesPage() {
                     <div class="episodes-header-right">
                         ${episodes.length > 1 ? `
                         <div class="episodes-header-controls">
+                            ${isBook ? '<span class="episodes-order-msg">Default: oldest first (1, 2, 3…).</span>' : ''}
                             <div class="sort-controls-inline">
                                 <label for="podcast-episodes-sort-select-inline" class="sort-label-inline">Sort:</label>
                                 <select id="podcast-episodes-sort-select-inline" class="sort-select-inline" onchange="applyPodcastEpisodesSorting()">
@@ -5304,14 +5360,8 @@ async function loadEpisodesPage() {
                 
                 const episodeInQueue = isInQueue(episode.id);
                 return `
-                    <div class="episode-item ${isCompleted ? 'episode-completed' : ''} ${isCurrentEpisode ? 'episode-playing' : ''}" 
+                    <div class="episode-item episode-item-no-art ${isCompleted ? 'episode-completed' : ''} ${isCurrentEpisode ? 'episode-playing' : ''}" 
                          oncontextmenu="event.preventDefault(); showEpisodeContextMenu(event, '${episode.id}', '${currentPodcast.id}');">
-                        <div class="episode-item-image">
-                            <img src="${sanitizeImageUrl(currentPodcast.image_url) || getPlaceholderImage()}" 
-                                 alt="${escapeHtml(currentPodcast.title || '')}" 
-                                 class="episode-list-artwork"
-                                 onerror="this.src='${getPlaceholderImage()}'">
-                        </div>
                         <button class="btn-episode-play ${isEpisodePlaying ? 'playing' : ''}" onclick="event.stopPropagation(); ${isEpisodePlaying ? 'togglePlayPause()' : `playEpisode(${JSON.stringify(episode).replace(/"/g, '&quot;')})`}" title="${isEpisodePlaying ? 'Pause' : 'Play'}">
                             <span class="episode-play-icon" data-episode-id="${episode.id}">${isEpisodePlaying ? '⏸' : '▶'}</span>
                         </button>
@@ -5324,7 +5374,7 @@ async function loadEpisodesPage() {
                             </div>
                             ${progressBar}
                         </div>
-                        <div style="display: flex; gap: 6px; align-items: center;">
+                        <div class="episode-item-actions">
                             ${episodeInQueue ? '<span class="episode-queue-indicator" title="In queue">✓</span>' : ''}
                             <button class="btn-favorite ${isFavorite ? 'favorited' : ''}" onclick="event.stopPropagation(); toggleEpisodeFavorite('${episode.id}', '${currentPodcast.id}')" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
                                 ${isFavorite ? '❤️' : '🤍'}
@@ -6244,6 +6294,15 @@ function findEpisodeDataForItem(item, episodeId) {
     return episode;
 }
 
+// Find episode by id and optional podcastId (for homepage/Library play buttons)
+function findEpisodeByIdAndPodcast(episodeId, podcastId) {
+    let episode = allEpisodes.find(e => String(e.id) === String(episodeId));
+    if (!episode && podcastId && episodesCache[podcastId]) {
+        episode = episodesCache[podcastId].find(e => String(e.id) === String(episodeId));
+    }
+    return episode || null;
+}
+
 // Update play/pause button
 function updatePlayPauseButton() {
     const icon = document.getElementById('play-icon-bar');
@@ -6300,6 +6359,28 @@ function updatePlayPauseButton() {
     if (currentPage === 'favorites') {
         updateEpisodeListInPlace();
     }
+    
+    // Update Recently Listened / homepage small play buttons (Library and personalized homepage)
+    document.querySelectorAll('.btn-episode-play-small').forEach(btn => {
+        const episodeId = btn.getAttribute('data-episode-id');
+        const podcastId = btn.getAttribute('data-podcast-id');
+        if (!episodeId || !podcastId) return;
+        const episode = findEpisodeByIdAndPodcast(episodeId, podcastId);
+        const isCurrent = currentEpisode && String(currentEpisode.id) === String(episodeId);
+        const playing = isCurrent && isPlaying;
+        const span = btn.querySelector('span');
+        if (span) span.textContent = playing ? '⏸' : '▶';
+        btn.classList.toggle('playing', playing);
+        btn.removeAttribute('onclick');
+        btn.onclick = function(e) {
+            e.stopPropagation();
+            if (playing) togglePlayPause();
+            else {
+                const ep = episode || findEpisodeByIdAndPodcast(episodeId, podcastId);
+                if (ep) playEpisode(ep);
+            }
+        };
+    });
     
     // Update episode detail page favorite button if visible
     if (currentPage === 'episode' && displayedEpisode) {
@@ -6776,6 +6857,7 @@ function setupAuth() {
             updateAuthUI(null);
             syncEnabled = false;
             localStorage.removeItem('user_sync_enabled');
+            localStorage.removeItem(USER_VISIBLE_CATEGORIES_KEY);
         }
     });
 }
@@ -6845,25 +6927,68 @@ function updateAuthUI(user) {
         authButton.textContent = user.email ? user.email.split('@')[0] : 'Account';
         authButton.classList.add('signed-in');
     } else {
-        authButton.textContent = 'Sign Up';
+        authButton.textContent = 'Save Progress';
         authButton.classList.remove('signed-in');
+        userVisibleCategories = null;
     }
 }
 
-// Toggle auth modal
+// Account dropdown (when signed in: click username opens this instead of modal)
+window.closeAccountDropdown = function() {
+    const dropdown = document.getElementById('account-dropdown');
+    if (dropdown) dropdown.classList.add('hidden');
+    document.removeEventListener('click', closeAccountDropdownOnClickOutside);
+};
+
+function closeAccountDropdownOnClickOutside(e) {
+    const container = document.getElementById('auth-button-container');
+    const dropdown = document.getElementById('account-dropdown');
+    if (container && dropdown && !container.contains(e.target)) {
+        closeAccountDropdown();
+    }
+}
+
+function openAccountDropdown(user) {
+    const dropdown = document.getElementById('account-dropdown');
+    if (!dropdown) return;
+    const emailEl = document.getElementById('account-dropdown-email');
+    const statsEl = document.getElementById('account-dropdown-stats');
+    if (emailEl) emailEl.textContent = user.email || 'Signed in';
+    if (statsEl) {
+        const history = getHistory();
+        const favs = getFavorites();
+        const queue = getQueue();
+        const historyCount = history.length;
+        const favCount = (favs.podcasts && favs.podcasts.length) + (favs.episodes && favs.episodes.length ? favs.episodes.length : 0);
+        const queueCount = queue.length;
+        statsEl.innerHTML = [
+            historyCount ? `${historyCount} in listening history` : 'No listening history yet',
+            favCount ? `${favCount} favorite${favCount !== 1 ? 's' : ''}` : null,
+            queueCount ? `${queueCount} in queue` : null
+        ].filter(Boolean).join(' · ') || 'Start playing to see your stats here.';
+    }
+    dropdown.classList.remove('hidden');
+    setTimeout(() => document.addEventListener('click', closeAccountDropdownOnClickOutside), 0);
+}
+
+// Toggle auth modal (or account dropdown when signed in)
 window.toggleAuthModal = async function() {
     const modal = document.getElementById('auth-modal');
+    const dropdown = document.getElementById('account-dropdown');
     const user = await authService.getCurrentUser();
     
     if (user) {
-        // If signed in, show account info
-        showSignedInView(user);
+        modal.classList.add('hidden');
+        if (dropdown && dropdown.classList.contains('hidden')) {
+            openAccountDropdown(user);
+        } else {
+            closeAccountDropdown();
+        }
     } else {
-        // Show sign up form by default
+        closeAccountDropdown();
         switchAuthMode('signup');
+        modal.classList.toggle('hidden');
     }
-    
-    modal.classList.toggle('hidden');
 };
 
 // Close auth modal
@@ -6871,6 +6996,79 @@ window.closeAuthModal = function() {
     const modal = document.getElementById('auth-modal');
     modal.classList.add('hidden');
     clearAuthMessages();
+    closeAccountDropdown();
+};
+
+// Category preferences modal (Customize Library)
+window.openCategoryPreferencesModal = function() {
+    closeAccountDropdown();
+    const savedMsg = document.getElementById('category-pref-saved-msg');
+    const saveBtn = document.getElementById('category-pref-save-btn');
+    if (savedMsg) savedMsg.classList.add('hidden');
+    if (saveBtn) saveBtn.classList.remove('hidden');
+    if (categories.length === 0) extractCategories();
+    const listEl = document.getElementById('category-preferences-list');
+    if (!listEl) return;
+    const allCategories = ['Top 10', ...getCategoriesByPopularity()];
+    const selected = userVisibleCategories && userVisibleCategories.length > 0 ? userVisibleCategories : null;
+    const checkedSet = selected ? new Set(selected) : null;
+    listEl.innerHTML = allCategories.map((cat, i) => {
+        const isChecked = checkedSet === null || checkedSet.has(cat);
+        const safeId = 'cat-pref-' + i;
+        return `
+            <label class="category-pref-item" style="display: flex; align-items: center; gap: 10px; padding: 8px 0; cursor: pointer;">
+                <input type="checkbox" class="category-pref-checkbox" data-category="${escapeHtml(cat)}" ${isChecked ? 'checked' : ''} id="${safeId}">
+                <span>${escapeHtml(cat)}</span>
+            </label>`;
+    }).join('');
+    document.getElementById('category-preferences-modal').classList.remove('hidden');
+};
+
+window.closeCategoryPreferencesModal = function() {
+    document.getElementById('category-preferences-modal').classList.add('hidden');
+};
+
+window.selectAllCategoryPreferences = function() {
+    document.querySelectorAll('#category-preferences-list .category-pref-checkbox').forEach(cb => { cb.checked = true; });
+};
+
+window.deselectAllCategoryPreferences = function() {
+    document.querySelectorAll('#category-preferences-list .category-pref-checkbox').forEach(cb => { cb.checked = false; });
+};
+
+window.saveCategoryPreferences = function() {
+    const savedMsg = document.getElementById('category-pref-saved-msg');
+    const saveBtn = document.getElementById('category-pref-save-btn');
+    try {
+        const checkboxes = document.querySelectorAll('#category-preferences-list .category-pref-checkbox:checked');
+        const allCheckboxes = document.querySelectorAll('#category-preferences-list .category-pref-checkbox');
+        const selected = Array.from(checkboxes).map(el => el.getAttribute('data-category'));
+        if (selected.length === 0 || selected.length === allCheckboxes.length) {
+            userVisibleCategories = null;
+        } else {
+            userVisibleCategories = selected;
+        }
+        localStorage.setItem(USER_VISIBLE_CATEGORIES_KEY, JSON.stringify(userVisibleCategories));
+        const containerEl = document.getElementById('podcast-container');
+        if (containerEl && podcasts.length > 0) {
+            if (categories.length === 0) extractCategories();
+            renderLibraryWithCategoryRows();
+        }
+        if (syncEnabled) {
+            const prefs = JSON.parse(localStorage.getItem(PODCAST_SORT_PREFERENCES_KEY) || '{}');
+            syncToServer().catch(() => {});
+        }
+    } catch (e) {
+        console.error('Save category preferences:', e);
+    }
+    // Always show feedback and close (even if save threw)
+    if (savedMsg) savedMsg.classList.remove('hidden');
+    if (saveBtn) saveBtn.classList.add('hidden');
+    setTimeout(() => {
+        if (savedMsg) savedMsg.classList.add('hidden');
+        if (saveBtn) saveBtn.classList.remove('hidden');
+        closeCategoryPreferencesModal();
+    }, 1200);
 };
 
 // Switch between sign in and sign up
@@ -6903,7 +7101,7 @@ window.switchAuthMode = function(mode) {
     } else {
         // Default to signup
         signupForm.classList.remove('hidden');
-        modalTitle.textContent = 'Sign Up';
+        modalTitle.textContent = 'Save Progress';
     }
 };
 
@@ -6918,7 +7116,7 @@ function showSignedInView(user) {
     signinForm.classList.add('hidden');
     signupForm.classList.add('hidden');
     signedinView.classList.remove('hidden');
-    modalTitle.textContent = 'Account';
+    modalTitle.textContent = 'Your account';
     if (userEmail) {
         userEmail.textContent = user.email || 'User';
     }
@@ -7128,7 +7326,10 @@ async function syncToServer() {
             progress: JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}'),
             history: getHistory(),
             favorites: getFavorites(),
-            sortPreferences: JSON.parse(localStorage.getItem(PODCAST_SORT_PREFERENCES_KEY) || '{}')
+            sortPreferences: {
+                ...JSON.parse(localStorage.getItem(PODCAST_SORT_PREFERENCES_KEY) || '{}'),
+                visible_categories: JSON.parse(localStorage.getItem(USER_VISIBLE_CATEGORIES_KEY) || 'null')
+            }
         };
         
         // Fetch existing data and merge
@@ -7179,7 +7380,11 @@ async function syncToServer() {
                 progress: { ...existing.progress, ...userData.progress },
                 history: uniqueHistory,
                 favorites: mergedFavorites,
-                sortPreferences: { ...existing.sort_preferences, ...userData.sortPreferences }
+                sortPreferences: {
+                    ...existing.sort_preferences,
+                    ...userData.sortPreferences,
+                    visible_categories: userData.sortPreferences.visible_categories !== undefined ? userData.sortPreferences.visible_categories : existing.sort_preferences?.visible_categories
+                }
             };
             await authService.syncUserData(merged);
         } else {
@@ -7269,14 +7474,20 @@ async function syncFromServer() {
             
             if (serverData.sort_preferences) {
                 const localPrefs = JSON.parse(localStorage.getItem(PODCAST_SORT_PREFERENCES_KEY) || '{}');
-                // Merge preferences: server takes precedence
                 const merged = { ...localPrefs, ...serverData.sort_preferences };
                 localStorage.setItem(PODCAST_SORT_PREFERENCES_KEY, JSON.stringify(merged));
                 restorePodcastSortPreferences();
+                if (serverData.sort_preferences.visible_categories !== undefined) {
+                    userVisibleCategories = Array.isArray(serverData.sort_preferences.visible_categories) ? serverData.sort_preferences.visible_categories : null;
+                    localStorage.setItem(USER_VISIBLE_CATEGORIES_KEY, JSON.stringify(userVisibleCategories));
+                }
             }
             
             // Refresh UI
             renderSidebar();
+            if (currentPage === 'grid') {
+                renderLibraryWithCategoryRows();
+            }
             if (currentPage === 'favorites') {
                 loadFavoritesPage();
             } else if (currentPage === 'history') {

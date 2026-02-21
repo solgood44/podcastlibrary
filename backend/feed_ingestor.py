@@ -2,7 +2,7 @@ import csv
 import os
 import time
 import re
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from dateutil import parser as dateparser
 import feedparser
 import httpx
@@ -36,6 +36,10 @@ DELETE_MISSING = os.environ.get("DELETE_MISSING", "true").lower() == "true"
 # ONLY_DAILY_FEEDS: If true, only process feeds that have a "daily" column set (1, true, yes, daily).
 # Add a column "daily" to feeds.csv and set it for feeds you want to refresh when using this.
 ONLY_DAILY_FEEDS = os.environ.get("ONLY_DAILY_FEEDS", "false").lower() == "true"
+# When True, only refresh feeds that are "active" (had an episode in last N days) or new. Skips completed/inactive feeds.
+REFRESH_ACTIVE_ONLY = os.environ.get("REFRESH_ACTIVE_ONLY", "true").lower() == "true"
+# Feeds with no new episode in this many days are considered "complete" and skipped on normal runs.
+ACTIVE_DAYS = int(os.environ.get("REFRESH_ACTIVE_DAYS", "60"))
 
 sb: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -439,6 +443,90 @@ def was_recently_refreshed(last_refreshed_str: str | None, threshold_minutes: in
         return False
 
 
+def get_active_feed_urls(csv_feed_urls: list[str]) -> set[str]:
+    """
+    Return set of feed_urls that should be refreshed this run:
+    - New feeds (in CSV but not in DB)
+    - Feeds where the latest episode pub_date is within ACTIVE_DAYS (still "active")
+    Skips feeds that have no new episode in ACTIVE_DAYS (considered complete/inactive).
+    Uses batched queries to avoid URL length limits.
+    """
+    if not csv_feed_urls:
+        return set()
+    csv_set = set(csv_feed_urls)
+    cutoff = datetime.utcnow() - timedelta(days=ACTIVE_DAYS)
+
+    # Batch size for IN clauses (avoid 414 URI too long)
+    batch_size = 400
+
+    def _get_podcasts_batch(urls_batch):
+        return retry_db_operation(
+            lambda: sb.table("podcasts").select("id, feed_url").in_("feed_url", urls_batch).execute().data
+        )
+
+    feed_to_id = {}
+    for i in range(0, len(csv_feed_urls), batch_size):
+        batch = csv_feed_urls[i : i + batch_size]
+        rows = _get_podcasts_batch(batch) or []
+        for row in rows:
+            feed_to_id[row["feed_url"]] = row["id"]
+
+    new_feeds = csv_set - set(feed_to_id.keys())
+    podcast_ids = list(feed_to_id.values())
+    if not podcast_ids:
+        return new_feeds
+
+    # Get max(pub_date) per podcast_id from episodes (PostgREST: group by non-aggregate column)
+    id_to_latest = {}
+    for j in range(0, len(podcast_ids), batch_size):
+        id_batch = podcast_ids[j : j + batch_size]
+        try:
+            # Select podcast_id and max pub_date; filter by podcast_id in batch
+            res = retry_db_operation(
+                lambda b=id_batch: sb.table("episodes")
+                .select("podcast_id, pub_date.max()")
+                .in_("podcast_id", b)
+                .execute()
+            )
+            if res and res.data:
+                for row in res.data:
+                    pid = row.get("podcast_id")
+                    # PostgREST may return max as "pub_date" or "max"
+                    latest = row.get("max") or row.get("pub_date")
+                    if pid is not None:
+                        id_to_latest[pid] = latest
+        except Exception as e:
+            # If aggregate not supported or fails, treat all as active (process all)
+            console = Console()
+            console.print(f"[yellow]Could not get latest episode dates ({e}), processing all feeds[/yellow]")
+            return csv_set
+
+    active_feeds = set()
+    for feed_url, pid in feed_to_id.items():
+        latest = id_to_latest.get(pid)
+        # Process if: no episodes yet (latest is None) or latest episode is within ACTIVE_DAYS
+        if latest is None:
+            active_feeds.add(feed_url)
+        else:
+            try:
+                if isinstance(latest, str):
+                    latest_dt = dateparser.parse(latest)
+                else:
+                    latest_dt = latest
+                if latest_dt:
+                    # Compare as UTC naive
+                    if getattr(latest_dt, "tzinfo", None):
+                        latest_utc = latest_dt.astimezone(timezone.utc).replace(tzinfo=None)
+                    else:
+                        latest_utc = latest_dt
+                    if latest_utc >= cutoff:
+                        active_feeds.add(feed_url)
+            except Exception:
+                active_feeds.add(feed_url)  # on parse error, treat as active
+
+    return new_feeds | active_feeds
+
+
 def delete_podcasts_not_in_csv(csv_feed_urls: set[str]):
     """
     Delete podcasts from database whose feed_url is not in the CSV.
@@ -490,6 +578,17 @@ def run_once():
             console.print("[yellow]No feeds marked as daily in CSV (column 'daily' = 1, true, yes, or daily).[/yellow]")
             return
         console.print(f"[cyan]Only processing {len(feeds)} daily feeds (ONLY_DAILY_FEEDS=true)[/cyan]")
+
+    # Only refresh "active" feeds (new or had episode in last ACTIVE_DAYS); skip completed/inactive
+    if REFRESH_ACTIVE_ONLY and not (BATCH_SIZE and BATCH_SIZE > 0):
+        csv_urls = [f[0] for f in feeds]
+        active_urls = get_active_feed_urls(csv_urls)
+        feeds = [f for f in feeds if f[0] in active_urls]
+        skipped_inactive = len(csv_urls) - len(feeds)
+        if skipped_inactive > 0:
+            console.print(f"[cyan]✓ Only refreshing active feeds (new or episode in last {ACTIVE_DAYS} days)[/cyan]")
+            console.print(f"[cyan]  Processing {len(feeds)} feeds, skipping {skipped_inactive} inactive/complete[/cyan]")
+
     # Process all feeds unless BATCH_SIZE is explicitly set
     if BATCH_SIZE and BATCH_SIZE > 0:
         feeds_to_process = feeds[:BATCH_SIZE]
@@ -497,7 +596,7 @@ def run_once():
         console.print(f"[yellow]   (To process all feeds, unset REFRESH_BATCH_SIZE or set it to 0/all)[/yellow]")
     else:
         feeds_to_process = feeds
-        if not ONLY_DAILY_FEEDS:
+        if not ONLY_DAILY_FEEDS and not REFRESH_ACTIVE_ONLY:
             console.print(f"[green]✓ Processing all {len(all_feeds)} feeds[/green]")
     # Normalize to (feed_url, genre_override) for the loop
     feeds_to_process = [(f[0], f[1]) for f in feeds_to_process]
