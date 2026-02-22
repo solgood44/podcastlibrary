@@ -9,12 +9,32 @@ const nextConfig = {
       { source: '/web/', destination: '/web/index.html', permanent: false },
     ];
   },
-  // Rewrites: serve SPA for app routes so URL stays (e.g. /podcast/xxx stays on refresh)
+  // Rewrites: serve SPA for app routes so URL stays (e.g. /podcast/xxx, /favorites, /recent stay on refresh)
   async rewrites() {
     return [
       {
         source: '/web/:path*',
         destination: '/web/:path*',
+      },
+      {
+        source: '/recent',
+        destination: '/web/index.html',
+      },
+      {
+        source: '/favorites',
+        destination: '/web/index.html',
+      },
+      {
+        source: '/authors',
+        destination: '/web/index.html',
+      },
+      {
+        source: '/search',
+        destination: '/web/index.html',
+      },
+      {
+        source: '/category/:path*',
+        destination: '/web/index.html',
       },
       {
         source: '/',

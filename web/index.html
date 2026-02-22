@@ -61,32 +61,32 @@
         </div>
         
         <div class="sidebar-section">
-            <div class="sidebar-item" onclick="navigateTo('grid', 'library')" id="sidebar-item-library">
+            <a href="/" class="sidebar-item" id="sidebar-item-library">
                 <span class="sidebar-item-icon">📚</span>
                 <span class="sidebar-item-title">Library</span>
-            </div>
-            <div class="sidebar-item" onclick="navigateTo('recent')" id="sidebar-item-recent">
+            </a>
+            <a href="/recent" class="sidebar-item" id="sidebar-item-recent">
                 <span class="sidebar-item-icon">🕐</span>
                 <span class="sidebar-item-title">Recently Listened To</span>
                 <span id="sidebar-recent-count" class="sidebar-item-count">0</span>
-            </div>
-            <div class="sidebar-item" onclick="navigateTo('favorites')" id="sidebar-item-favorites">
+            </a>
+            <a href="/favorites" class="sidebar-item" id="sidebar-item-favorites">
                 <span class="sidebar-item-icon">⭐</span>
                 <span class="sidebar-item-title">Favorites</span>
                 <span id="sidebar-favorites-count" class="sidebar-item-count">0</span>
-            </div>
+            </a>
         </div>
         
         <div class="sidebar-section">
-            <div class="sidebar-item" onclick="openSearchModal()">
+            <a href="/search" class="sidebar-item" id="sidebar-item-search">
                 <span class="sidebar-item-icon">🔍</span>
                 <span class="sidebar-item-title">Search</span>
-            </div>
-            <div class="sidebar-item" onclick="navigateTo('authors')" id="sidebar-item-authors">
+            </a>
+            <a href="/authors" class="sidebar-item" id="sidebar-item-authors">
                 <span class="sidebar-item-icon">✍️</span>
                 <span class="sidebar-item-title">Authors</span>
                 <span id="sidebar-authors-count" class="sidebar-item-count">0</span>
-            </div>
+            </a>
             
             <!-- Sleep Timer (visible on mobile, hidden on desktop when player bar is visible) -->
             <div id="sidebar-sleep-timer" class="sidebar-sleep-timer-section hidden">

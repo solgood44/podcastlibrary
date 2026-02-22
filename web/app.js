@@ -265,6 +265,29 @@ document.addEventListener('DOMContentLoaded', () => {
     audioPlayer = document.getElementById('audio-player');
     setupAudioPlayer();
     setupRouting();
+    // Sidebar + category links: same as podcast/author — prevent default, use pushState so URL updates
+    document.addEventListener('click', (e) => {
+        const a = e.target.closest('a.sidebar-item[href^="/"], a.homepage-category-title-link[href^="/category/"]');
+        if (!a) return;
+        const path = (a.getAttribute('href') || '').replace(/^#.*$/, '').trim();
+        if (!path || path.includes('//')) return;
+        e.preventDefault();
+        if (path === '/') {
+            navigateTo('grid', 'library');
+        } else if (path === '/recent') {
+            navigateTo('recent');
+        } else if (path === '/favorites') {
+            navigateTo('favorites');
+        } else if (path === '/authors') {
+            navigateTo('authors');
+        } else if (path === '/search') {
+            openSearchModal();
+        } else if (path.startsWith('/category/')) {
+            const slug = path.replace(/^\/category\//, '').replace(/\/$/, '');
+            const categoryName = getCategoryBySlug(slug);
+            if (categoryName) showCategory(categoryName);
+        }
+    });
     // Initialize sleep timer UI to show sidebar timer
     updateSleepTimerUI();
     setupAuth(); // Initialize authentication
@@ -499,6 +522,41 @@ function setupRouting() {
             }
         }
         
+        // Sidebar routes
+        if (path === '/recent') {
+            loadRecentlyListenedPage();
+            showPage('recent');
+            updateActiveSidebarItem('recent');
+            return;
+        }
+        if (path === '/favorites') {
+            loadFavoritesPage();
+            showPage('favorites');
+            updateActiveSidebarItem('favorites');
+            return;
+        }
+        if (path === '/authors') {
+            loadAuthorsPage();
+            showPage('authors');
+            updateActiveSidebarItem('authors');
+            return;
+        }
+        if (path === '/search') {
+            showPage('grid');
+            openSearchModal();
+            return;
+        }
+        const catMatch = path.match(/^\/category\/([^/]+)/);
+        if (catMatch) {
+            const categoryName = getCategoryBySlug(catMatch[1]);
+            if (categoryName) {
+                currentCategory = categoryName;
+                showCategoryPage(categoryName);
+                updateActiveSidebarItem('category', categoryName);
+                return;
+            }
+        }
+        
         // Handle /web/ root path - go to Library (home screen)
         if (path === '/web/' || path === '/web' || path === '/') {
             navigateTo('grid', 'library');
@@ -511,11 +569,34 @@ function setupRouting() {
 }
 
 function navigateTo(page, param = null) {
+    // Sidebar URLs (address bar updates on click; refresh and back/forward work):
+    //   Library → /   |   Recently Listened To → /recent   |   Favorites → /favorites
+    //   Search → /search (set in openSearchModal)   |   Authors → /authors
+    //   Categories → /category/:slug (e.g. /category/books). Set in navigateTo and showCategory().
+    const path = window.location.pathname;
+    if (page === 'grid') {
+        const isDeepLink = path.startsWith('/podcast/') || path.startsWith('/author/') || path.startsWith('/genre/');
+        if (!isDeepLink && path !== '/' && path !== '/web' && path !== '/web/') {
+            window.history.pushState({ page: 'grid', param }, '', '/');
+        }
+    } else if (page === 'recent' || page === 'history' || page === 'queue') {
+        if (path !== '/recent') window.history.pushState({ page: 'recent' }, '', '/recent');
+    } else if (page === 'favorites') {
+        if (path !== '/favorites') window.history.pushState({ page: 'favorites' }, '', '/favorites');
+    } else if (page === 'authors') {
+        if (path !== '/authors') window.history.pushState({ page: 'authors' }, '', '/authors');
+    } else if (page === 'category' && param) {
+        const categoryPath = '/category/' + getCategorySlug(String(param).trim());
+        if (path !== categoryPath) window.history.pushState({ page: 'category', param }, '', categoryPath);
+        else window.history.replaceState({ page: 'category', param }, '', categoryPath);
+    }
+    // Search URL is set in openSearchModal() when the modal opens
+
     showPage(page);
     
     // Track page view
     if (window.analytics) {
-        const pageName = page === 'grid' ? 'Library' : 
+        const pageName = page === 'grid' ? 'Library' :
                         page === 'episodes' ? 'Podcast Episodes' :
                         page === 'player' ? 'Player' :
                         page === 'search' ? 'Search' :
@@ -546,13 +627,6 @@ function navigateTo(page, param = null) {
     
     // Load page-specific content
     if (page === 'grid') {
-        // Library is the home page. Use / as canonical URL — but don't overwrite deep links (podcast/author/genre)
-        // so that on refresh, handleURLParams() can run and open the right page before we touch the URL.
-        const p = window.location.pathname;
-        const isDeepLink = p.startsWith('/podcast/') || p.startsWith('/author/') || p.startsWith('/genre/');
-        if (!isDeepLink && p !== '/' && p !== '/web' && p !== '/web/') {
-            window.history.pushState({ page: 'grid', param }, '', '/');
-        }
         currentPodcast = null; // Clear current podcast when going to grid
         if (searchMode !== 'podcasts') {
             setSearchMode('podcasts');
@@ -899,6 +973,18 @@ function extractCategories() {
     categories = Array.from(categorySet).sort();
 }
 
+// Category URL slug: "Arts" → "arts", "Alternative Health" → "alternative-health"
+function getCategorySlug(categoryName) {
+    return String(categoryName || '').toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+}
+
+// Resolve category name from URL slug (must have categories loaded)
+function getCategoryBySlug(slug) {
+    if (categories.length === 0) extractCategories();
+    const norm = String(slug || '').toLowerCase().trim();
+    return categories.find(c => getCategorySlug(c) === norm) || null;
+}
+
 // Extract unique authors from podcasts (excluding specified ones)
 function extractAuthors() {
     const authorSet = new Set();
@@ -941,6 +1027,10 @@ function updateActiveSidebarItem(page = currentPage, pageParam = null) {
         activeId = 'sidebar-item-favorites';
     } else if (page === 'authors' || page === 'author') {
         activeId = 'sidebar-item-authors';
+    } else if (page === 'search') {
+        activeId = 'sidebar-item-search';
+    } else if (page === 'category' && pageParam) {
+        activeId = 'sidebar-item-category-' + getCategorySlug(pageParam);
     }
     
     if (activeId) {
@@ -991,6 +1081,12 @@ function loadRecentlyListenedPage() {
             const isFavorite = isEpisodeFavorited(episode.id);
             const episodeInQueue = isInQueue(episode.id);
             const progressBar = `<div class="progress-bar"><div class="progress-fill" style="width: ${epProgress}%"></div></div>`;
+            const resumeAtSeconds = (episode.duration_seconds && epProgress > 0 && epProgress < 100)
+                ? (epProgress / 100) * episode.duration_seconds
+                : 0;
+            const progressLabel = resumeAtSeconds
+                ? `${Math.round(epProgress)}% · Resume at ${formatTime(resumeAtSeconds)}`
+                : `${Math.round(epProgress)}%`;
             return `
                 <div class="episode-item episode-in-progress ${isCurrentEpisode ? 'episode-playing' : ''}" 
                      oncontextmenu="event.preventDefault(); showEpisodeContextMenu(event, '${episode.id}', '${podcast.id}');">
@@ -1009,11 +1105,11 @@ function loadRecentlyListenedPage() {
                             <span onclick="event.stopPropagation(); openEpisodes('${podcast.id}')" style="cursor: pointer; text-decoration: underline;">${escapeHtml(podcast.title || 'Unknown Podcast')}</span>
                             ${episode.pub_date ? `<span>• ${formatDate(episode.pub_date)}</span>` : ''}
                             ${episode.duration_seconds ? `<span>• ${formatDuration(episode.duration_seconds)}</span>` : ''}
-                            <span class="episode-progress-text">${Math.round(epProgress)}%</span>
+                            <span class="episode-progress-text">${progressLabel}</span>
                         </div>
                         ${progressBar}
                     </div>
-                    <div style="display: flex; gap: 8px; align-items: center;">
+                    <div class="episode-item-actions">
                         <button class="btn-queue-small ${episodeInQueue ? 'in-queue' : ''}" 
                                 onclick="event.stopPropagation(); ${episodeInQueue ? `removeFromQueue('${episode.id}')` : `addToQueue('${episode.id}', '${podcast.id}')`}; loadRecentlyListenedPage(); renderSidebar();" 
                                 title="${episodeInQueue ? 'Remove from queue' : 'Add to queue'}">
@@ -2767,13 +2863,16 @@ function renderCategories() {
         return;
     }
     
-    categoriesEl.innerHTML = categories.map(category => `
-        <div class="sidebar-item" onclick="showCategory('${escapeHtml(category)}')">
+    categoriesEl.innerHTML = categories.map(category => {
+        const slug = getCategorySlug(category);
+        return `
+        <a href="/category/${slug}" class="sidebar-item" id="sidebar-item-category-${slug}">
             <span class="sidebar-item-icon">${getCategoryEmoji(category)}</span>
             <span class="sidebar-item-title">${escapeHtml(category)}</span>
             <span class="sidebar-item-count">${getCategoryCount(category)}</span>
-        </div>
-    `).join('');
+        </a>
+    `;
+    }).join('');
 }
 
 // Get count of podcasts in category
@@ -2882,10 +2981,10 @@ function getCategoryRowsHtml() {
         rowPodcasts.forEach(p => shownInRows.add(p.id));
         const emoji = categoryName === 'All Podcasts' ? '🎙️' : getCategoryEmoji(categoryName);
         const categoryEscaped = escapeHtml(categoryName);
-        const categoryAttr = String(categoryName).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const categorySlug = getCategorySlug(categoryName);
         const titleContent = categoryName === 'All Podcasts'
             ? `${emoji} ${categoryEscaped}`
-            : `<a href="#" class="homepage-category-title-link" data-category="${categoryAttr}" onclick="event.preventDefault(); showCategory(this.getAttribute('data-category')); return false;">${emoji} ${categoryEscaped}</a>`;
+            : `<a href="/category/${categorySlug}" class="homepage-category-title-link">${emoji} ${categoryEscaped}</a>`;
         html += `
             <div class="homepage-category-row">
                 <div class="homepage-section-header homepage-category-row-header">
@@ -3010,8 +3109,16 @@ function renderLibraryWithCategoryRows() {
 
 // Show category page
 function showCategory(categoryName) {
-    currentCategory = categoryName;
-    navigateTo('category', categoryName);
+    if (!categoryName || typeof categoryName !== 'string') return;
+    const name = categoryName.trim();
+    currentCategory = name;
+    const categoryPath = '/category/' + getCategorySlug(name);
+    if (window.location.pathname !== categoryPath) {
+        window.history.pushState({ page: 'category', param: name }, '', categoryPath);
+    } else {
+        window.history.replaceState({ page: 'category', param: name }, '', categoryPath);
+    }
+    navigateTo('category', name);
 }
 
 function showCategoryPage(categoryName) {
@@ -3560,6 +3667,48 @@ function handleURLParams() {
     if (pendingRoute) {
         path = pendingRoute;
         sessionStorage.removeItem('pendingRoute');
+    }
+    
+    // Sidebar routes: /recent, /favorites, /authors, /search, /category/:slug
+    if (path === '/recent') {
+        window.history.replaceState({ page: 'recent' }, '', '/recent');
+        loadRecentlyListenedPage();
+        showPage('recent');
+        updateActiveSidebarItem('recent');
+        return;
+    }
+    if (path === '/favorites') {
+        window.history.replaceState({ page: 'favorites' }, '', '/favorites');
+        loadFavoritesPage();
+        showPage('favorites');
+        updateActiveSidebarItem('favorites');
+        return;
+    }
+    if (path === '/authors') {
+        window.history.replaceState({ page: 'authors' }, '', '/authors');
+        loadAuthorsPage();
+        showPage('authors');
+        updateActiveSidebarItem('authors');
+        return;
+    }
+    if (path === '/search') {
+        window.history.replaceState({ page: 'search' }, '', '/search');
+        currentPage = 'search';
+        showPage('grid');
+        updateActiveSidebarItem('search');
+        setTimeout(() => openSearchModal(), 100);
+        return;
+    }
+    const categoryPathMatch = path.match(/^\/category\/([^/]+)/);
+    if (categoryPathMatch) {
+        const categoryName = getCategoryBySlug(categoryPathMatch[1]);
+        if (categoryName) {
+            currentCategory = categoryName;
+            window.history.replaceState({ page: 'category', param: categoryName }, '', path);
+            showCategoryPage(categoryName);
+            updateActiveSidebarItem('category', categoryName);
+            return;
+        }
     }
     
     // Check for /podcast/[slug] path (from shared link, middleware redirect, or ?slug=)
@@ -5603,6 +5752,9 @@ function openSearchModal() {
     const modal = document.getElementById('search-modal');
     const input = document.getElementById('search-modal-input');
     if (modal) {
+        if (window.location.pathname !== '/search') {
+            window.history.pushState({ page: 'search' }, '', '/search');
+        }
         modal.classList.remove('hidden');
         // Sync search mode with main search
         setSearchModeModal(searchMode);
@@ -5627,6 +5779,9 @@ function openSearchModal() {
 function closeSearchModal() {
     const modal = document.getElementById('search-modal');
     if (modal) {
+        if (window.location.pathname === '/search') {
+            window.history.back();
+        }
         modal.classList.add('hidden');
         // Restore body scroll
         document.body.style.overflow = '';
