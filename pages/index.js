@@ -6,8 +6,8 @@ export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    // Redirect to the SPA
-    router.replace('/web/');
+    // Redirect to root (SPA is served there via rewrite; avoid /web/ so refresh stays on /)
+    router.replace('/');
   }, [router]);
 
   return null;

@@ -546,9 +546,12 @@ function navigateTo(page, param = null) {
     
     // Load page-specific content
     if (page === 'grid') {
-        // Library is the home page: category rows + Browse All grid for both Home and Library
-        if (window.location.pathname !== '/web/' && window.location.pathname !== '/web') {
-            window.history.pushState({ page: 'grid', param }, '', '/web/');
+        // Library is the home page. Use / as canonical URL — but don't overwrite deep links (podcast/author/genre)
+        // so that on refresh, handleURLParams() can run and open the right page before we touch the URL.
+        const p = window.location.pathname;
+        const isDeepLink = p.startsWith('/podcast/') || p.startsWith('/author/') || p.startsWith('/genre/');
+        if (!isDeepLink && p !== '/' && p !== '/web' && p !== '/web/') {
+            window.history.pushState({ page: 'grid', param }, '', '/');
         }
         currentPodcast = null; // Clear current podcast when going to grid
         if (searchMode !== 'podcasts') {
@@ -704,7 +707,7 @@ function updatePageTitle(page) {
     updateMetaTag('og:image', image);
     // Only set og:url for the base SPA, not for individual pages to avoid canonical conflicts
     if (page === 'grid' || page === 'authors' || page === 'favorites' || page === 'recent' || page === 'history' || page === 'search') {
-        updateMetaTag('og:url', 'https://podcastlibrary.org/web/');
+        updateMetaTag('og:url', 'https://podcastlibrary.org/');
     } else {
         // For podcast/author pages, don't set og:url to avoid canonical conflicts
         // The Next.js pages handle canonical tags
@@ -752,7 +755,7 @@ function goBack() {
 // Go back to library from episodes (used when there is no history to go back to)
 function goBackToLibrary() {
     currentPodcast = null;
-    window.history.pushState({ page: 'grid' }, '', '/web/');
+    window.history.pushState({ page: 'grid' }, '', '/');
     navigateTo('grid');
 }
 
@@ -794,7 +797,7 @@ function goBackToEpisode() {
         window.history.pushState({ podcastId: currentPodcast.id, page: 'episodes' }, '', `/podcast/${slug}`);
         navigateTo('episodes');
     } else {
-        window.history.pushState({ page: 'grid' }, '', '/web/');
+        window.history.pushState({ page: 'grid' }, '', '/');
         navigateTo('grid');
     }
 }
@@ -3698,7 +3701,7 @@ function goBackFromEpisode() {
         window.history.pushState({ podcastId: currentPodcast.id, page: 'episodes' }, '', `/podcast/${slug}`);
         navigateTo('episodes');
     } else {
-        window.history.pushState({ page: 'grid' }, '', '/web/');
+        window.history.pushState({ page: 'grid' }, '', '/');
         navigateTo('grid');
     }
 }
