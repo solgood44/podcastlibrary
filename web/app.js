@@ -3538,16 +3538,18 @@ function openEpisodeDetail(episodeId, podcastId) {
 // Handle URL parameters from SEO pages (e.g., ?episode=123&podcast=456)
 function handleURLParams() {
     let path = window.location.pathname;
-    
-    // Check for _route query param (from middleware redirect)
     const urlParams = new URLSearchParams(window.location.search);
+    
+    // Check for _route query param (from middleware redirect when user opens /podcast/slug)
     const routeParam = urlParams.get('_route');
     if (routeParam) {
         path = routeParam;
-        // Clean up the URL by removing the query param
-        const newUrl = new URL(window.location.href);
-        newUrl.searchParams.delete('_route');
-        window.history.replaceState({}, '', newUrl.pathname + newUrl.search);
+    }
+    
+    // Support ?slug=xxx so pasting /web/?slug=my-show or opening with slug param goes to that show
+    const slugParam = urlParams.get('slug');
+    if (slugParam && slugParam.trim()) {
+        path = '/podcast/' + slugParam.trim();
     }
     
     // Check sessionStorage for a pending route (from 404 redirect or SEO page)
@@ -3557,7 +3559,15 @@ function handleURLParams() {
         sessionStorage.removeItem('pendingRoute');
     }
     
-    // Check for /podcast/[slug] path (from shared link or middleware redirect via ?_route=)
+    // Clean up URL: remove _route and slug from query so we can set canonical URL after match
+    const newUrl = new URL(window.location.href);
+    if (newUrl.searchParams.has('_route') || newUrl.searchParams.has('slug')) {
+        newUrl.searchParams.delete('_route');
+        newUrl.searchParams.delete('slug');
+        window.history.replaceState({}, '', newUrl.pathname + (newUrl.search || ''));
+    }
+    
+    // Check for /podcast/[slug] path (from shared link, middleware redirect, or ?slug=)
     const podcastMatch = path.match(/^\/podcast\/([^\/]+)/);
     if (podcastMatch) {
         const slugRaw = podcastMatch[1];
@@ -4977,13 +4987,13 @@ function getDefaultPodcastSortOrder(podcast, episodes = []) {
         return 'date-asc';
     }
     
-    // Podcast title has numbers but no chapters/acts/sections in episodes → newest first
-    if (/\d/.test(podcast.title || '')) {
+    // More than 100 episodes → newest first (e.g. daily/news shows)
+    if (episodes && episodes.length > 100) {
         return 'date-desc';
     }
     
-    // Default: newest first (daily shows, news, etc.)
-    return 'date-desc';
+    // Default: oldest to newest (1 at top) for all other shows
+    return 'date-asc';
 }
 
 // Returns true if podcast is ordered content (book/audiobook) and should always show episodes 1,2,3...
@@ -7088,7 +7098,7 @@ window.switchAuthMode = function(mode) {
     } else {
         // signup
         signupForm.classList.remove('hidden');
-        modalTitle.textContent = 'Save Progress';
+        modalTitle.textContent = 'Create account';
     }
 };
 
