@@ -9,15 +9,13 @@ const nextConfig = {
       { source: '/web/', destination: '/web/index.html', permanent: false },
     ];
   },
-  // Rewrites for dev mode (Vercel uses vercel.json in production)
+  // Rewrites: serve SPA for app routes so URL stays (e.g. /podcast/xxx stays on refresh)
   async rewrites() {
     return [
-      // Serve SPA from /web directory
       {
         source: '/web/:path*',
         destination: '/web/:path*',
       },
-      // Root redirects to web
       {
         source: '/',
         destination: '/web/index.html',

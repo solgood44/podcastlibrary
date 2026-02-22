@@ -15,36 +15,10 @@ export function middleware(request) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  // For podcast routes, redirect real users to SPA, keep for bots
-  if (pathname.startsWith('/podcast/')) {
-    // Only redirect if NOT a bot
+  // For podcast/author/genre: bots get Next.js SEO page; users get SPA via rewrite so URL stays (refresh works)
+  if (pathname.startsWith('/podcast/') || pathname.startsWith('/author/') || pathname.startsWith('/genre/')) {
     if (!isBot) {
-      // Redirect to SPA, preserving the path in sessionStorage via query param
-      // The SPA will check this and route correctly
-      const redirectUrl = new URL('/web/', request.url);
-      redirectUrl.searchParams.set('_route', pathname);
-      return NextResponse.redirect(redirectUrl);
-    }
-  }
-
-  // For author routes, redirect real users to SPA, keep for bots
-  if (pathname.startsWith('/author/')) {
-    // Only redirect if NOT a bot
-    if (!isBot) {
-      // Redirect to SPA, preserving the path in sessionStorage via query param
-      const redirectUrl = new URL('/web/', request.url);
-      redirectUrl.searchParams.set('_route', pathname);
-      return NextResponse.redirect(redirectUrl);
-    }
-  }
-
-  // For genre routes, redirect real users to SPA, keep for bots
-  if (pathname.startsWith('/genre/')) {
-    // Only redirect if NOT a bot
-    if (!isBot) {
-      const redirectUrl = new URL('/web/', request.url);
-      redirectUrl.searchParams.set('_route', pathname);
-      return NextResponse.redirect(redirectUrl);
+      return NextResponse.rewrite(new URL('/web/index.html', request.url));
     }
   }
 
