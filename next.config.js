@@ -9,38 +9,41 @@ const nextConfig = {
       { source: '/web/', destination: '/web/index.html', permanent: false },
     ];
   },
-  // Rewrites: serve SPA for app routes so URL stays (e.g. /podcast/xxx, /favorites, /recent stay on refresh)
+  // Rewrites: serve SPA for app routes. Use beforeFiles so these run before page routes,
+  // otherwise / would be handled by pages/index.js instead of serving the SPA.
   async rewrites() {
-    return [
-      {
-        source: '/web/:path*',
-        destination: '/web/:path*',
-      },
-      {
-        source: '/recent',
-        destination: '/web/index.html',
-      },
-      {
-        source: '/favorites',
-        destination: '/web/index.html',
-      },
-      {
-        source: '/authors',
-        destination: '/web/index.html',
-      },
-      {
-        source: '/search',
-        destination: '/web/index.html',
-      },
-      {
-        source: '/category/:path*',
-        destination: '/web/index.html',
-      },
-      {
-        source: '/',
-        destination: '/web/index.html',
-      },
-    ];
+    return {
+      beforeFiles: [
+        {
+          source: '/web/:path*',
+          destination: '/web/:path*',
+        },
+        {
+          source: '/recent',
+          destination: '/web/index.html',
+        },
+        {
+          source: '/favorites',
+          destination: '/web/index.html',
+        },
+        {
+          source: '/authors',
+          destination: '/web/index.html',
+        },
+        {
+          source: '/search',
+          destination: '/web/index.html',
+        },
+        {
+          source: '/category/:path*',
+          destination: '/web/index.html',
+        },
+        {
+          source: '/',
+          destination: '/web/index.html',
+        },
+      ],
+    };
   },
   
   // Output configuration

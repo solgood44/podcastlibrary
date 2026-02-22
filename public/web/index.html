@@ -450,6 +450,17 @@
             </div>
             <div id="all-episodes-list" class="episodes-full-page"></div>
         </div>
+
+        <!-- 404 Page -->
+        <div id="page-404" class="page hidden">
+            <div class="page-404-content">
+                <span class="page-404-emoji" aria-hidden="true">🎧</span>
+                <h1 class="page-404-title">404</h1>
+                <p class="page-404-subtitle">This page doesn’t exist — looks like you wandered off the playlist.</p>
+                <p class="page-404-hint">No worries! Hit the button below and we’ll get you back to the good stuff.</p>
+                <a href="/" class="page-404-btn" onclick="event.preventDefault(); navigateTo('grid', 'library'); return false;">Explore our library</a>
+            </div>
+        </div>
     </main>
 
     <!-- Persistent Audio Player (always visible when playing episodes) -->

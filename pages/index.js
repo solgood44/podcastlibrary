@@ -1,14 +1,10 @@
-// Root page - redirect to SPA
+// Root page: only used if beforeFiles rewrite didn't run (e.g. client nav). Full-page redirect to / so rewrite serves SPA and URL stays /.
 import { useEffect } from 'react';
-import { useRouter } from 'next/router';
 
 export default function Home() {
-  const router = useRouter();
-
   useEffect(() => {
-    // Redirect to root (SPA is served there via rewrite; avoid /web/ so refresh stays on /)
-    router.replace('/');
-  }, [router]);
+    window.location.replace('/');
+  }, []);
 
   return null;
 }

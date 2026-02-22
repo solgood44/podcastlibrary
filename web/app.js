@@ -555,6 +555,8 @@ function setupRouting() {
                 updateActiveSidebarItem('category', categoryName);
                 return;
             }
+            showNotFoundPage();
+            return;
         }
         
         // Handle /web/ root path - go to Library (home screen)
@@ -563,6 +565,9 @@ function setupRouting() {
             currentPodcast = null;
             return;
         }
+        
+        // Unknown path (or podcast/author slug not found)
+        showNotFoundPage();
     });
     
     // Note: Initial URL path check is handled in handleURLParams() after podcasts load
@@ -780,7 +785,10 @@ function updatePageTitle(page) {
     updateMetaTag('og:description', description);
     updateMetaTag('og:image', image);
     // Only set og:url for the base SPA, not for individual pages to avoid canonical conflicts
-    if (page === 'grid' || page === 'authors' || page === 'favorites' || page === 'recent' || page === 'history' || page === 'search') {
+    if (page === '404') {
+        title = `404 - Page Not Found - ${baseTitle}`;
+        description = 'This page doesn’t exist. Explore the podcast library.';
+    } else if (page === 'grid' || page === 'authors' || page === 'favorites' || page === 'recent' || page === 'history' || page === 'search') {
         updateMetaTag('og:url', 'https://podcastlibrary.org/');
     } else {
         // For podcast/author pages, don't set og:url to avoid canonical conflicts
@@ -2854,6 +2862,58 @@ function getCategoryEmoji(category) {
     return '🎙️';
 }
 
+// Netflix-style tagline for category row on home page only (sidebar keeps raw category name).
+function getCategoryHomepageTitle(categoryName) {
+    if (!categoryName || categoryName === 'All Podcasts') return categoryName || 'All Podcasts';
+    const map = {
+        'true crime': 'The mystery that hooks you',
+        'comedy': 'Laugh out loud with us',
+        'news': 'Know what\'s happening out there',
+        'religion': 'Find meaning beyond the everyday',
+        'religion & spirituality': 'Find meaning beyond the everyday',
+        'business': 'Build something that matters',
+        'technology': 'Tomorrow\'s tools in your ears',
+        'arts': 'Where creativity meets the ear',
+        'education': 'Curious? Your next lesson awaits',
+        'health': 'Feel good, inside and out',
+        'politics': 'Power, policy, and the news',
+        'science': 'The world through a new lens',
+        'sports': 'You live for game day',
+        'tv & film': 'Your next obsession starts here',
+        'music': 'Soundtrack your day with us',
+        'daily': 'Fresh every single morning',
+        'entertainment': 'Just hit play and go',
+        'history': 'The past that made us',
+        'storytelling': 'Get lost in a story',
+        'interview': 'Real people, real talk',
+        'discussion': 'Think harder, talk smarter',
+        'science fiction': 'Escape to other worlds',
+        'fantasy': 'Where anything is possible',
+        'self-improvement': 'Become your best self',
+        'personal development': 'Level up your life',
+        'philosophy': 'Big questions, deeper answers',
+        'psychology': 'Why we do what we do',
+        'spirituality': 'Something bigger than yourself',
+        'finance': 'Get your money right',
+        'investing': 'Make your money work',
+        'food': 'Stories you can taste',
+        'travel': 'The world in your ears',
+        'fitness': 'Stronger tomorrow than today',
+        'parenting': 'You\'re not in this alone',
+        'relationships': 'Love and everything between',
+        'society': 'How we live, right now',
+        'culture': 'Ideas that move the world',
+        'alternative health': 'Body and mind, together',
+    };
+    const key = String(categoryName).trim().toLowerCase();
+    if (map[key]) return map[key];
+    // Fallback: if category contains a known key (e.g. "Religion & Spirituality" → religion), use that tagline
+    for (const [mapKey, tagline] of Object.entries(map)) {
+        if (key.includes(mapKey) || mapKey.includes(key)) return tagline;
+    }
+    return categoryName;
+}
+
 // Render categories in sidebar
 function renderCategories() {
     const categoriesEl = document.getElementById('sidebar-categories');
@@ -2922,18 +2982,26 @@ function hashString(str) {
     return h;
 }
 
-// Daily seed: same order all day, new order next day (YYYYMMDD)
+// Daily seed: same order all day, new order next day. Use local date (YYYYMMDD) so rotation is at midnight in the user's timezone.
 function getDailySeed() {
-    return new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return '' + y + m + day;
 }
 
-// Shuffle array deterministically by daily seed (so it feels fresh each day)
+// Shuffle array deterministically by daily seed (same order all day, new order at local midnight).
+// Works for both logged-in (custom categories) and logged-out (all categories by popularity).
 function shuffleWithDailySeed(arr) {
     const seed = getDailySeed();
     return [...arr].sort((a, b) => {
-        const ha = hashString((a.id || a) + seed);
-        const hb = hashString((b.id || b) + seed);
-        return ha - hb;
+        const keyA = (a && (a.id !== undefined && a.id !== null)) ? a.id : String(a);
+        const keyB = (b && (b.id !== undefined && b.id !== null)) ? b.id : String(b);
+        const ha = hashString(keyA + seed);
+        const hb = hashString(keyB + seed);
+        if (ha !== hb) return ha - hb;
+        return keyA < keyB ? -1 : keyA > keyB ? 1 : 0;
     });
 }
 
@@ -2980,11 +3048,12 @@ function getCategoryRowsHtml() {
         const rowPodcasts = categoryPodcasts.slice(0, PER_ROW);
         rowPodcasts.forEach(p => shownInRows.add(p.id));
         const emoji = categoryName === 'All Podcasts' ? '🎙️' : getCategoryEmoji(categoryName);
-        const categoryEscaped = escapeHtml(categoryName);
         const categorySlug = getCategorySlug(categoryName);
+        const displayTitle = getCategoryHomepageTitle(categoryName);
+        const displayTitleEscaped = escapeHtml(displayTitle);
         const titleContent = categoryName === 'All Podcasts'
-            ? `${emoji} ${categoryEscaped}`
-            : `<a href="/category/${categorySlug}" class="homepage-category-title-link">${emoji} ${categoryEscaped}</a>`;
+            ? `${emoji} ${displayTitleEscaped}`
+            : `<a href="/category/${categorySlug}" class="homepage-category-title-link">${emoji} ${displayTitleEscaped}</a>`;
         html += `
             <div class="homepage-category-row">
                 <div class="homepage-section-header homepage-category-row-header">
@@ -3133,7 +3202,7 @@ function showCategoryPage(categoryName) {
     const controlsEl = document.getElementById('category-controls');
     const sortSelect = document.getElementById('category-sort-select');
     
-    titleEl.textContent = categoryName;
+    titleEl.textContent = getCategoryHomepageTitle(categoryName);
     if (controlsEl) controlsEl.classList.remove('hidden');
     if (sortSelect) sortSelect.value = sortMode === 'title-desc' ? 'title-desc' : 'title-asc';
     loadingEl.classList.remove('hidden');
@@ -3709,6 +3778,8 @@ function handleURLParams() {
             updateActiveSidebarItem('category', categoryName);
             return;
         }
+        showNotFoundPage();
+        return;
     }
     
     // Check for /podcast/[slug] path (from shared link, middleware redirect, or ?slug=)
@@ -3734,6 +3805,8 @@ function handleURLParams() {
             loadEpisodesPage();
             return;
         }
+        showNotFoundPage();
+        return;
     }
     
     // Check for /author/[slug] path
@@ -3751,6 +3824,15 @@ function handleURLParams() {
             showAuthorPage(author);
             return;
         }
+        showNotFoundPage();
+        return;
+    }
+    
+    // Library (root)
+    if (path === '/' || path === '/web' || path === '/web/') {
+        navigateTo('grid', 'library');
+        currentPodcast = null;
+        return;
     }
     
     // Handle query parameters
@@ -3778,7 +3860,18 @@ function handleURLParams() {
             window.history.replaceState({}, document.title, `/podcast/${slug}`);
             loadEpisodesPage();
         }
+        return;
     }
+    
+    // Unknown path
+    showNotFoundPage();
+}
+
+function showNotFoundPage() {
+    currentPage = '404';
+    window.history.replaceState({ page: '404' }, '', window.location.pathname);
+    showPage('404');
+    updateActiveSidebarItem(null);
 }
 
 // Load episode detail page
