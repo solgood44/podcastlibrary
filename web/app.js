@@ -474,8 +474,8 @@ function setupRouting() {
         // Handle /podcast/[slug] paths
         const podcastMatch = path.match(/^\/podcast\/([^\/]+)/);
         if (podcastMatch) {
-            const slug = podcastMatch[1];
-            const podcast = podcasts.find(p => generateSlug(p.title || '') === slug);
+            const slugNorm = decodeURIComponent(podcastMatch[1]).toLowerCase().trim();
+            const podcast = podcasts.find(p => generateSlug(p.title || '') === slugNorm || (p.slug && p.slug.toLowerCase() === slugNorm));
             if (podcast) {
                 currentPodcast = podcast;
                 navigateTo('episodes');
@@ -558,7 +558,7 @@ function navigateTo(page, param = null) {
         const containerEl = document.getElementById('podcast-container');
         if (podcasts.length > 0) {
             if (containerEl) containerEl.classList.remove('hidden');
-            // Library: Recently Listened To, Top 10 today, category rows, Browse All
+            // Library: Recently Listened To, category rows, Browse All
             renderLibraryWithCategoryRows();
         } else if (podcasts.length === 0 && allEpisodes.length === 0) {
             // If no podcasts loaded yet, trigger load
@@ -740,11 +740,51 @@ function updateMetaTag(property, content) {
     meta.setAttribute('content', content);
 }
 
-// Go back to library from episodes
+// Go back to previous page (or library if no history)
+function goBack() {
+    if (window.history.length > 1) {
+        window.history.back();
+    } else {
+        goBackToLibrary();
+    }
+}
+
+// Go back to library from episodes (used when there is no history to go back to)
 function goBackToLibrary() {
     currentPodcast = null;
     window.history.pushState({ page: 'grid' }, '', '/web/');
     navigateTo('grid');
+}
+
+// From player bar: go to the podcast page of the episode that is currently playing
+function goToNowPlayingPodcast() {
+    if (!currentEpisode) {
+        navigateTo('episode');
+        return;
+    }
+    // Resolve podcast from episode: prefer direct id, then allEpisodes, then episodesCache
+    let podcastId = currentEpisode.podcast_id || currentEpisode.podcastId;
+    if (podcastId == null || podcastId === '') {
+        const fromAll = allEpisodes.find(e => String(e.id) === String(currentEpisode.id));
+        if (fromAll) podcastId = fromAll.podcast_id || fromAll.podcastId;
+    }
+    if (podcastId == null || podcastId === '') {
+        for (const [pid, eps] of Object.entries(episodesCache)) {
+            if (eps && eps.some(e => String(e.id) === String(currentEpisode.id))) {
+                podcastId = pid;
+                break;
+            }
+        }
+    }
+    const podcast = podcasts.find(p => String(p.id) === String(podcastId));
+    if (podcast) {
+        openEpisodes(podcast.id);
+        return;
+    }
+    // Last resort: show episode detail with correct podcast if we can resolve it
+    const p = podcasts.find(x => String(x.id) === String(podcastId));
+    if (p) currentPodcast = p;
+    navigateTo('episode');
 }
 
 // Go back to episodes from player
@@ -2806,62 +2846,6 @@ function scrollCategoryRow(button, direction) {
     inner.scrollBy({ left: scrollAmount, behavior: 'smooth' });
 }
 
-// Build HTML for the Trending / Top 10 row (order rotates daily via daily seed)
-// When episode counts aren't loaded yet, show 10 podcasts from a daily shuffle so the row always appears
-function getTrendingRowHtml() {
-    let trending = getTrendingPodcasts(10);
-    if (trending.length === 0) {
-        trending = shuffleWithDailySeed([...podcasts]).slice(0, 10);
-    } else {
-        trending = shuffleWithDailySeed(trending).slice(0, 10);
-    }
-    if (trending.length === 0) return '';
-    const rowPodcasts = trending;
-    return `
-        <div class="homepage-category-row">
-            <div class="homepage-section-header homepage-category-row-header">
-                <h2 class="homepage-section-title">🔥 Top 10 today</h2>
-                <div class="homepage-row-nav-wrap">
-                    <button type="button" class="homepage-row-nav homepage-row-nav-prev" onclick="scrollCategoryRow(this, -1)" aria-label="Scroll left">‹</button>
-                    <button type="button" class="homepage-row-nav homepage-row-nav-next" onclick="scrollCategoryRow(this, 1)" aria-label="Scroll right">›</button>
-                </div>
-            </div>
-            <div class="homepage-category-row-inner">
-                ${rowPodcasts.map(podcast => {
-                    const isFavorite = isPodcastFavorited(podcast.id);
-                    return `
-                        <div class="podcast-card podcast-card-in-row">
-                            <div class="podcast-card-content" onclick="openEpisodes('${podcast.id}')">
-                                <div class="podcast-image-wrap">
-                                    <img 
-                                        src="${podcast.image_url || getPlaceholderImage()}" 
-                                        alt="${escapeHtml(podcast.title || 'Podcast')}"
-                                        class="podcast-image"
-                                        onerror="this.src='${getPlaceholderImage()}'"
-                                    >
-                                </div>
-                                <div class="podcast-info">
-                                    <div class="podcast-title">${escapeHtml(podcast.title || 'Untitled Podcast')}</div>
-                                    ${(() => {
-                                        const cleanedAuthor = podcast.author ? cleanAuthorText(podcast.author) : '';
-                                        if (cleanedAuthor && !shouldHideAuthor(cleanedAuthor)) {
-                                            return `<div class="podcast-author">${escapeHtml(cleanedAuthor)}</div>`;
-                                        }
-                                        return '';
-                                    })()}
-                                </div>
-                            </div>
-                            <button class="btn-podcast-favorite ${isFavorite ? 'favorited' : ''}" onclick="event.stopPropagation(); togglePodcastFavorite('${podcast.id}');" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
-                                ${isFavorite ? '❤️' : '🤍'}
-                            </button>
-                        </div>
-                    `;
-                }).join('')}
-            </div>
-        </div>
-    `;
-}
-
 // Build HTML for all category rows. Category order randomized daily; each podcast appears in at most one row.
 // Always use localStorage for visible categories so the library reflects the last saved preferences.
 function getCategoryRowsHtml() {
@@ -3000,7 +2984,7 @@ function getRecentlyListenedToSectionHtml() {
     `;
 }
 
-// Library view: Recently Listened To (if any), then Top 10 today, then category rows, then full sortable grid
+// Library view: Recently Listened To (if any), then category rows, then Browse All
 function renderLibraryWithCategoryRows() {
     const containerEl = document.getElementById('podcast-container');
     if (!containerEl) return;
@@ -3008,7 +2992,6 @@ function renderLibraryWithCategoryRows() {
         extractCategories();
     }
     let html = getRecentlyListenedToSectionHtml();
-    html += getTrendingRowHtml();
     html += getCategoryRowsHtml();
     html += `
         <div class="homepage-section">
@@ -3574,15 +3557,19 @@ function handleURLParams() {
         sessionStorage.removeItem('pendingRoute');
     }
     
-    // Check for /podcast/[slug] path
+    // Check for /podcast/[slug] path (from shared link or middleware redirect via ?_route=)
     const podcastMatch = path.match(/^\/podcast\/([^\/]+)/);
     if (podcastMatch) {
-        const slug = podcastMatch[1];
-        const podcast = podcasts.find(p => generateSlug(p.title || '') === slug);
+        const slugRaw = podcastMatch[1];
+        const slug = decodeURIComponent(slugRaw).toLowerCase().trim();
+        const podcast = podcasts.find(p => {
+            const titleSlug = generateSlug(p.title || '');
+            return titleSlug === slug || (p.slug && p.slug.toLowerCase() === slug);
+        });
         if (podcast) {
             currentPodcast = podcast;
-            // Update URL to match the path
-            window.history.replaceState({ podcastId: podcast.id, page: 'episodes' }, '', path);
+            const canonicalPath = '/podcast/' + generateSlug(podcast.title || '');
+            window.history.replaceState({ podcastId: podcast.id, page: 'episodes' }, '', canonicalPath);
             navigateTo('episodes');
             loadEpisodesPage();
             return;
@@ -4204,19 +4191,6 @@ function getNewEpisodesFromFavorites(limit = 10) {
         });
     
     return newEpisodes;
-}
-
-// Get trending podcasts (most episodes = most popular)
-function getTrendingPodcasts(limit = 12) {
-    return podcasts
-        .map(podcast => ({
-            podcast,
-            episodeCount: getPodcastEpisodeCount(podcast.id)
-        }))
-        .filter(item => item.episodeCount > 0)
-        .sort((a, b) => b.episodeCount - a.episodeCount)
-        .slice(0, limit)
-        .map(item => item.podcast);
 }
 
 // Load all episodes for search (lazy-loaded only when needed)
@@ -4939,7 +4913,7 @@ async function loadAllEpisodesPage() {
 
 // Open episodes page for a podcast
 async function openEpisodes(podcastId) {
-    currentPodcast = podcasts.find(p => p.id === podcastId);
+    currentPodcast = podcasts.find(p => String(p.id) === String(podcastId));
     
     // Track podcast view
     if (window.analytics && currentPodcast) {
@@ -4957,6 +4931,28 @@ async function openEpisodes(podcastId) {
     loadEpisodesPage();
 }
 
+// Episode title patterns that indicate chapters, acts, or sections (ordered content)
+const CHAPTER_ACT_SECTION_PATTERNS = [
+    /chapter\s+\d+/i,
+    /part\s+\d+/i,
+    /act\s+\d+/i,
+    /section\s+\d+/i,
+    /episode\s+0*1[^\d]/i, // Episode 1, Episode 01 (not Episode 10, 11)
+    /^chapter\s+\d+/i,
+    /^part\s+\d+/i,
+    /^act\s+\d+/i,
+    /^section\s+\d+/i
+];
+
+function hasChaptersOrActsOrSections(episodes) {
+    if (!episodes || episodes.length === 0) return false;
+    const sample = episodes.slice(0, Math.min(5, episodes.length));
+    return sample.some(ep => {
+        const title = (ep.title || '').toLowerCase();
+        return CHAPTER_ACT_SECTION_PATTERNS.some(p => p.test(title));
+    });
+}
+
 // Determine default sort order for a podcast based on its characteristics
 function getDefaultPodcastSortOrder(podcast, episodes = []) {
     if (!podcast) return 'date-desc'; // Default to newest first
@@ -4964,46 +4960,29 @@ function getDefaultPodcastSortOrder(podcast, episodes = []) {
     // Check genre for book-related keywords
     const genres = podcast.genre || [];
     const genreStr = Array.isArray(genres) ? genres.join(' ').toLowerCase() : String(genres || '').toLowerCase();
-    
     const bookKeywords = ['book', 'audiobook', 'literature', 'novel', 'chapter', 'storytelling', 'fiction', 'narrative'];
-    const isBookPodcast = bookKeywords.some(keyword => genreStr.includes(keyword));
-    
-    if (isBookPodcast) {
-        return 'date-asc'; // Books should be oldest first (first chapter first)
+    if (bookKeywords.some(kw => genreStr.includes(kw))) {
+        return 'date-asc'; // Books: oldest first (1 at top)
     }
     
     // Check title for book/chapter indicators
     const titleStr = (podcast.title || '').toLowerCase();
     const titleBookKeywords = ['chapter', 'part 1', 'episode 1', 'book', 'audiobook'];
-    const titleSuggestsBook = titleBookKeywords.some(keyword => titleStr.includes(keyword));
-    
-    if (titleSuggestsBook) {
-        return 'date-asc'; // Books should be oldest first
+    if (titleBookKeywords.some(kw => titleStr.includes(kw))) {
+        return 'date-asc';
     }
     
-    // Check episode titles for chapter/part patterns (strongest indicator)
-    if (episodes && episodes.length > 0) {
-        const episodeTitlePatterns = [
-            /chapter\s+\d+/i,
-            /part\s+\d+/i,
-            /episode\s+0*1[^\d]/i, // Episode 1, Episode 01 (but not Episode 10, 11, etc.)
-            /^chapter\s+\d+/i,
-            /^part\s+\d+/i
-        ];
-        
-        // Check first few episodes for chapter/part patterns
-        const sampleEpisodes = episodes.slice(0, Math.min(5, episodes.length));
-        const hasChapterPattern = sampleEpisodes.some(ep => {
-            const epTitle = (ep.title || '').toLowerCase();
-            return episodeTitlePatterns.some(pattern => pattern.test(epTitle));
-        });
-        
-        if (hasChapterPattern) {
-            return 'date-asc'; // Books/chapters should be oldest first
-        }
+    // Episode titles show chapters/acts/sections → oldest first (1 at top)
+    if (hasChaptersOrActsOrSections(episodes)) {
+        return 'date-asc';
     }
     
-    // Default: newest first (for daily shows, news, etc.)
+    // Podcast title has numbers but no chapters/acts/sections in episodes → newest first
+    if (/\d/.test(podcast.title || '')) {
+        return 'date-desc';
+    }
+    
+    // Default: newest first (daily shows, news, etc.)
     return 'date-desc';
 }
 
@@ -5189,7 +5168,9 @@ function applyPodcastEpisodesDurationFilter() {
 async function loadEpisodesPage() {
     if (!currentPodcast) return;
     
-    // Update page title for this podcast
+    const pageEl = document.getElementById('page-episodes');
+    if (pageEl) pageEl.style.background = '';
+    
     updatePageTitle('episodes');
     
     const loadingEl = document.getElementById('episodes-loading');
@@ -5278,11 +5259,13 @@ async function loadEpisodesPage() {
             const headerHTML = `
                 <div class="episodes-page-header-compact" id="episodes-page-header">
                     <div class="episodes-header-left">
-                        <img src="${latestPodcast.image_url || getPlaceholderImage()}" 
-                             alt="${escapeHtml(latestPodcast.title || '')}" 
-                             class="episodes-page-artwork-compact"
-                             onload="extractColorFromImage(this)"
-                             onerror="this.src='${getPlaceholderImage()}'">
+                        <div class="episodes-page-artwork-wrap">
+                            <img src="${latestPodcast.image_url || getPlaceholderImage()}" 
+                                 alt="${escapeHtml(latestPodcast.title || '')}" 
+                                 class="episodes-page-artwork-compact"
+                                 onload="extractColorFromImage(this)"
+                                 onerror="this.src='${getPlaceholderImage()}'">
+                        </div>
                         <div class="episodes-header-info">
                             <h1 class="episodes-podcast-title-compact">${escapeHtml(latestPodcast.title || '')}</h1>
                             ${latestPodcast.author ? (() => {
@@ -5294,7 +5277,6 @@ async function loadEpisodesPage() {
                     <div class="episodes-header-right">
                         ${episodes.length > 1 ? `
                         <div class="episodes-header-controls">
-                            ${isBook ? '<span class="episodes-order-msg">Default: oldest first (1, 2, 3…).</span>' : ''}
                             <div class="sort-controls-inline">
                                 <label for="podcast-episodes-sort-select-inline" class="sort-label-inline">Sort:</label>
                                 <select id="podcast-episodes-sort-select-inline" class="sort-select-inline" onchange="applyPodcastEpisodesSorting()">
@@ -5362,7 +5344,7 @@ async function loadEpisodesPage() {
                 return `
                     <div class="episode-item episode-item-no-art ${isCompleted ? 'episode-completed' : ''} ${isCurrentEpisode ? 'episode-playing' : ''}" 
                          oncontextmenu="event.preventDefault(); showEpisodeContextMenu(event, '${episode.id}', '${currentPodcast.id}');">
-                        <button class="btn-episode-play ${isEpisodePlaying ? 'playing' : ''}" onclick="event.stopPropagation(); ${isEpisodePlaying ? 'togglePlayPause()' : `playEpisode(${JSON.stringify(episode).replace(/"/g, '&quot;')})`}" title="${isEpisodePlaying ? 'Pause' : 'Play'}">
+                        <button class="btn-episode-play ${isEpisodePlaying ? 'playing' : ''}" onclick="event.stopPropagation(); ${isEpisodePlaying ? 'window.togglePlayPause()' : `window.playEpisodeById('${String(episode.id).replace(/'/g, "\\'")}')`}" title="${isEpisodePlaying ? 'Pause' : 'Play'}">
                             <span class="episode-play-icon" data-episode-id="${episode.id}">${isEpisodePlaying ? '⏸' : '▶'}</span>
                         </button>
                         <div class="episode-item-main" onclick="openEpisodeDetail('${episode.id}', '${currentPodcast.id}')">
@@ -5489,7 +5471,7 @@ function loadPlayerPage() {
                             </svg>
                             <span class="skip-number">-10</span>
                         </button>
-                        <button id="play-pause-btn-player-page" class="btn-play-pause-large" onclick="togglePlayPause()">
+                        <button id="play-pause-btn-player-page" class="btn-play-pause-large" onclick="window.togglePlayPause()">
                             <span id="play-icon-player-page">${isPlaying ? '⏸' : '▶'}</span>
                         </button>
                         <button class="btn-skip-circular-large" onclick="skipForward()" title="Skip forward 30s">
@@ -5899,7 +5881,7 @@ function playEpisodeFromSearch(episode) {
 
 // Play episode
 function playEpisode(episode) {
-    if (!episode.audio_url) {
+    if (!episode || !episode.audio_url) {
         alert('This episode has no audio URL available.');
         return;
     }
@@ -6053,6 +6035,7 @@ function playEpisode(episode) {
     }
     // For episodes page, updatePlayPauseButton() already handles in-place updates
 }
+window.playEpisode = playEpisode;
 
 // Skip backward 10 seconds
 function skipBackward() {
@@ -6140,29 +6123,30 @@ window.toggleAuthorDescription = function(button) {
     }
 };
 
-// Toggle play/pause
+// Toggle play/pause (also on window for inline onclick)
 function togglePlayPause() {
     if (!currentEpisode) return;
+    if (!audioPlayer) return;
     
     if (isPlaying) {
         audioPlayer.pause();
         isPlaying = false;
-        // Track pause
         if (window.analytics && currentPodcast) {
             window.analytics.trackEpisodePause(
-                currentEpisode, 
-                currentPodcast, 
-                audioPlayer.currentTime, 
+                currentEpisode,
+                currentPodcast,
+                audioPlayer.currentTime,
                 audioPlayer.duration
             );
         }
     } else {
-        audioPlayer.play();
+        audioPlayer.play().catch(function (e) { console.warn('Play failed:', e); });
         isPlaying = true;
     }
     updatePlayPauseButton();
-    updateSleepTimerUI(); // Update sidebar timer visibility
+    updateSleepTimerUI();
 }
+window.togglePlayPause = togglePlayPause;
 
 // Helper function to play episode by ID (used by onclick handlers)
 window.playEpisodeById = function(episodeId) {
@@ -6658,7 +6642,7 @@ function getPlaceholderImage() {
     return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iIzE5MUEyNCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM2NjYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=';
 }
 
-// Extract dominant color from image for gradient
+// Extract dominant color from image and apply subtle background tint to podcast page
 window.extractColorFromImage = async function(img) {
     try {
         const canvas = document.createElement('canvas');
@@ -6694,19 +6678,19 @@ window.extractColorFromImage = async function(img) {
             g = Math.floor(g / count);
             b = Math.floor(b / count);
             
-            // Make it slightly darker and more muted for subtle gradient
-            r = Math.floor(r * 0.7);
-            g = Math.floor(g * 0.7);
-            b = Math.floor(b * 0.7);
+            // Keep color muted and dark so background stays subtle
+            r = Math.floor(r * 0.5);
+            g = Math.floor(g * 0.5);
+            b = Math.floor(b * 0.5);
             
-            const headerEl = document.getElementById('episodes-page-header');
-            if (headerEl) {
-                headerEl.style.background = `linear-gradient(180deg, rgba(${r}, ${g}, ${b}, 0.15) 0%, rgba(${r}, ${g}, ${b}, 0) 100%)`;
+            const pageEl = document.getElementById('page-episodes');
+            if (pageEl) {
+                pageEl.style.background = `linear-gradient(180deg, rgba(${r}, ${g}, ${b}, 0.14) 0%, rgba(${r}, ${g}, ${b}, 0.05) 35%, transparent 70%), var(--bg-primary)`;
             }
         }
     } catch (e) {
-        // Fallback if color extraction fails
-        console.log('Color extraction failed, using default');
+        const pageEl = document.getElementById('page-episodes');
+        if (pageEl) pageEl.style.background = '';
     }
 };
 
@@ -6921,13 +6905,17 @@ async function handleEmailConfirmation() {
 // Update auth UI based on user state
 function updateAuthUI(user) {
     const authButton = document.getElementById('auth-button');
+    const signedOutEl = document.getElementById('auth-signed-out');
     if (!authButton) return;
 
     if (user) {
+        signedOutEl.classList.add('hidden');
+        authButton.classList.remove('hidden');
         authButton.textContent = user.email ? user.email.split('@')[0] : 'Account';
         authButton.classList.add('signed-in');
     } else {
-        authButton.textContent = 'Save Progress';
+        signedOutEl.classList.remove('hidden');
+        authButton.classList.add('hidden');
         authButton.classList.remove('signed-in');
         userVisibleCategories = null;
     }
@@ -6986,7 +6974,6 @@ window.toggleAuthModal = async function() {
         }
     } else {
         closeAccountDropdown();
-        switchAuthMode('signup');
         modal.classList.toggle('hidden');
     }
 };
@@ -7009,7 +6996,7 @@ window.openCategoryPreferencesModal = function() {
     if (categories.length === 0) extractCategories();
     const listEl = document.getElementById('category-preferences-list');
     if (!listEl) return;
-    const allCategories = ['Top 10', ...getCategoriesByPopularity()];
+    const allCategories = getCategoriesByPopularity();
     const selected = userVisibleCategories && userVisibleCategories.length > 0 ? userVisibleCategories : null;
     const checkedSet = selected ? new Set(selected) : null;
     listEl.innerHTML = allCategories.map((cat, i) => {
@@ -7099,7 +7086,7 @@ window.switchAuthMode = function(mode) {
         resetForm.classList.remove('hidden');
         modalTitle.textContent = 'Set New Password';
     } else {
-        // Default to signup
+        // signup
         signupForm.classList.remove('hidden');
         modalTitle.textContent = 'Save Progress';
     }

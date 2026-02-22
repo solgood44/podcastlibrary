@@ -1,5 +1,6 @@
 import csv
 import os
+import sys
 import time
 import re
 from datetime import datetime, timedelta, timezone
@@ -14,8 +15,16 @@ from rich.console import Console
 
 load_dotenv()
 
-SUPABASE_URL = os.environ["SUPABASE_URL"]
-SUPABASE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
+def _require_env(name: str) -> str:
+    val = os.environ.get(name, "").strip()
+    if not val:
+        print(f"ERROR: Missing required environment variable: {name}", file=sys.stderr)
+        print("  Set it in GitHub Actions secrets (Settings → Secrets and variables → Actions).", file=sys.stderr)
+        sys.exit(1)
+    return val
+
+SUPABASE_URL = _require_env("SUPABASE_URL")
+SUPABASE_KEY = _require_env("SUPABASE_SERVICE_ROLE_KEY")
 CSV_PATH = os.environ.get("CSV_PATH", "./feeds.csv") or "./feeds.csv"
 # BATCH_SIZE: If set to a positive integer, limits the number of feeds to process.
 # Set REFRESH_BATCH_SIZE environment variable to limit (e.g., "200" for testing)
@@ -465,8 +474,8 @@ def get_active_feed_urls(csv_feed_urls: list[str]) -> set[str]:
         )
 
     feed_to_id = {}
-    for i in range(0, len(csv_feed_urls), batch_size):
-        batch = csv_feed_urls[i : i + batch_size]
+    for i in range(0, len(csv_feed_urls), feed_url_batch_size):
+        batch = csv_feed_urls[i : i + feed_url_batch_size]
         rows = _get_podcasts_batch(batch) or []
         for row in rows:
             feed_to_id[row["feed_url"]] = row["id"]
@@ -478,8 +487,8 @@ def get_active_feed_urls(csv_feed_urls: list[str]) -> set[str]:
 
     # Get max(pub_date) per podcast_id from episodes (PostgREST: group by non-aggregate column)
     id_to_latest = {}
-    for j in range(0, len(podcast_ids), batch_size):
-        id_batch = podcast_ids[j : j + batch_size]
+    for j in range(0, len(podcast_ids), podcast_id_batch_size):
+        id_batch = podcast_ids[j : j + podcast_id_batch_size]
         try:
             # Select podcast_id and max pub_date; filter by podcast_id in batch
             res = retry_db_operation(
@@ -750,5 +759,11 @@ def run_once():
 
 
 if __name__ == "__main__":
-    run_once()
+    try:
+        run_once()
+    except Exception as e:
+        import traceback
+        print("Feed ingestor failed:", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
+        sys.exit(1)
 

@@ -136,6 +136,7 @@
     <!-- Top Bar -->
     <header class="top-bar">
         <button class="btn-menu" onclick="toggleSidebar()">☰</button>
+        <button type="button" class="btn-home" onclick="navigateTo('grid', 'library')" title="Library">🏠</button>
         <div class="top-bar-search-container">
             <input 
                 type="text" 
@@ -147,7 +148,11 @@
             >
         </div>
         <div id="auth-button-container" class="auth-button-container">
-            <button id="auth-button" class="btn-auth" onclick="toggleAuthModal()">Save Progress</button>
+            <div id="auth-signed-out" class="auth-signed-out-ui">
+                <button type="button" class="btn-auth btn-signin" onclick="switchAuthMode('signin'); toggleAuthModal();">Sign in</button>
+                <a href="#" class="auth-create-account-link" onclick="switchAuthMode('signup'); toggleAuthModal(); return false;">Create account</a>
+            </div>
+            <button id="auth-button" class="btn-auth hidden" onclick="toggleAuthModal()">Account</button>
             <div id="account-dropdown" class="account-dropdown hidden">
                 <div class="account-dropdown-email" id="account-dropdown-email"></div>
                 <div class="account-dropdown-stats" id="account-dropdown-stats"></div>
@@ -181,7 +186,7 @@
         <!-- Episodes Page -->
         <div id="page-episodes" class="page hidden">
             <div class="page-header">
-                <button class="btn-back" onclick="goBackToLibrary()">← Back</button>
+                <button class="btn-back" onclick="goBack()">← Back</button>
                 <h1 id="episodes-page-title">Episodes</h1>
             </div>
             <div id="episodes-loading" class="loading hidden">
@@ -452,7 +457,7 @@
     <div id="player-bar" class="player-bar hidden">
         <div class="player-bar-content">
             <div class="player-bar-main">
-                <div class="player-bar-info" onclick="navigateTo('episode')">
+                <div class="player-bar-info" onclick="goToNowPlayingPodcast()">
                     <div class="player-bar-artwork">
                         <img id="player-bar-image" src="" alt="" onerror="this.style.display='none'">
                     </div>
@@ -650,7 +655,7 @@
                 <div id="auth-error" class="auth-error hidden"></div>
                 <div id="auth-success" class="auth-success hidden"></div>
                 
-                <div id="auth-signin-form" class="auth-form hidden">
+                <div id="auth-signin-form" class="auth-form">
                     <div class="auth-form-group">
                         <label for="signin-email">Email</label>
                         <input type="email" id="signin-email" class="auth-input" placeholder="your@email.com">
@@ -675,7 +680,7 @@
                     </p>
                 </div>
 
-                <div id="auth-signup-form" class="auth-form">
+                <div id="auth-signup-form" class="auth-form hidden">
                     <div class="auth-benefits" style="background: var(--bg-tertiary); padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
                         <h3 style="margin: 0 0 0.75rem 0; font-size: 1rem; color: var(--text-primary);">Why save your progress?</h3>
                         <ul style="margin: 0; padding-left: 1.25rem; color: var(--text-secondary); font-size: 0.9rem; line-height: 1.6;">

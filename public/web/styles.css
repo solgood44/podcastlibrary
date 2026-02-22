@@ -83,6 +83,26 @@ body {
     background: var(--bg-hover);
 }
 
+.btn-home {
+    background: none;
+    border: none;
+    font-size: 22px;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 8px;
+    transition: background 0.2s;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    min-height: 40px;
+}
+
+.btn-home:hover {
+    background: var(--bg-hover);
+}
+
 /* On desktop, add left margin to top bar to account for visible sidebar */
 @media (min-width: 769px) {
     .top-bar {
@@ -812,9 +832,35 @@ body {
     margin-bottom: 20px;
 }
 
-/* Category row: horizontal scroll with arrows */
+/* Category row: horizontal scroll with arrows; extend to right edge of viewport */
 .homepage-category-row {
     margin-bottom: 40px;
+}
+
+@media (min-width: 769px) {
+    .homepage-category-row {
+        margin-right: -48px;
+    }
+    .homepage-category-row-inner {
+        padding-right: 24px; /* small gap so last card isn’t flush to viewport */
+    }
+    body:has(.sidebar:not(.open)) .homepage-category-row,
+    body.sidebar-closed .homepage-category-row {
+        margin-right: -40px;
+    }
+    body:has(.sidebar:not(.open)) .homepage-category-row-inner,
+    body.sidebar-closed .homepage-category-row-inner {
+        padding-right: 24px;
+    }
+}
+
+@media (max-width: 768px) {
+    .homepage-category-row {
+        margin-right: -16px;
+    }
+    .homepage-category-row-inner {
+        padding-right: 24px;
+    }
 }
 
 .homepage-category-row-header {
@@ -2537,6 +2583,11 @@ body {
     min-width: 0;
 }
 
+.episodes-page-artwork-wrap {
+    position: relative;
+    flex-shrink: 0;
+}
+
 .episodes-page-artwork-compact {
     width: 120px;
     height: 120px;
@@ -2544,6 +2595,35 @@ body {
     border-radius: 12px;
     object-fit: cover;
     box-shadow: 0 4px 16px var(--shadow-lg);
+    display: block;
+}
+
+.episodes-artwork-play-overlay {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+    transition: transform 0.2s, background 0.2s;
+}
+
+.episodes-artwork-play-overlay:hover {
+    background: var(--accent-hover);
+    transform: scale(1.08);
+}
+
+.episodes-artwork-play-icon {
+    color: white;
+    font-size: 18px;
+    margin-left: 3px;
 }
 
 .episodes-header-info {
@@ -5047,10 +5127,6 @@ body.player-bar-visible .episodes-list-content-compact {
         gap: 12px;
     }
     
-    .suggested-podcast-image {
-        height: 120px;
-    }
-    
     .suggested-podcast-info {
         padding: 8px;
     }
@@ -5108,6 +5184,29 @@ body.player-bar-visible .episodes-list-content-compact {
     align-items: center;
     margin-left: auto;
     position: relative;
+    gap: 12px;
+}
+
+.auth-signed-out-ui {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.auth-signed-out-ui.hidden {
+    display: none;
+}
+
+.auth-create-account-link {
+    font-size: 13px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.auth-create-account-link:hover {
+    color: var(--text-primary);
+    text-decoration: underline;
 }
 
 .account-dropdown {
