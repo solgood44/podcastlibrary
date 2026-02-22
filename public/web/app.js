@@ -3559,22 +3559,20 @@ function handleURLParams() {
         sessionStorage.removeItem('pendingRoute');
     }
     
-    // Clean up URL: remove _route and slug from query so we can set canonical URL after match
-    const newUrl = new URL(window.location.href);
-    if (newUrl.searchParams.has('_route') || newUrl.searchParams.has('slug')) {
-        newUrl.searchParams.delete('_route');
-        newUrl.searchParams.delete('slug');
-        window.history.replaceState({}, '', newUrl.pathname + (newUrl.search || ''));
-    }
-    
     // Check for /podcast/[slug] path (from shared link, middleware redirect, or ?slug=)
+    // Only change URL after we've opened the podcast so clicking a link reliably lands on that show
     const podcastMatch = path.match(/^\/podcast\/([^\/]+)/);
     if (podcastMatch) {
-        const slugRaw = podcastMatch[1];
-        const slug = decodeURIComponent(slugRaw).toLowerCase().trim();
+        let slugRaw = podcastMatch[1];
+        try {
+            slugRaw = decodeURIComponent(slugRaw);
+        } catch (e) {
+            /* use as-is */
+        }
+        const slug = slugRaw.toLowerCase().trim().replace(/\s+/g, '-');
         const podcast = podcasts.find(p => {
             const titleSlug = generateSlug(p.title || '');
-            return titleSlug === slug || (p.slug && p.slug.toLowerCase() === slug);
+            return titleSlug === slug || (p.slug && p.slug.toLowerCase().trim() === slug);
         });
         if (podcast) {
             currentPodcast = podcast;
